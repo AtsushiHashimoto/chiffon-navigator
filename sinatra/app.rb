@@ -1,5 +1,7 @@
 require 'rubygems'
 require 'sinatra'
+require 'json'
+
 require 'lib/default.rb'
 
 get '/' do
@@ -18,17 +20,17 @@ end
 
 post '/navi/:algorithm' do |alg|
 	request.body.rewind
-	data = request.body.read
-
-	prescription;
-	if !navigator.include?(alg) then
+	json_data = JSON.parse(request.body.read) 
+	prescription = {}
+	if !navigators.include?(alg) then
 		# Error!!
 	elsif
-		prescription = navigator[alg].counsel(data)
+		prescription = navigators[alg].counsel(json_data)
 	end
 
 #	validate(prescription)
 
-	return prescription
+	prescription = json_data # only for debug. remove it for developing counsel
+	return JSON.generate(prescription)
 end
 

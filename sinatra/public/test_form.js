@@ -1,3 +1,4 @@
+
 function form2json(form_id){
 	var param = {};
 	var form = $("form#"+form_id);
@@ -27,7 +28,6 @@ function submit2chiffon_navigator(jason_string,navigator_url){
 	var geturl = $.ajax({
 		type: "post",
 		url: navigator_url,
-		Content-Type: "text/plain"
 		data: json_string,
 		error: function(){alert("failed to communicate with the navigator.");},
 		success: function(response){showText2DOMElem("div#prescription",geturl.getAllResponseHeaders()+"\n"+response);}
@@ -48,4 +48,3 @@ function updateTime(){
 	var time = $('#hidden_time').text();
 	$('input#_time').val(time);
 }
-
