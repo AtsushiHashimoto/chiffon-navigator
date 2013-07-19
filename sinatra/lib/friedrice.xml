@@ -1,0 +1,266 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<recipe title="あんかけ炒飯" overview="./image/overview.png">
+	<materials>
+		<objest_group name="材料" id="ingredients">
+			<object name="ご飯" id="rice" size="茶碗" amount="3" unit="杯" img="./image/rice.png" />
+			<object name="卵" id="egg" amount="2" unit="個" img="./image/egg.png"></object>
+			<object name="玉ねぎ" id="onion" amount="1/2" unit="個" img="./image/onion.png"></object>
+			<object name="生姜" id="ginger" size="親指大" amount="1" unit="片" />
+			<object name="ウィンナー" id="sausage" amount="1" unit="本" />
+			<object name="もやし" id="sprout" amount="適量" />
+		</objest_group>
+		<object_group name="炒飯調味料" id="seasoning_friedrice">
+			<object name="醤油" id="soysauce_1" size="小さじ" amount="1" unit="杯" />
+			<object name="鶏がらスープの素" id="chickenstock_1" size="小さじ" amount="1" unit="杯" />
+			<object name="塩こしょう" id="salt_pepper" amount="少々" />
+		</object_group>
+		<object_group name="あん調味料" id="seasoning_starchy">
+			<object name="水" id="water_1" amount="400" unit="cc" />
+			<object name="酒" id="sake" amount="50" unit="cc" />
+			<object name="醤油" id="soysaue_2" size="大さじ" amount="1" unit="杯" />
+			<object name="ごま油" id="sesameoil" size="大さじ" amount="1" unit="杯" />
+			<object name="鶏がらスープの素" id="chickenstock_2" size="大さじ" amount="1" unit="杯" />
+			<object name="塩こしょう" id="salt_pepper" amount="少々" />
+		</object_group>
+		<object_group name="水溶き片栗粉" id="water_starch">
+			<object name="片栗粉" id="starch" size="大さじ" amount="2" unit="杯" />
+			<object name="水" id="water_2" size="大さじ" amount="3" unit="杯" />
+		</object_group>
+	</materials>
+	<directions>
+		<step id="step00" priority="14" navi_text="ご飯と卵黄を混ぜる">
+			<substep navi_text="3杯分のご飯を用意する" order="1" id="substep00_00">
+				<html_contents>炊きたてではないご飯を茶碗3杯分用意してください．茶碗3杯分で2人前相当です．</html_contents>
+				<trigger timing="start" ref="rice" delay="3" />
+				<trigger timing="start" ref="dish_rice" delay="3" />
+			</substep>
+			<substep navi_text="卵を卵黄と卵白に分ける" order="2" id="substep00_01">
+				<html_contents>卵を割り，卵黄と卵白に分けてください．卵白は案を作るときに使用するので取っておくこと．</html_contents>
+				<video path="./video/substep00_01.avi" title="卵黄と卵白の分け方" id="substep00_01_video">
+					<trigger timing="start" ref="egg" delay="5" />
+				</video>
+				<audio path="./audio/substep00_01.wav" id="substep00_01_audio">
+					<trigger timing="start" ref="egg" delay="3" />
+				</audio>
+				<trigger timing="start" ref="egg" delay="0" />
+			</substep>
+			<substep navi_text="ご飯と卵黄を混ぜる" order="3" id="substep00_02">
+				<html_contents />
+				<video path="./video/substep00_02.avi" title="卵黄とご飯の混ぜ具合" id="substep00_02_video">
+					<trigger timing="start" ref="dish_rice" delay="4" />
+				</video>
+				<trigger timing="start" ref="dish_rice" delay="2" />
+			</substep>
+		</step>
+		<step id="step01" priority="13" navi_text="玉ねぎの粗みじん切り">
+			<substep navi_text="皮をむき，水で洗う" order="1" id="substep01_00">
+				<html_contents />
+				<trigger timing="start" ref="onion" delay="4" />
+			</substep>
+			<substep navi_text="天地を落とし，粗みじん切り" order="2" id="substep01_01">
+				<html_contents />
+				<video path="./video/substep01_01.avi" title="玉ねぎのみじん切りの仕方" id="substep01_01_video">
+					<trigger timing="start" ref="knife" delay="3" />
+				</video>
+				<trigger timing="start" ref="knife" delay="2" />
+			</substep>
+		</step>
+		<step id="step02" priority="12" navi_text="生姜のみじん切り">
+			<substep navi_text="スプーンで皮をむく" order="1" id="substep02_00">
+				<html_contents />
+				<video path="./video/substep02_00.avi" title="生姜の皮のむき方" id="substep02_00_video">
+					<trigger timing="start" ref="spoon" delay="3" />
+				</video>
+				<trigger timing="start" ref="ginger" delay="2" />
+				<trigger timing="start" ref="spoon" delay="2" />
+			</substep>
+			<substep navi_text="みじん切り" order="2" id="substep02_01">
+				<html_contents />
+				<video path="./video/substep02_01.avi" title="生姜のみじん切りの仕方" id="substep02_01_video">
+					<trigger timing="start" ref="knife" delay="3" />
+				</video>
+				<trigger timing="start" ref="knife" delay="1" />
+			</substep>
+		</step>
+		<step id="step03" priority="11" navi_text="ウィンナーの薄切り">
+			<substep navi_text="薄切り" order="1" id="substep03_00">
+				<html_contents />
+				<trigger timing="start" ref="sausage" delay="0" />
+			</substep>
+		</step>
+		<step id="step04" priority="10" navi_text="ご飯と卵黄を炒める">
+			<parent ref="step00" />
+			<substep navi_text="鍋を熱してごま油を引く" order="1" id="substep04_00">
+				<html_contents />
+				<trigger timing="start" ref="fryingpan" delay="0" />
+				<trigger timing="start" ref="sesameoil" delay="0" />
+			</substep>
+			<substep navi_text="ご飯と卵黄を炒める" order="2" id="substep04_01">
+				<html_contents />
+				<video path="./video/substep04_00.avi" title="ご飯と卵黄の炒め具合" id="substep04_00_video">
+					<trigger timing="start" ref="dish_rice" delay="0" />
+				</video>
+				<trigger timing="start" ref="dish_rice" delay="0" />
+			</substep>
+		</step>
+		<step id="step05" chain="step04" priority="9" navi_text="玉ねぎなどを加え炒める">
+			<parent ref="step01 step02 step03 step04" />
+			<substep navi_text="玉ねぎなどを加え炒める" order="1" id="substep04_00">
+				<html_contents />
+				<video path="./video/substep04_00.avi" title="野菜を加えさらに炒める" id="substep04_00_video">
+					<trigger timing="start" ref="dish_vegetable" delay="0" />
+					<trigger timing="start" ref="board" delay="0" />
+				</video>
+				<trigger timing="start" ref="dish_vegetable" delay="0" />
+				<trigger timing="start" ref="board" delay="0" />
+				<notification id="">
+					<html_contents />
+					<audio path="" id="">
+						<trigger timing="" ref="" delay="" />
+					</audio>
+					<trigger timing="" ref="" delay="" />
+				</notification>
+			</substep>
+		</step>
+		<step id="step06" chain="step05" priority="8" navi_text="醤油，塩こしょうなどで味付け">
+			<parent ref="step05" />
+			<substep navi_text="醤油，塩こしょうなどで味付け" order="1" id="substep05_00">
+				<html_contents />
+				<audio path="./audio/substep05_00.wav" id="substep05_00_audio">
+					<trigger timing="start" ref="saysauce_1" delay="0" />
+					<trigger timing="start" ref="chickenstock_1" delay="0" />
+					<trigger timing="start" ref="salt_pepper" delay="0"></trigger>
+				</audio>
+				<trigger timing="start" ref="saysauce_1" delay="0" />
+				<trigger timing="start" ref="chickenstock_1" delay="0" />
+				<trigger timing="start" ref="salt_pepper" delay="0"></trigger>
+			</substep>
+		</step>
+		<step id="step07" priority="7" navi_text="炒飯を皿に盛りつける">
+			<parent ref="step06" />
+			<substep navi_text="炒飯を皿に盛り付ける" order="1" id="substep06_00">
+				<html_contents />
+				<trigger timing="start" ref="dish_fryedrice" delay="0" />
+			</substep>
+		</step>
+		<step id="step08" priority="6" navi_text="もやしを炒める">
+			<substep navi_text="もやしを洗う" order="1" id="substep08_00">
+				<html_contents />
+				<trigger timing="start" ref="sprout" delay="0" />
+			</substep>
+			<substep navi_text="鍋にごま油を引く" order="2" id="substep08_01">
+				<html_contents />
+				<trigger timing="start" ref="sesameoil" delay="0" />
+			</substep>
+			<substep navi_text="もやしを炒める" order="3" id="substep08_02">
+				<html_contents />
+				<trigger timing="start" ref="sprout" delay="0" />
+			</substep>
+		</step>
+		<step id="step09" priority="5" navi_text="水，酒を加え煮る">
+			<parent ref="step08" />
+			<substep navi_text="水と酒を加え煮る" order="1" id="substep09_00">
+				<html_contents />
+				<video path="./video/susbtep09_00.avi" title="あんの煮詰め具合" id="substep09_99_video">
+					<trigger timing="start" ref="water_1" delay="5"></trigger>
+					<trigger timing="start" ref="sake" delay="5" />
+				</video>
+				<audio path="./audio/substep09_00.wav" id="substep09_00_audio">
+					<trigger timing="start" ref="water_1" delay="3"></trigger>
+					<trigger timing="start" ref="sake" delay="3" />
+				</audio>
+				<trigger timing="start" ref="water_1" delay="0"></trigger>
+				<trigger timing="start" ref="sake" delay="0" />
+				<notification id="substep09_00_notification">
+					<html_contents />
+					<audio path="./audio/substep09_00_notification.wav" id="substep09_00_notification_audio">
+						<trigger timing="start" ref="water" delay="300"></trigger>
+						<trigger timing="start" ref="sake" delay="300" />
+					</audio>
+					<trigger timing="start" ref="water" delay="300"></trigger>
+					<trigger timing="start" ref="sake" delay="300" />
+				</notification>
+			</substep>
+		</step>
+		<step id="step10" chain="step09" priority="4" navi_text="醤油などで味付け">
+			<parent ref="step09" />
+			<substep navi_text="醤油などで味付けする" order="1" id="substep10_00">
+				<html_contents />
+				<audio path="./audio/substep10_00.wav" id="substep10_00_audio">
+					<trigger timing="start" ref="soysauce_2" delay="0" />
+					<trigger timing="start" ref="chickenstock_2" delay="0"></trigger>
+					<trigger timing="start" ref="sesameoil" delay="0" />
+				</audio>
+				<trigger timing="start" ref="soysauce_2" delay="0" />
+				<trigger timing="start" ref="chickenstock_2" delay="0"></trigger>
+				<trigger timing="start" ref="sesameoil" delay="0" />
+			</substep>
+		</step>
+		<step id="step11" chain="step10" priority="3" navi_text="水溶き片栗粉でとろみをつける">
+			<parent ref="step10" />
+			<substep navi_text="水溶き片栗粉を作る" order="1" id="substep11_00">
+				<html_contents />
+				<audio path="./audio/substep11_00.wav" id="substep11_00_audio">
+					<trigger timing="start" ref="starch" delay="0" />
+					<trigger timing="start" ref="water_2" delay="0" />
+				</audio>
+				<trigger timing="start" ref="starch" delay="0" />
+				<trigger timing="start" ref="water_2" delay="0" />
+			</substep>
+			<substep navi_text="水溶き片栗粉を回し入れる" order="2" id="substep11_01">
+				<html_contents />
+				<video path="./video/substep11_01.avi" title="水溶き片栗粉でとろみをつける" id="substep11_01_video">
+					<trigger timing="start" ref="dish_starch" delay="0" />
+				</video>
+				<trigger timing="start" ref="dish_starch]" delay="0" />
+			</substep>
+		</step>
+		<step id="step12" chain="step11" priority="2" navi_text="卵白を加える">
+			<parent ref="step11" />
+			<substep navi_text="卵白を回し入れる" order="1" id="substep12_00">
+				<html_contents />
+				<video path="./video/substep12_00.avi" title="卵白を回し入れる" id="substep12_00_video">
+					<trigger timing="start" ref="dish_egg" delay="0" />
+				</video>
+				<trigger timing="start" ref="dish_egg" delay="0" />
+			</substep>
+		</step>
+		<step id="step13" priority="1" navi_text="あんを炒飯にかけて完成">
+			<parent ref="step07 step12" />
+			<substep navi_text="あんを炒飯にかける" order="1" id="substep13_00">
+				<html_contents />
+				<audio path="./audio/finish.wav" id="finish_audio">
+					<trigger timing="start" ref="dish_fryedrice" delay="0" />
+				</audio>
+				<trigger timing="start" ref="dish_fryedrice" delay="0" />
+			</substep>
+		</step>
+	</directions>
+	<event id="knife">
+		<!--包丁-->
+	</event>
+	<event id="spoon">
+		<!--スプーン-->
+	</event>
+	<event id="fryingpan">
+		<!--フライパン-->
+	</event>
+	<event id="dish_rice">
+		<!--ご飯用の器-->
+	</event>
+	<event id="dish_egg">
+		<!--卵用の器-->
+	</event>
+	<event id="dish_vegetable">
+		<!--野菜用の器-->
+	</event>
+	<event id="dish_fryedrice">
+		<!--炒飯用の器-->
+	</event>
+	<event id="dish_starch">
+		<!--片栗粉用の器-->
+	</event>
+	<event id="board">
+		<!--まな板-->
+	</event>
+</recipe>

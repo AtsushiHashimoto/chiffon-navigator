@@ -30,7 +30,7 @@ post '/navi/:algorithm' do |alg|
 
 #	validate(prescription)
 
-	prescription = json_data # only for debug. remove it for developing counsel
+#	prescription = json_data # only for debug. remove it for developing counsel
 	return JSON.generate(prescription)
 end
 
