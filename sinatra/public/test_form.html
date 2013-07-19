@@ -14,14 +14,14 @@
 
 </head>
 
-<body>
+<body onLoad="updateTime();">
 <h1>Chiffon Navigator Tester</h1>
 <div id="form">
 <form id="request_form" action="javascript:form_click('request_form','http://130.54.15.172:4567/navi/default')" method="post">
 
 <p>
 セッションID<br/>
-<input type="text" name="session_id" size="40" value="testuser_testrecipe_20130713_101010_213"/>
+<input type="text" name="session_id" size="40" value="testuser_friedrice_20130713_101010_213"/>
 </p>
 
 <p>
@@ -31,19 +31,26 @@
 
 <p>
 入力の状況<br/>
-<select name="situation" value="NAVI_MENU">
-<option value="NAVI_MENU">NAVI_MENU</option>
-<option value="EXTERNAL_INPUT">EXTERNAL_INPUT</option>
-<option value="CHANNEL">CHANNEL</option>
-<option value="CHECK">CHECK</option>
+<select name="situation" value="START">
 <option value="START">START</option>
+<option value="CHANNEL">CHANNEL</option>
+<option value="NAVI_MENU">NAVI_MENU</option>
+<option value="CHECK">CHECK</option>
+<option value="EXTERNAL_INPUT">EXTERNAL_INPUT</option>
 <option value="END">END</option>
 </select>
 </p>
 
 <p>
 入力内容<br/>
-<textarea name="operation_contents" rows="4" cols="40"></textarea>
+<textarea name="operation_contents" rows="7" cols="80">
+START: recipe.xmlの中身（テキストデータ）<br/>
+CHANNEL: GUIDE | OVERVIEW | MATERIALS
+NAVI_MENU: stepのID | substepのID
+CHECK: stepのID | audioのID | videoのID
+EXTERNAL_INPUT: 任意の文字列
+END: 空の文字列
+</textarea>
 </p>
 
 <p>
