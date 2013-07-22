@@ -20,7 +20,7 @@ class StartAction
 		`touch records/#{@session_id}/#{@session_id}_recipe.xml`
 		`touch records/#{@session_id}/#{@session_id}_table.txt`
 		`touch records/#{@session_id}/#{@session_id}_mode.txt`
-		`touch records/#{@session_id}/#{@session_id}_sortedstep.txt` # stepをpriorityの順にソートしたもの
+		`touch records/#{@session_id}/#{@session_id}_sortedstep.txt`
 
 		fo = open("records/#{@session_id}/hoge.xml", "w")
 		fo.puts(contents)

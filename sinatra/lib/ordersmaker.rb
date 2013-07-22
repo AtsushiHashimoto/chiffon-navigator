@@ -361,8 +361,9 @@ class OrdersMaker
 	end
 
 	def modeUpdate_externalinput(time, id)
-		if id == "Cancel:notification" then
-#			@hash_mode["notification"]["mode"][][0] = "STOP"
+		element_name = searchElementName(@session_id, id)
+		if element_name == "notification"
+			@hash_mode["notification"]["mode"][id][0] = "STOP"
 		else
 			# Find substep which use input object as trigger.
 			next_substep = nil
