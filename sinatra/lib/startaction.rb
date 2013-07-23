@@ -4,7 +4,7 @@ require 'rubygems'
 require 'json'
 require 'rexml/document'
 
-require 'lib/utils.rb'
+require './lib/utils.rb'
 
 class StartAction
 	def initialize(input)
@@ -22,6 +22,7 @@ class StartAction
 		`touch records/#{@session_id}/#{@session_id}_mode.txt`
 		`touch records/#{@session_id}/#{@session_id}_sortedstep.txt`
 
+		p contents
 		fo = open("records/#{@session_id}/hoge.xml", "w")
 		fo.puts(contents)
 		fo.close()

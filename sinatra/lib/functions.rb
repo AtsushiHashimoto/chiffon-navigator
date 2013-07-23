@@ -1,8 +1,8 @@
 #!/usr/bin/ruby
 
-require 'lib/utils.rb'
-require 'lib/startaction.rb'
-require 'lib/ordersmaker.rb'
+require './lib/utils.rb'
+require './lib/startaction.rb'
+require './lib/ordersmaker.rb'
 
 def navi_menu(jason_input)
 	maker = OrdersMaker.new(jason_input["session_id"])

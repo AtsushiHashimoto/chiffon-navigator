@@ -4,7 +4,7 @@ require 'rubygems'
 require 'json'
 require 'rexml/document'
 
-require 'lib/utils.rb'
+require './lib/utils.rb'
 
 class OrdersMaker
 	def initialize(input)
@@ -407,16 +407,57 @@ class OrdersMaker
 					break
 				end
 			}
+			current_substep = nil
 			if next_substep == nil then
-				# Do nothing
-			else
-				current_substep = nil
+#				current_substep = nil
 				@hash_mode["substep"]["mode"].each{|key, value|
 					if value[2] == "CURRENT" then
 						current_substep = key
 						break
 					end
 				}
+				if @hash_mode["substep"]["mode"][current_substep][0] == "ABLE"
+					if @doc.elements["//substep[@id=\"#{current_substep}\"]"].next_sibling_node != nil
+						next_substep = @doc.elements["//substep[@id=\"#{current_substep}\"]"].next_sibling_node.attributes.get_attribute("id").value
+					else
+						@sorted_step.each{|v|
+							if @hash_mode["step"]["mode"][v[1]][0] == "ABLE"
+								@doc.get_elements("//step[@id=\"#{v[1]}\"]/substep").each{|node|
+									substep_id = node.attributes.get_attribute("id").value
+									if @hash_mode["substep"]["mode"][substep_id][1] == "NOT_YET"
+										next_substep = substep_id
+										break
+									end
+								}
+								break
+							end
+						}
+					end
+				else
+					@sorted_step.each{|v|
+						if @hash_mode["step"]["mode"][v[1]][0] == "ABLE"
+							@doc.get_elements("//step[@id=\"#{v[1]}\"]/substep").each{|node|
+								substep_id = node.attributes.get_attribute("id").value
+								if @hash_mode["substep"]["mode"][substep_id][1] == "NOT_YET"
+									next_substep = substep_id
+									break
+								end
+							}
+							break
+						end
+					}
+				end
+			end
+			if next_substep == nil
+				# Do nothing
+			else
+#				current_substep = nil
+#				@hash_mode["substep"]["mode"].each{|key, value|
+#					if value[2] == "CURRENT" then
+#						current_substep = key
+#						break
+#					end
+#				}
 				# If current substep is next substep, no need to change CURRENT.
 				# Update CURRENT if current substep is NOT next substep.
 				if next_substep != current_substep then
