@@ -90,6 +90,7 @@ class OrdersMaker
 							@hash_mode[v]["mode"][key][1] = finish_time
 						}
 					else
+						#@hash_mode[v]["mode"][key][1] = ?
 						return []
 					end
 				end
