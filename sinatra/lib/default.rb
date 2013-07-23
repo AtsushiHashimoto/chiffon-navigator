@@ -1,4 +1,5 @@
-require './lib/functions.rb'
+$LOAD_PATH.push(File.dirname(__FILE__))
+require 'lib/functions.rb'
 
 class DefaultNavigator
 
@@ -18,7 +19,6 @@ class DefaultNavigator
 			when "CHECK"
 				orders = check(jason_input)
 			when "START"
-				p "#############"
 				orders = start(jason_input)
 			when "END"
 				orders = finish(jason_input)

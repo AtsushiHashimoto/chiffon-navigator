@@ -4,7 +4,8 @@ require 'rubygems'
 require 'json'
 require 'rexml/document'
 
-require './lib/utils.rb'
+$LOAD_PATH.push(File.dirname(__FILE__))
+require 'lib/utils.rb'
 
 class OrdersMaker
 	def initialize(input)
@@ -363,7 +364,11 @@ class OrdersMaker
 	def modeUpdate_externalinput(time, id)
 		element_name = searchElementName(@session_id, id)
 		if element_name == "notification"
-			@hash_mode["notification"]["mode"][id][0] = "STOP"
+			if @hash_mode["notification"]["mode"][id][0] == "NOT_YET"
+				@hash_mode["notification"]["mode"][id][0] = "CURRENT"
+			elsif @hash_mode["notification"]["mode"][id][0] == "KEEP"
+				@hash_mode["notification"]["mode"][id][0] = "STOP"
+			end
 		else
 			# Find substep which use input object as trigger.
 			next_substep = nil
@@ -389,7 +394,7 @@ class OrdersMaker
 				elsif @hash_mode["step"]["mode"][v[1]][1] == "NOT_YET" and @hash_mode["step"]["mode"][v[1]][2] == "CURRENT" then
 					@doc.get_elements("//step[@id=\"#{v[1]}\"]/substep").each{|node|
 						substep_id = node.attributes.get_attribute("id").value
-						if @hash_mode["substep"]["mode"][substep_id][1] == "NOT_YET" then
+						if @hash_mode["substep"]["mode"][substep_id][1] == "NOT_YET" and @hash_mode["substep"]["mode"][substep_id][0] == "ABLE" then
 							@doc.get_elements("//substep[@id=\"#{substep_id}\"]/trigger").each{|node2|
 								if node2.attributes.get_attribute("ref").value == id then
 									next_substep = node2.parent.attributes.get_attribute("id").value
@@ -420,8 +425,9 @@ class OrdersMaker
 					if @doc.elements["//substep[@id=\"#{current_substep}\"]"].next_sibling_node != nil
 						next_substep = @doc.elements["//substep[@id=\"#{current_substep}\"]"].next_sibling_node.attributes.get_attribute("id").value
 					else
+						parent_id = @doc.elements["//substep[@id=\"#{current_substep}\"]"].parent.attributes.get_attribute("id").value
 						@sorted_step.each{|v|
-							if @hash_mode["step"]["mode"][v[1]][0] == "ABLE"
+							if parent_id != v[1] and @hash_mode["step"]["mode"][v[1]][0] == "ABLE"
 								@doc.get_elements("//step[@id=\"#{v[1]}\"]/substep").each{|node|
 									substep_id = node.attributes.get_attribute("id").value
 									if @hash_mode["substep"]["mode"][substep_id][1] == "NOT_YET"
@@ -451,13 +457,13 @@ class OrdersMaker
 			if next_substep == nil
 				# Do nothing
 			else
-#				current_substep = nil
-#				@hash_mode["substep"]["mode"].each{|key, value|
-#					if value[2] == "CURRENT" then
-#						current_substep = key
-#						break
-#					end
-#				}
+				current_substep = nil
+				@hash_mode["substep"]["mode"].each{|key, value|
+					if value[2] == "CURRENT" then
+						current_substep = key
+						break
+					end
+				}
 				# If current substep is next substep, no need to change CURRENT.
 				# Update CURRENT if current substep is NOT next substep.
 				if next_substep != current_substep then
@@ -466,6 +472,15 @@ class OrdersMaker
 					@hash_mode["substep"]["mode"][current_substep][1] = "is_finished"
 					@hash_mode["substep"]["mode"][current_substep][2] = "NOT_CURRENT"
 					current_step = @doc.elements["//substep[@id=\"#{current_substep}\"]"].parent.attributes.get_attribute("id").value
+					media = ["audio", "video"]
+					media.each{|v|
+						@doc.get_elements("//substep[@id=\"#{current_substep}\"]/#{v}").each{|node|
+							media_id = node.attributes.get_attribute("id").value
+							if @hash_mode[v]["mode"][media_id][0] == "CURRENT"
+								@hash_mode[v]["mode"][media_id][0] = "STOP"
+							end
+						}
+					}
 					# Update current step to NOT_CURRENT
 					@hash_mode["step"]["mode"][current_step][2] = "NOT_CURRENT"
 					# If current substep is last in parent step, update parent step to is_finished(=1)
@@ -487,8 +502,8 @@ class OrdersMaker
 					media.each{|v|
 						@doc.get_elements("//substep[@id=\"#{next_substep}\"]/#{v}").each{|node|
 							media_id = node.attributes.get_attribute("id").value
-							if @hash_mode[v]["mode"][media_id] == "NOT_YET" then
-								@hash_mode[v]["mode"][media_id] = "CURRENT"
+							if @hash_mode[v]["mode"][media_id][0] == "NOT_YET" then
+								@hash_mode[v]["mode"][media_id][0] = "CURRENT"
 							end
 						}
 					}
@@ -503,8 +518,8 @@ class OrdersMaker
 					media.each{|v|
 						@doc.get_elements("//substep[@id=\"#{next_substep}\"]/#{v}").each{|node|
 							media_id = node.attributes.get_attribute("id").value
-							if @hash_mode[v]["mode"][media_id] == "NOT_YET" then
-								@hash_mode[v]["mode"][media_id] = "CURRENT"
+							if @hash_mode[v]["mode"][media_id][0] == "NOT_YET" then
+								@hash_mode[v]["mode"][media_id][0] = "CURRENT"
 							end
 						}
 					}
@@ -598,178 +613,285 @@ class OrdersMaker
 	end
 
 	def modeUpdate_check(time, id)
-		# Update checked step(/substep) to is_finished(=1)
-		# Also update media which correspond to above substep to FINISHED
-		### Fundamentally, we should update media to FINISHED by cancel function.
-		### But in this phase, we may have to update "NOT_CURRENT" media to is_finished.
-		### So, we especially update media in this function.
 		element_name = searchElementName(@session_id, id)
+		# チェックされたものによって場合分け．
 		case element_name
-		when "audio"
+		when "audio" # 再生待ちをSTOPに．
 			@hash_mode["audio"]["mode"][id][0] = "STOP"
-		when "video"
+		when "video" # 再生待ちをSTOPに．
 			@hash_mode["video"]["mode"][id][0] = "STOP"
 		when "step"
-			# Update checked step to is_finished(=1)
-			@hash_mode["step"]["mode"][id][1] = "is_finished"
-			# If checked step is ABLE, update to OTHERS
-			if @hash_mode["step"]["mode"][id][0] == "ABLE" then
-				@hash_mode["step"]["mode"][id][0] = "OTHERS"
-			end
-			# Update substeps which included in checked step to is_finished(=1)
-			@doc.get_elements("//step[@id=\"#{id}\"]/substep").each{|node|
-				substep_id = node.attributes.get_attribute("id").value
-				@hash_mode["substep"]["mode"][substep_id][1] = "is_finished"
-				@hash_mode["substep"]["mode"][substep_id][0] = "OTHERS"
-				# Also update media to FINISHED
-				# If media is CURRENT or KEEP, it may be presented now. So update it to STOP.
-				media = ["audio", "video", "notification"]
-				media.each{|v|
-					@doc.get_elements("//substep[@id=\"#{substep_id}\"]/#{v}").each{|node|
-						media_id = node.attributes.get_attribute("id").value
-						if @hash_mode[v]["mode"][media_id][0] == "NOT_YET" then
-							@hash_mode[v]["mode"][media_id][0] = "FINISHED"
-						elsif @hash_mode[v]["mode"][media_id][0] == "CURRENT" or @hash_mode[v]["mode"][media_id][0] == "KEEP" then
-							@hash_mode[v]["mode"][media_id][0] = "STOP"
-						end
-					}
-				}
-			}
-			# Update some step to ABLE
-			current_step = nil
-			@doc.get_elements("//step").each{|node|
-				step_id = node.attributes.get_attribute("id").value
-				if @hash_mode["step"]["mode"][step_id][2] == "CURRENT" then
-					current_step = step_id
-					break
-				end
-			}
-			@hash_mode["step"]["mode"].each{|key, value|
-				# Search ABLE step from steps which is NOT is_finished(=1).
-				if value[1] == "NOT_YET" then
-					# If the step has no parent step, update it to ABLE.
-					if @doc.elements["//step[@id=\"#{key}\"]/parent"] == nil then
-						@hash_mode["step"]["mode"][key][0] = "ABLE"
-					else
-						flag = -1
-						@doc.elements["//step[@id=\"#{key}\"]/parent"].attributes.get_attribute("ref").value.split(" ").each{|v|
-							if @hash_mode["step"]["mode"].key?(v) then
-								if @hash_mode["step"]["mode"][v][1] == "is_finished" then
-									flag = 1
-								else
-									if v == current_step and @hash_mode["step"]["mode"][current_step][0] == "ABLE" then
-										flag = 1
-									else
-										flag = -1
-									end
-								end
+			# is_finishedまたはNOT_YETの操作．
+			if @hash_mode["step"]["mode"][id][1] == "NOT_YET" # NOT_YETならis_finishedに．
+				# チェックされたstepをis_finishedに．
+				@hash_mode["step"]["mode"][id][1] = "is_finished"
+				# チェックされたstepに含まれるsubstepを全てis_finishedに．
+				@doc.get_elements("//step[@id=\"#{id}\"]/substep").each{|node|
+					substep_id = node.attributes.get_attribute("id").value
+					@hash_mode["substep"]["mode"][substep_id][1] = "is_finished"
+					# substepに含まれるメディアをFINISHEDにする．
+					# もしも現状でCURRENTまたはKEEPだったら，再生待ちまたは再生中なのでSTOPにする．
+					media = ["audio", "video", "notification"]
+					media.each{|v|
+						@doc.get_elements("//substep[@id=\"#{substep_id}\"]/#{v}").each{|node|
+							media_id = node.attributes.get_attribute("id").value
+							if @hash_mode[v]["mode"][media_id][0] == "NOT_YET"
+								@hash_mode[v]["mode"][media_id][0] = "FINISHED"
+							elsif @hash_mode[v]["mode"][media_id][0] == "CURRENT" || @hash_mode[v]["mode"][media_id][0] == "KEEP"
+								@hash_mode[v]["mode"][media_id][0] = "STOP"
 							end
 						}
-						if flag == 1 then
-							@hash_mode["step"]["mode"][key][0] = "ABLE"
-						end
-					end
-				end
-			}
-		when "substep"
-			parent_step = @doc.elements["//substep[@id=\"#{id}\"]"].parent.attributes.get_attribute("id").value
-			media = ["audio", "video", "notification"]
-			# Update checked substep and all previous substep to is_finished(=1).
-			@doc.get_elements("//step[@id=\"#{parent_step}\"]/substep").each{|node|
-				child_substep = node.attributes.get_attribute("id").value
-				@hash_mode["substep"]["mode"][child_substep][1] = "is_finished"
-				@hash_mode["substep"]["mode"][child_substep][0] = "OTHERS"
-				# Also update media to FINISHED
-				# If media is CURRENT or KEEP, it may be presented now. So update it to STOP.
-				media.each{|v|
-					@doc.get_elements("//substep[@id=\"#{child_substep}\"]/#{v}").each{|node2|
-						media_id = node2.attributes.get_attribute("id").value
-						if @hash_mode[v]["mode"][media_id][0] == "NOT_YET" then
-							@hash_mode[v]["mode"][media_id][0] = "FINISHED"
-						elsif @hash_mode[v]["mode"][media_id][0] == "CURRENT" or @hash_mode[v]["mode"][media_id][0] == "KEEP" then
-							@hash_mode[v]["mode"][media_id][0] = "STOP"
-						end
 					}
 				}
-				if child_substep == id then
+				#
+				#
+				# 本当は，チェックされたstepがparentに持つstepもis_finishedにしなければならない．
+				# 
+				#
+			else # is_finishedならNOT_YETに．
+				# チェックされたstepをNOT_YETに．
+				@hash_mode["step"]["mode"][id][1] = "NOT_YET"
+				# チェックされたstepに含まれるsubstepを全てNOT_YETに．
+				@doc.get_elements("//step[@id=\"#{id}\"]/substep").each{|node|
+					substep_id = node.attributes.get_attribute("id").value
+					@hash_mode["substep"]["mode"][substep_id][1] = "NOT_YET"
+					# substepに含まれるメディアをNOT_YETにする．
+					media = ["audio", "video", "notification"]
+					media.each{|v|
+						@doc.get_elements("//substep[@id=\"#{substep_id}\"]/#{v}").each{|node|
+							media_id = node.attributes.get_attribute("id").value
+							@hash_mode[v]["mode"][media_id][0] = "NOT_YET"
+						}
+					}
+				}
+				# チェックされたstepをparentに持つis_finishedなstepを全てNOT_YETにする．
+				@hash_mode["step"]["mode"].each{|key, value|
+					if value[1] == "is_finished"
+						if @doc.elements["//step[@id=\"#{key}\"]/parent"] != nil then
+							@doc.elements["//step[@id=\"#{key}\"]/parent"].attributes.get_attribute("ref").value.split(" ").each{|v|
+								if v == id
+									@hash_mode["step"]["mode"][key][1] = "NOT_YET"
+									# NOT_YETにされたstepに含まれるsubstepを全てNOT_YETに．
+									@doc.get_elements("//step[@id=\"#{key}\"]/substep").each{|node|
+										substep_id = node.attributes.get_attribute("id").value
+										@hash_mode["substep"]["mode"][substep_id][1] = "NOT_YET"
+										# substepに含まれるメディアをNOT_YETにする．
+										media = ["audio", "video", "notification"]
+										media.each{|v|
+											@doc.get_elements("//substep[@id=\"#{substep_id}\"]/#{v}").each{|node|
+												media_id = node.attributes.get_attribute("id").value
+												@hash_mode[v]["mode"][media_id][0] = "NOT_YET"
+											}
+										}
+									}
+									break
+								end
+							}
+						end
+					end
+				}
+			end
+			# ABLEまたはOTHERSの操作のために，CURRENTなstepとsubstepのidを調べる．
+			current_step = nil
+			current_substep = nil
+			@hash_mode["step"]["mode"].each{|key, value|
+				if @hash_mode["step"]["mode"][key][2] == "CURRENT"
+					current_step = key
+					@doc.get_elements("//step[@id=\"#{key}\"]/substep").each{|node|
+						substep_id = node.attributes.get_attribute("id").value
+						if @hash_mode["substep"]["mode"][substep_id][2] == "CURRENT"
+							current_substep = substep_id
+							break
+						end
+					}
 					break
 				end
 			}
-			# If next substep is not is_finished, update next substep to ABLE.
-			if @doc.elements["//substep[@id=\"#{id}\"]"].next_sibling_node != nil then
-				next_substep = @doc.elements["//substep[@id=\"#{id}\"]"].next_sibling_node.attributes.get_attribute("id").value
-				if @hash_mode["substep"]["mode"][next_substep][1] == "NOT_YET" then
-					@hash_mode["substep"]["mode"][next_substep][0] = "ABLE"
-				end
-			end
-			# If all of next(/previous) substep is is_finished(=1), update parent step to is_finished(=1) and OTHERS.
-			flag = -1
-			@doc.get_elements("//step[@id=\"#{parent_step}\"]/substep").each{|node|
-				child_substep = node.attributes.get_attribute("id").value
-				if @hash_mode["substep"]["mode"][child_substep][1] == "NOT_YET" then
-					flag = 1
+			# ABLEまたはOTHERSの操作．
+			@hash_mode = set_ABLEorOTHERS(@doc, @hash_mode, current_step, current_substep)
+			# 可能なsubstepに遷移する
+			@hash_mode = go2current(@doc, @hash_mode, @sorted_step, current_step, current_substep)
+			# 再度ABLEの判定を行う
+			current_step = nil
+			current_substep = nil
+			@hash_mode["step"]["mode"].each{|key, value|
+				if @hash_mode["step"]["mode"][key][2] == "CURRENT"
+					current_step = key
+					@doc.get_elements("//step[@id=\"#{key}\"]/substep").each{|node|
+						substep_id = node.attributes.get_attribute("id").value
+						if @hash_mode["substep"]["mode"][substep_id][2] == "CURRENT"
+							current_substep = substep_id
+							break
+						end
+					}
+					break
 				end
 			}
-			if flag == -1 then
-				@hash_mode["step"]["mode"][parent_step][1] = "is_finished"
-				@hash_mode["step"]["mode"][parent_step][0] = "OTHERS"
-				# Update some step to ABLE
-				current_step = nil
-				@doc.get_elements("//step").each{|node|
-					step_id = node.attributes.get_attribute("id").value
-					if @hash_mode["step"]["mode"][step_id][2] == "CURRENT" then
-						current_step = step_id
+			# ABLEまたはOTHERSの操作．
+			@hash_mode = set_ABLEorOTHERS(@doc, @hash_mode, current_step, current_substep)
+		when "substep"
+			# is_finishedまたはNOT_YETの操作．
+			if @hash_mode["substep"]["mode"][id][1] == "NOT_YET" # NOT_YETならばis_finishedに．
+				parent_step = @doc.elements["//substep[@id=\"#{id}\"]"].parent.attributes.get_attribute("id").value
+				media = ["audio", "video", "notification"]
+				# チェックされたsubstepを含めそれ以前のsubstep全てをis_finishedに．
+				@doc.get_elements("//step[@id=\"#{parent_step}\"]/substep").each{|node1|
+					child_substep = node1.attributes.get_attribute("id").value
+					@hash_mode["substep"]["mode"][child_substep][1] = "is_finished"
+					# そのsubstepに含まれるメディアをFINISHEDに．
+					# もしも現状でCURRENTまたはKEEPならば，再生中または再生待ちなのでSTOPに．
+					media.each{|v|
+						@doc.get_elements("//substep[@id=\"#{child_substep}\"]/#{v}").each{|node2|
+							media_id = node2.attributes.get_attribute("id").value
+							if @hash_mode[v]["mode"][media_id][0] == "NOT_YET"
+								@hash_mode[v]["mode"][media_id][0] = "FINISHED"
+							elsif @hash_mode[v]["mode"][media_id][0] == "CURRENT" || @hash_mode[v]["mode"][media_id][0] == "KEEP"
+								@hash_mode[v]["mode"][media_id][0] = "STOP"
+							end
+						}
+					}
+					# チェックされたsubstepをis_finishedにしたらループ終了．
+					if child_substep == id
 						break
 					end
 				}
+				# 全てのsubstepがis_finishedならば，親ノードのstepもis_finishedにする．
+				flag = -1
+				@doc.get_elements("//step[@id=\"#{parent_step}\"]/substep").each{|node|
+					child_substep = node.attributes.get_attribute("id").value
+					# NOT_YETなsubstepがいれば，親ノードのstepはis_finishedにならないので直ちにbreak．
+					if @hash_mode["substep"]["mode"][child_substep][1] == "NOT_YET"
+						flag = 1
+						break
+					end
+				}
+				# stepがis_finishedに変更されたら，ABLEの計算もし直す．
+				if flag == -1 then
+					@hash_mode["step"]["mode"][parent_step][1] = "is_finished"
+					# current_substepの探索．（current_stepはparent_stepに一致）
+					current_substep = nil
+					@doc.get_elements("//step[@id=\"#{parent_step}\"]/substep").each{|node|
+						substep_id = node.attributes.get_attribute("id").value
+						if @hash_mode["substep"]["mode"][substep_id][2] == "CURRENT"
+							current_substep = substep_id
+							break
+						end
+					}
+					# stepとsubstepを適切にABLEに．
+					@hash_mode = set_ABLEorOTHERS(@doc, @hash_mode, parent_step, current_substep)
+				end
+				current_step = nil
+				current_substep = nil
 				@hash_mode["step"]["mode"].each{|key, value|
-					# Search ABLE step from steps which is NOT is_finished(=1).
-					if value[1] == "NOT_YET" then
-						# If the step has no parent step, update it to ABLE.
-						if @doc.elements["//step[@id=\"#{key}\"]/parent"] == nil then
-							@hash_mode["step"]["mode"][key][0] = "ABLE"
-						else
-							flag = -1
-							@doc.elements["//step[@id=\"#{key}\"]/parent"].attributes.get_attribute("ref").value.split(" ").each{|v|
-								if @hash_mode["step"]["mode"].key?(v) then
-									if @hash_mode["step"]["mode"][v][1] == "is_finished" then
-										flag = 1
-									else
-										if v == current_step and @hash_mode["step"]["mode"][current_step][0] == "ABLE" then
-											flag = 1
-										else
-											flag = -1
-										end
-									end
-								end
-							}
-							if flag == 1 then
-								@hash_mode["step"]["mode"][key][0] = "ABLE"
+					if @hash_mode["step"]["mode"][key][2] == "CURRENT"
+						current_step = key
+						@doc.get_elements("//step[@id=\"#{key}\"]/substep").each{|node|
+							substep_id = node.attributes.get_attribute("id").value
+							if @hash_mode["substep"]["mode"][substep_id][2] == "CURRENT"
+								current_substep = substep_id
+								break
 							end
+						}
+						break
+					end
+				}
+				# 可能なsubstepに遷移する
+				@hash_mode = go2current(@doc, @hash_mode, @sorted_step, current_step, current_substep)
+				# 再度ABLEの判定を行う．
+				current_step = nil
+				current_substep = nil
+				@hash_mode["step"]["mode"].each{|key, value|
+					if @hash_mode["step"]["mode"][key][2] == "CURRENT"
+						current_step = key
+						@doc.get_elements("//step[@id=\"#{key}\"]/substep").each{|node|
+							substep_id = node.attributes.get_attribute("id").value
+							if @hash_mode["substep"]["mode"][substep_id][2] == "CURRENT"
+								current_substep = substep_id
+								break
+							end
+						}
+						break
+					end
+				}
+				# ABLEまたはOTHERSの操作．
+				@hash_mode = set_ABLEorOTHERS(@doc, @hash_mode, current_step, current_substep)
+			else # is_finishedならばNOT_YETに．
+				parent_step = @doc.elements["//substep[@id=\"#{id}\"]"].parent.attributes.get_attribute("id").value
+				media = ["audio", "video", "notification"]
+				# チェックされたsubstepを含むそれ以降の（同一step内の）substepをNOT_YETに．
+				flag = -1
+				@doc.get_elements("//step[@id=\"#{parent_step}\"]/substep").each{|node|
+					child_substep = node.attributes.get_attribute("id").value
+					if flag == 1
+						@hash_mode["substep"]["mode"][child_substep][1] = "NOT_YET"
+						# そのsubstepに含まれるメディアをNOT_YETに．
+						media.each{|v|
+							@doc.get_elements("//substep[@id=\"#{child_substep}\"]/#{v}").each{|node2|
+								media_id = node2.attributes.get_attribute("id").value
+								@hash_mode[v]["mode"][media_id][0] = "NOT_YET"
+							}
+						}
+					end
+					if child_substep == id
+						flag = 1
+						@hash_mode["substep"]["mode"][child_substep][1] = "NOT_YET"
+						# そのsubstepに含まれるメディアをNOT_YETに．
+						media.each{|v|
+							@doc.get_elements("//substep[@id=\"#{child_substep}\"]/#{v}").each{|node2|
+								media_id = node2.attributes.get_attribute("id").value
+								@hash_mode[v]["mode"][media_id][0] = "NOT_YET"
+							}
+						}
+						# チェックされたsubstepが同一step内の最終substepならば，親ノードのstepをNOT_YETにして，ABLEの操作をする．
+						if node.next_sibling_node == nil
+							@hash_mode["step"]["mode"][parent_step][1] = "NOT_YET"
+							@hash_mode = set_ABLEorOTHERS(@doc, @hash_mode, parent_step, id)
 						end
 					end
 				}
+				# 可能なsubstepに遷移する
+				current_step = nil
+				current_substep = nil
+				@hash_mode["step"]["mode"].each{|key, value|
+					if @hash_mode["step"]["mode"][key][2] == "CURRENT"
+						current_step = key
+						@doc.get_elements("//step[@id=\"#{key}\"]/substep").each{|node|
+							substep_id = node.attributes.get_attribute("id").value
+							if @hash_mode["substep"]["mode"][substep_id][2] == "CURRENT"
+								current_substep = substep_id
+								break
+							end
+						}
+						break
+					end
+				}
+				@hash_mode = go2current(@doc, @hash_mode, @sorted_step, current_step, current_substep)
+				# 再度ABLEの判定を行う．
+				current_step = nil
+				current_substep = nil
+				@hash_mode["step"]["mode"].each{|key, value|
+					if @hash_mode["step"]["mode"][key][2] == "CURRENT"
+						current_step = key
+						@doc.get_elements("//step[@id=\"#{key}\"]/substep").each{|node|
+							substep_id = node.attributes.get_attribute("id").value
+							if @hash_mode["substep"]["mode"][substep_id][2] == "CURRENT"
+								current_substep = substep_id
+								break
+							end
+						}
+						break
+					end
+				}
+				@hash_mode = set_ABLEorOTHERS(@doc, @hash_mode, current_step, current_substep)
 			end
 		else
 			errorLOG()
 		end
-		# If notification was presented before this function is called, upload it to FINISHED (Not STOP).
-		@hash_mode["notification"]["mode"].each{|key, value|
-			if value[0]  == "KEEP" then
-				if time > value[1] then
-					@hash_mode["notification"]["mode"][key] = ["FINISHED", -1]
-					# If the notification has audio, also update it to FINISHED
-					@doc.get_elements("//notification[@id=\"#{key}\"]/audio").each{|node|
-						audio_id = node.attributes.get_attribute("id").value
-						if audio_id != nil then
-							@hash_mode["audio"]["mode"][audio_id] = ["FINISHED", -1]
-						end
-					}
-				end
-			end
+		# notificationが再生済みかどうかは，隙あらば調べましょう．
+		@hash_mode = check_notification_FINISHED(@doc, @hash_mode, time)
+		open("records/#{@session_id}/#{@session_id}_mode.txt", "w"){|io|
+			io.puts(JSON.pretty_generate(@hash_mode))
 		}
-		# Keep current step(/substep) CURRENT
-		# (I actually want to update steps(/substeps) to is_finished(=1), which should be done before checked step(/substep))
 	end
 
 	def modeUpdate_start()

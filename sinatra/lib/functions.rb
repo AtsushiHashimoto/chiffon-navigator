@@ -1,8 +1,9 @@
 #!/usr/bin/ruby
 
-require './lib/utils.rb'
-require './lib/startaction.rb'
-require './lib/ordersmaker.rb'
+$LOAD_PATH.push(File.dirname(__FILE__))
+require 'lib/utils.rb'
+require 'lib/startaction.rb'
+require 'lib/ordersmaker.rb'
 
 def navi_menu(jason_input)
 	maker = OrdersMaker.new(jason_input["session_id"])
@@ -141,7 +142,9 @@ def check(jason_input)
 		# DetailDraw：
 		orders.concat(maker.detailDraw())
 		# Play：不要．チェックを入れるだけで大きな画面遷移ではない
+		orders.concat(maker.play(jason_input["time"]["sec"]))
 		# Notify：不要．チェックを入れるだけで大きな画面遷移ではない不要．
+		orders.concat(maker.notify(jason_input["time"]["sec"]))
 		# Cancel：CURRENTなsubstepをチェックされた場合，メディアを終了する必要がある．
 		orders.concat(maker.cancel())
 		# ChannelSwitch：不要．
@@ -163,8 +166,7 @@ end
 
 def start(jason_input)
 	# Navigationに必要なファイル（詳細はクラスファイル内）を作成
-	action = StartAction.new(jason_input["session_id"])
-	action.makeLogfile(jason_input["operation_contents"])
+	start_action(jason_input["session_id"], jason_input["operation_contents"])
 	maker = OrdersMaker.new(jason_input["session_id"])
 	# modeファイルをSTARTな状態に設定
 	maker.modeUpdate("START", jason_input["time"]["sec"])

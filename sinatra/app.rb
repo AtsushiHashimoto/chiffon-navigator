@@ -2,6 +2,7 @@ require 'rubygems'
 require 'sinatra'
 require 'json'
 
+$LOAD_PATH.push(File.dirname(__FILE__))
 require 'lib/default.rb'
 
 get '/' do
