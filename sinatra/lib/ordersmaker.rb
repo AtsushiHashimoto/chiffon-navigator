@@ -83,11 +83,15 @@ class OrdersMaker
 			@hash_mode[v]["mode"].each{|key, value|
 				if value[0] == "CURRENT" then
 					# There may be some trigger. Which trigger should we use for playing?
-					@doc.get_elements("//#{v}[@id=\"#{key}\"]/trigger[1]").each{|node|
-						orders.push({"Play"=>{"id"=>key, "delay"=>node.attributes.get_attribute("delay").value}})
-						finish_time = time + node.attributes.get_attribute("delay").value.to_i * 1000
-						@hash_mode[v]["mode"][key][1] = finish_time
-					}
+					if @doc.elements["//#{v}[@id=\"#{key}\"]/trigger[1]"] != nil
+						@doc.get_elements("//#{v}[@id=\"#{key}\"]/trigger[1]").each{|node|
+							orders.push({"Play"=>{"id"=>key, "delay"=>node.attributes.get_attribute("delay").value}})
+							finish_time = time + node.attributes.get_attribute("delay").value.to_i * 1000
+							@hash_mode[v]["mode"][key][1] = finish_time
+						}
+					else
+						return []
+					end
 				end
 			}
 		}
