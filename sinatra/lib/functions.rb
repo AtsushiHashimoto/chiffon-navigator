@@ -137,7 +137,7 @@ def channel(jason_input)
 			# Cancel：再生待ちコンテンツがあればキャンセル
 			orders.concat(maker.cancel())
 			# ChannelSwitch：OVERVIEWを指定
-			orders.push({"ChannelSwitch"=>{"channel"=>"GUIDE"}})
+			orders.push({"ChannelSwitch"=>{"channel"=>"OVERVIEW"}})
 			# NaviDraw：不要．Naviは描画されない
 
 			# 履歴ファイルを書き込む
