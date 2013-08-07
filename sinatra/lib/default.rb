@@ -6,8 +6,8 @@ class DefaultNavigator
 	def counsel(jason_input)
 		orders = []
 		# generate orders along to jason_input
-		if jason_input["situation"] == nil or jason_input["situation"] == "" then
-			orders = [{}]
+		if jason_input["situation"] == nil or jason_input["situation"] == ""
+			orders.push({"status"=>"invalid params"})
 		else
 			case jason_input["situation"]
 			when "NAVI_MENU"
@@ -23,7 +23,7 @@ class DefaultNavigator
 			when "END"
 				orders = finish(jason_input)
 			else
-				orders = [{}]
+				orders.push({"status"=>"invalid params"})
 			end
 		end
 		return orders

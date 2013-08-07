@@ -2,6 +2,7 @@
 
 require 'rubygems'
 require 'json'
+require 'rexml/document'
 
 def searchElementName(session_id, id)
 	hash_id = Hash.new()
@@ -136,6 +137,25 @@ def check_notification_FINISHED(doc, hash_mode, time)
 		end
 	}
 	return hash_mode
+end
+
+def search_CURRENT(doc, hash_mode)
+	current_step = nil
+	current_substep = nil
+	hash_mode["step"]["mode"].each{|key, value|
+		if hash_mode["step"]["mode"][key][2] == "CURRENT"
+			current_step = key
+			doc.get_elements("//step[@id=\"#{key}\"]/substep").each{|node|
+				substep_id = node.attributes.get_attribute("id").value
+				if hash_mode["substep"]["mode"][substep_id][2] == "CURRENT"
+					current_substep = substep_id
+					break
+				end
+			}
+			break
+		end
+	}
+	return current_step, current_substep
 end
 
 def logger()
