@@ -13,9 +13,9 @@ def navi_menu(jason_input)
 		# modeの修正
 		result = maker.modeUpdate_navimenu(jason_input["time"]["sec"], jason_input["operation_contents"])
 		if result == "internal_error"
-			return [{"status"=>"internal error"}]
+			return {"status"=>"internal error"}
 		elsif result == "invalid_params"
-			return [{"status"=>"invalid params"}]
+			return {"status"=>"invalid params"}
 		end
 
 		orders = []
@@ -33,10 +33,10 @@ def navi_menu(jason_input)
 		logger()
 	rescue => e
 		p e
-		return [{"status"=>"internal error"}]
+		return {"status"=>"internal error"}
 	end
 
-	return [{"status"=>"success"}].concat(orders)
+	return {"status"=>"success","body"=>orders}
 end
 
 def external_input(jason_input)
@@ -45,9 +45,9 @@ def external_input(jason_input)
 		# modeの修正
 		result = maker.modeUpdate_externalinput(jason_input["time"]["sec"], jason_input["operation_contents"])
 		if result == "internal_error"
-			return [{"status"=>"internal error"}]
+			return {"status"=>"internal error"}
 		elsif result == "invalid_params"
-			return [{"status"=>"invalid params"}]
+			return {"status"=>"invalid params"}
 		end
 
 		orders = []
@@ -67,10 +67,10 @@ def external_input(jason_input)
 		logger()
 	rescue => e
 		p e
-		return [{"status"=>"internal error"}]
+		return {"status"=>"internal error"}
 	end
 
-	return [{"status"=>"success"}].concat(orders)
+	return {"status"=>"success","body"=>orders}
 end
 
 def channel(jason_input)
@@ -83,9 +83,9 @@ def channel(jason_input)
 			# modeの修正
 			result = maker.modeUpdate_channel(jason_input["time"]["sec"], 0)
 			if result == "internal_error"
-				return [{"status"=>"internal error"}]
+				return {"status"=>"internal error"}
 			elsif result == "invalid_params"
-				return [{"status"=>"invalid params"}]
+				return {"status"=>"invalid params"}
 			end
 
 			# DetailDraw：modeUpdateしないので，最近送ったオーダーと同じDetailDrawを送ることになる．
@@ -106,9 +106,9 @@ def channel(jason_input)
 			# modeの修正
 			result = maker.modeUpdate_channel(jason_input["time"]["sec"], 1)
 			if result == "internal_error"
-				return [{"status"=>"internal error"}]
+				return {"status"=>"internal error"}
 			elsif result == "invalid_params"
-				return [{"status"=>"invalid params"}]
+				return {"status"=>"invalid params"}
 			end
 
 			# DetailDraw：不要．Detailは描画されない
@@ -126,9 +126,9 @@ def channel(jason_input)
 			# modeの更新
 			result = maker.modeUpdate_channel(jason_input["time"]["sec"], 1)
 			if result == "internal_error"
-				return [{"status"=>"internal error"}]
+				return {"status"=>"internal error"}
 			elsif result == "invalid_params"
-				return [{"status"=>"invalid params"}]
+				return {"status"=>"invalid params"}
 			end
 
 			# DetailDraw：不要．Detailは描画されない
@@ -146,14 +146,14 @@ def channel(jason_input)
 			# 履歴ファイルに書き込む
 			logger()
 			errorLOG()
-			return [{"status"=>"invalid params"}]
+			return {"status"=>"invalid params"}
 		end
 	rescue => e
 		p e
-		return [{"status"=>"internal error"}]
+		return {"status"=>"internal error"}
 	end
 
-	return [{"status"=>"success"}].concat(orders)
+	return {"status"=>"success","body"=>orders}
 end
 
 def check(jason_input)
@@ -168,9 +168,9 @@ def check(jason_input)
 			# idをcancelに直接ぶち込んでもいいが，notificationが終わっているかの確認をmodeUpdateの中でやるので仕方なく
 			result = maker.modeUpdate_check(jason_input["time"]["sec"], jason_input["operation_contents"])
 			if result == "interlan_error"
-				return [{"status"=>"internal error"}]
+				return {"status"=>"internal error"}
 			elsif result == "invalid_params"
-				return [{"status"=>"invalid params"}]
+				return {"status"=>"invalid params"}
 			end
 
 			# DetailDraw：不要
@@ -187,9 +187,9 @@ def check(jason_input)
 			# modeの修正
 			result = maker.modeUpdate_check(jason_input["time"]["sec"], jason_input["operation_contents"])
 			if result == "interlan_error"
-				return [{"status"=>"internal error"}]
+				return {"status"=>"internal error"}
 			elsif result == "invalid_params"
-				return [{"status"=>"invalid params"}]
+				return {"status"=>"invalid params"}
 			end
 
 			# DetailDraw：
@@ -210,14 +210,14 @@ def check(jason_input)
 			# 履歴ファイルを書き込む
 			logger()
 			errorLOG()
-			return [{"status"=>"invalid params"}]
+			return {"status"=>"invalid params"}
 		end
 	rescue => e
 		 p e
-		 return [{"status"=>"internal error"}]
+		 return {"status"=>"internal error"}
 	end
 
-	return [{"status"=>"success"}].concat(orders)
+	return {"status"=>"success","body"=>orders}
 end
 
 def start(jason_input)
@@ -225,9 +225,9 @@ def start(jason_input)
 	# modeUpdateもこの関数でやってしまう
 	result = start_action(jason_input["session_id"], jason_input["operation_contents"])
 	if result == "internal_error"
-		return [{"status"=>"internal error"}]
+		return {"status"=>"internal error"}
 	elsif result == "invalid_params"
-		return [{"status"=>"invalid params"}]
+		return {"status"=>"invalid params"}
 	end
 
 	orders = []
@@ -241,7 +241,7 @@ def start(jason_input)
 
 	# 履歴ファイルに書き込む
 	logger()
-	return [{"status"=>"success"}].concat(orders)
+	return {"status"=>"success","body"=>orders}
 end
 
 def finish(jason_input)
@@ -249,9 +249,9 @@ def finish(jason_input)
 		# mediaをSTOPにする．
 		hash_mode, result = finish_action(jason_input["session_id"])
 		if result == "internal_error"
-			return [{"status"=>"internal error"}]
+			return {"status"=>"internal error"}
 		elsif result == "invalid_params"
-			return [{"status"=>"invalid params"}]
+			return {"status"=>"invalid params"}
 		end
 
 		doc = REXML::Document.new(open("records/#{jason_input["session_id"]}/#{jason_input["session_id"]}_recipe.xml"))
@@ -262,9 +262,9 @@ def finish(jason_input)
 		### Cancel：再生待ちコンテンツが存在すればキャンセル
 		orders, result = cancel(jason_input["session_id"], doc, hash_mode)
 		if result == "internal_error"
-			return [{"status"=>"internal error"}]
+			return {"status"=>"internal error"}
 		elsif result == "invalid_params"
-			return [{"status"=>"invalid params"}]
+			return {"status"=>"invalid params"}
 		end
 		### ChannelSwitch：不要
 		### NaviDraw：不要．Naviは描画されない
@@ -273,8 +273,8 @@ def finish(jason_input)
 		logger()
 	rescue => e
 		p e
-		return [{"status"=>"internal error"}]
+		return {"status"=>"internal error"}
 	end
 
-	return [{"status"=>"success"}].concat(orders)
+	return {"status"=>"success","bosy"=>orders}
 end
