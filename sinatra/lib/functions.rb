@@ -81,7 +81,7 @@ def channel(jason_input)
 		case jason_input["operation_contents"]
 		when "GUIDE"
 			# modeの修正
-			result = maker.modeUpdate_channel(jason_input["time"]["sec"], 0)
+			result = maker.modeUpdate_channel(jason_input["time"]["sec"], "GUIDE")
 			if result == "internal_error"
 				return {"status"=>"internal error"}
 			elsif result == "invalid_params"
@@ -104,7 +104,7 @@ def channel(jason_input)
 			logger()
 		when "MATERIALS"
 			# modeの修正
-			result = maker.modeUpdate_channel(jason_input["time"]["sec"], 1)
+			result = maker.modeUpdate_channel(jason_input["time"]["sec"], "MATERIALS")
 			if result == "internal_error"
 				return {"status"=>"internal error"}
 			elsif result == "invalid_params"
@@ -124,7 +124,7 @@ def channel(jason_input)
 			logger()
 		when "OVERVIEW"
 			# modeの更新
-			result = maker.modeUpdate_channel(jason_input["time"]["sec"], 1)
+			result = maker.modeUpdate_channel(jason_input["time"]["sec"], "OVERVIEW")
 			if result == "internal_error"
 				return {"status"=>"internal error"}
 			elsif result == "invalid_params"

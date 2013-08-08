@@ -201,6 +201,10 @@ class OrdersMaker
 	# NAVI_MENUリクエストの場合のmodeアップデート
 	def modeUpdate_navimenu(time, id)
 		begin
+			unless @hash_mode["display"] == "GUIDE"
+				p "#{@hash_mode["display"]} is displayed now."
+				return "invalid_params"
+			end
 			element_name = searchElementName(@session_id, id)
 			# 遷移要求先がstepかsubstepかで場合分け
 			case element_name
@@ -456,9 +460,13 @@ class OrdersMaker
 	# CHANNELリクエストの場合のmpodeアップデート
 	def modeUpdate_channel(time, flag)
 		begin
-			# flagが1ならば，チャンネル要求がOVERVIEWまたはMATERIALSなので，CURRENTなaudioとvideoをSTOPする．
+			if @hash_mode["display"] == flag
+				p "#{@hash_mode["display"]} is displayed now. You try to display same one."
+				return "invalid_params"
+			end
+			# CURRENTなaudioとvideoをSTOPする．
 			# notificationはSTOPしない．
-			if flag == 1
+			if flag == "MATERIALS" || flag == "OVERVIEW"
 				media = ["audio", "video"]
 				media.each{|v|
 					@hash_mode[v]["mode"].each{|key, value|
@@ -470,6 +478,8 @@ class OrdersMaker
 			end
 			# notificationが再生済みかどうかは，隙あらば調べましょう．
 			@hash_mode = check_notification_FINISHED(@doc, @hash_mode, time)
+			# チャンネルの切り替え
+			@hash_mode["display"] = flag
 			open("records/#{@session_id}/#{@session_id}_mode.txt", "w"){|io|
 				io.puts(JSON.pretty_generate(@hash_mode))
 			}
@@ -483,6 +493,10 @@ class OrdersMaker
 
 	def modeUpdate_check(time, id)
 		begin
+			unless @hash_mode["display"] == "GUIDE"
+				p "#{@hash_mode["display"]} is displayed now."
+				return "invalid_params"
+			end
 			element_name = searchElementName(@session_id, id)
 			# チェックされたものによって場合分け．
 			case element_name

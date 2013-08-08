@@ -33,6 +33,7 @@ def start_action(session_id, contents)
 		end
 
 		doc = REXML::Document.new(open("records/#{session_id}/#{session_id}_recipe.xml"))
+		p "####################test"
 
 		# idテーブルファイルの作成
 		hash_id = Hash.new{|h, k| h[k] = {}}
@@ -98,6 +99,9 @@ def start_action(session_id, contents)
 				hash_mode["notification"]["mode"][value] = ["NOT_YET", -1]
 			}
 		end
+
+		# 表示されている画面の管理のために（START時はOVERVIEW）
+		hash_mode["display"] = "OVERVIEW"
 
 		# modeUpdate
 		# 優先度の最も高いstepをCURRENTとし，その一番目のsubstepもCURRENTにする．
