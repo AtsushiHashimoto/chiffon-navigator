@@ -4,6 +4,20 @@ require 'rubygems'
 require 'json'
 require 'rexml/document'
 
+def read_hash(session_id)
+	hash_mode = Hash.new()
+	open("records/#{session_id}/#{session_id}_mode.txt", "r"){|io|
+		hash_mode = JSON.load(io)
+	}
+	sorted_step = []
+	open("records/#{session_id}/#{session_id}_sortedstep.txt", "r"){|io|
+		sorted_step = JSON.load(io)
+	}
+	doc = REXML::Document.new(open("records/#{session_id}/#{session_id}_recipe.xml"))
+	return doc, hash_mode, sorted_step
+end
+
+
 def searchElementName(session_id, id)
 	hash_id = Hash.new()
 	open("records/#{session_id}/#{session_id}_table.txt", "r"){|io|

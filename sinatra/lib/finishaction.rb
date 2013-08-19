@@ -1,13 +1,11 @@
 #!/usr/bin/ruby
 
-# ENDリクエストの場合のmodeアップデート
 def finish_action(session_id)
 	begin
 		hash_mode = Hash.new()
-		open("records/#{session_id}/#{session_id}_mode.txt", "r"){|io|
+		open("record/#{session_id}/#{session_id}_mode.txt", "r"){|io|
 			hash_mode = JSON.load(io)
 		}
-		# あらゆる再生待ちメディアをSTOPにする．
 		media = ["audio", "video", "notification"]
 		media.each{|v|
 			hash_mode[v]["mode"].each{|key, value|
@@ -23,4 +21,3 @@ def finish_action(session_id)
 
 	return hash_mode, "success"
 end
-

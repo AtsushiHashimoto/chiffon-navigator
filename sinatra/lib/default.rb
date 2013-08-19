@@ -22,6 +22,8 @@ class DefaultNavigator
 				orders = start(jason_input)
 			when "END"
 				orders = finish(jason_input)
+			when "PLAY_CONTROL"
+				orders = play_control(jason_input)
 			else
 				orders = {"status"=>"invalid params"}
 			end

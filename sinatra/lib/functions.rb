@@ -4,7 +4,6 @@ $LOAD_PATH.push(File.dirname(__FILE__))
 require 'lib/utils.rb'
 require 'lib/startaction.rb'
 require 'lib/ordersmaker.rb'
-require 'lib/ordersmaker_new.rb'
 require 'lib/finishaction.rb'
 
 def navi_menu(jason_input)
@@ -163,27 +162,7 @@ def check(jason_input)
 		# element_nameの確認
 		element_name = searchElementName(jason_input["session_id"], jason_input["operation_contents"])
 
-		if element_name == "audio" or element_name == "video"
-			# modeの修正
-			# idをcancelに直接ぶち込んでもいいが，notificationが終わっているかの確認をmodeUpdateの中でやるので仕方なく
-			result = maker.modeUpdate_check(jason_input["time"]["sec"], jason_input["operation_contents"])
-			if result == "interlan_error"
-				return {"status"=>"internal error"}
-			elsif result == "invalid_params"
-				return {"status"=>"invalid params"}
-			end
-
-			# DetailDraw：不要
-			# Play：不要
-			# Notify：不要
-			# Cancel：指定されたidをキャンセル
-			orders.concat(maker.cancel())
-			# ChannelSwitch：不要．
-			# NaviDraw：不要
-
-			# 履歴ファイルを書き込む
-			logger()
-		elsif element_name == "step" or element_name == "substep"
+		if element_name == "step" || element_name == "substep"
 			# modeの修正
 			result = maker.modeUpdate_check(jason_input["time"]["sec"], jason_input["operation_contents"])
 			if result == "interlan_error"
@@ -276,5 +255,39 @@ def finish(jason_input)
 		return {"status"=>"internal error"}
 	end
 
-	return {"status"=>"success","bosy"=>orders}
+	return {"status"=>"success","body"=>orders}
+end
+
+def play_control(jason_input)
+	begin
+		element_name = searchElementName(jason_input["session_id"], jason_input["operation_contents"]["id"])
+		if element_name == "audio" || element_name == "video"
+			case jason_input["operation_contents"]["operation"]
+			when "PLAY"
+			when "PAUSE"
+			when "JUMP"
+			when "TO_THE_END"
+			when "FULL_SCREEN"
+			when "MUTE"
+			when "VOLUME"
+			else
+				return {"status"=>"invalid params"}
+			end
+		else
+			return {"status"=>"invalid params"}
+		end
+
+		orders = []
+		### DetailDraw：不要．Detailは描画されない
+		### Play：
+		### Notify：
+		### Cancel：
+		### ChannelSwitch：不要
+		### NaviDraw：不要．Naviは描画されない
+	rescue => e
+		p e
+		return {"status"=>"internal error"}
+	end
+
+	return {"status"=>"success","body"=>orders}
 end

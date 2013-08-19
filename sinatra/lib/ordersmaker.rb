@@ -500,10 +500,6 @@ class OrdersMaker
 			element_name = searchElementName(@session_id, id)
 			# チェックされたものによって場合分け．
 			case element_name
-			when "audio" # 再生待ちをSTOPに．
-				@hash_mode["audio"]["mode"][id][0] = "STOP"
-			when "video" # 再生待ちをSTOPに．
-				@hash_mode["video"]["mode"][id][0] = "STOP"
 			when "step"
 				# is_finishedまたはNOT_YETの操作．
 				if @hash_mode["step"]["mode"][id][1] == "NOT_YET" # NOT_YETならis_finishedに．
