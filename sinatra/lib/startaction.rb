@@ -20,7 +20,6 @@ def start_action(session_id, contents)
 			p "Cannot touch error_log file"
 			return "internal_error"
 		end
-=begin
 
 		unless system("touch records/#{session_id}/#{session_id}_recipe.xml")
 			p "Cannot touch recipe file"
@@ -33,7 +32,7 @@ def start_action(session_id, contents)
 			p "Cannot 'tr' hoge file"
 			return "internal_error"
 		end
-=end
+
 		doc = REXML::Document.new(open("records/#{session_id}/#{session_id}_recipe.xml"))
 
 		# idテーブルファイルの作成
