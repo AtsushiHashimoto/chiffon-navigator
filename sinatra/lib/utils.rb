@@ -177,3 +177,76 @@ end
 
 def errorLOG()
 end
+
+# 再生待ち状態のaudio，video，notificationを中止するCancel命令．
+def cancel(session_id, doc, hash_mode, *id)
+	begin
+		orders = []
+		# 特に中止させるメディアについて指定が無い場合
+		if id == []
+			# audioとvideoの処理．
+			# Cancelさせるべきものは，STOPになっているはず．
+			media = ["audio", "video"]
+			media.each{|v|
+				if hash_mode.key?(v)
+					hash_mode[v]["mode"].each{|key, value|
+						if value[0] == "STOP"
+							orders.push({"Cancel"=>{"id"=>key}})
+							# STOPからFINISHEDに変更．
+							hash_mode[v]["mode"][key] = ["FINISHED", -1]
+						end
+					}
+				end
+			}
+			# notificationの処理．
+			# Cancelさせるべきものは，STOPのなっているはず．
+			if hash_mode.key?("notification")
+				hash_mode["notification"]["mode"].each{|key, value|
+					if value[0] == "STOP"
+						orders.push({"Cancel"=>{"id"=>key}})
+						# STOPからFINISHEDに変更．
+						hash_mode["notification"]["mode"][key] = ["FINISHED", -1]
+						# audioをもつnotificationの場合，audioもFINISHEDに変更．
+						if doc.elements["//notification[@id=\"#{key}\"]/audio"] != nil
+							audio_id = doc.elements["//notification[@id=\"#{key}\"]/audio"].attributes.get_attribute("id").value
+							hash_mode["audio"]["mode"][audio_id] = ["FINISHED", -1]
+						end
+					end
+				}
+			end
+		else # 中止させるメディアについて指定がある場合．
+			id.each{|v|
+				# 指定されたメディアのelement nameを調査．
+				element_name = searchElementName(session_id, v)
+				# audioとvideoの場合．
+				if element_name == "audio" || element_name == "video"
+					# 指定されたものが再生待ちかどうかとりあえず調べる，
+					if hash_mode[element_name]["mode"][v][0] == "CURRENT"
+						# CancelしてFINISHEDに．
+						orders.push({"Cancel"=>{"id"=>v}})
+						hash_mode[element_name]["mode"][v] = ["FINISHED", -1]
+					end
+				elsif element_name == "notification" # notificationの場合．
+					# 指定されたnotificationが再生待ちかどうかとりあえず調べる．
+					if hash_mode["notification"]["mode"][v][0] == "KEEP"
+						# CancelしてFINISHEDに．
+						orders.push({"Cancel"=>{"id"=>v}})
+						hash_mode["notification"]["mode"][v][0] = ["FINISHED", -1]
+						# audioを持つnotificationはaudioもFINISHEDに．
+						if doc.elements["//notification[@id=\"#{v}\"]/audio"] != nil
+							audio_id = doc.elements["//notification[@id=\"#{v}\"]/audio"].attributes.get_attribute("id").value
+							hash_mode["audio"]["mode"][audio_id] = ["FINISHED", -1]
+						end
+					end
+				else # 指定されたものがaudio，video，notificationで無い場合．
+					return [], hash_mode, "invalid_params"
+				end
+			}
+		end
+	rescue => e
+		p e
+		return [], hash_mode, "internal_error"
+	end
+
+	return orders, hash_mode, "success"
+end

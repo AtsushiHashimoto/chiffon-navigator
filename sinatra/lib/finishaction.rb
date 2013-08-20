@@ -3,7 +3,7 @@
 def finish_action(session_id)
 	begin
 		hash_mode = Hash.new()
-		open("record/#{session_id}/#{session_id}_mode.txt", "r"){|io|
+		open("records/#{session_id}/#{session_id}_mode.txt", "r"){|io|
 			hash_mode = JSON.load(io)
 		}
 		media = ["audio", "video", "notification"]
