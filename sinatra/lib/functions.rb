@@ -9,7 +9,7 @@ require 'lib/finishaction.rb'
 def navi_menu(jason_input)
 	begin
 		maker = OrdersMaker.new(jason_input["session_id"])
-		# mode¤Î½¤Àµ
+		# modeã®ä¿®æ­£
 		result = maker.modeUpdate_navimenu(jason_input["time"]["sec"], jason_input["operation_contents"])
 		if result == "internal_error"
 			return {"status"=>"internal error"}
@@ -18,17 +18,17 @@ def navi_menu(jason_input)
 		end
 
 		orders = []
-		# DetailDraw¡§ÆşÎÏ¤µ¤ì¤¿step¤òCURRENT¤È¤·¤ÆÄó¼¨
+		# DetailDrawï¼šå…¥åŠ›ã•ã‚ŒãŸstepã‚’CURRENTã¨ã—ã¦æç¤º
 		orders.concat(maker.detailDraw())
-		# Play¡§ÉÔÍ×¡¥¥¯¥ê¥Ã¥¯¤µ¤ì¤¿step¤ÎÄ´Íı¹ÔÆ°¤ò»Ï¤á¤ì¤Ğ¡¤EXTERNAL_INPUT¤ÇºÆÀ¸¤µ¤ì¤ë
-		# Notify¡§ÉÔÍ×¡¥¥¯¥ê¥Ã¥¯¤µ¤ì¤¿step¤ÎÄ´Íı¹ÔÆ°¤ò»Ï¤á¤ì¤Ğ¡¤EXTERNAL_INPUT¤ÇºÆÀ¸¤µ¤ì¤ë
-		# Cancel¡§ºÆÀ¸ÂÔ¤Á¥³¥ó¥Æ¥ó¥Ä¤¬¤¢¤ì¤Ğ¥­¥ã¥ó¥»¥ë
+		# Playï¼šä¸è¦ï¼ã‚¯ãƒªãƒƒã‚¯ã•ã‚ŒãŸstepã®èª¿ç†è¡Œå‹•ã‚’å§‹ã‚ã‚Œã°ï¼ŒEXTERNAL_INPUTã§å†ç”Ÿã•ã‚Œã‚‹
+		# Notifyï¼šä¸è¦ï¼ã‚¯ãƒªãƒƒã‚¯ã•ã‚ŒãŸstepã®èª¿ç†è¡Œå‹•ã‚’å§‹ã‚ã‚Œã°ï¼ŒEXTERNAL_INPUTã§å†ç”Ÿã•ã‚Œã‚‹
+		# Cancelï¼šå†ç”Ÿå¾…ã¡ã‚³ãƒ³ãƒ†ãƒ³ãƒ„ãŒã‚ã‚Œã°ã‚­ãƒ£ãƒ³ã‚»ãƒ«
 		orders.concat(maker.cancel())
-		# ChannelSwitch¡§ÉÔÍ×
-		# NaviDraw¡§Å¬ÀÚ¤Ëvisual¤ò½ñ¤­´¹¤¨¤¿¤â¤Î¤òÄó¼¨
+		# ChannelSwitchï¼šä¸è¦
+		# NaviDrawï¼šé©åˆ‡ã«visualã‚’æ›¸ãæ›ãˆãŸã‚‚ã®ã‚’æç¤º
 		orders.concat(maker.naviDraw())
 
-		# ÍúÎò¥Õ¥¡¥¤¥ë¤ò½ñ¤­¹ş¤à
+		# å±¥æ­´ãƒ•ã‚¡ã‚¤ãƒ«ã‚’æ›¸ãè¾¼ã‚€
 		logger()
 	rescue => e
 		p e
@@ -41,7 +41,7 @@ end
 def external_input(jason_input)
 	begin
 		maker = OrdersMaker.new(jason_input["session_id"])
-		# mode¤Î½¤Àµ
+		# modeã®ä¿®æ­£
 		result = maker.modeUpdate_externalinput(jason_input["time"]["sec"], jason_input["operation_contents"])
 		if result == "internal_error"
 			return {"status"=>"internal error"}
@@ -50,19 +50,19 @@ def external_input(jason_input)
 		end
 
 		orders = []
-		# DetailDraw¡§Ä´Íı¼Ô¤¬¤È¤Ã¤¿¤â¤Î¤Ë¹ç¤ï¤»¤¿substep¤Îid¤òÄó¼¨
+		# DetailDrawï¼šèª¿ç†è€…ãŒã¨ã£ãŸã‚‚ã®ã«åˆã‚ã›ãŸsubstepã®idã‚’æç¤º
 		orders.concat(maker.detailDraw)
-		# Play¡§substepÆâ¤Ë¥³¥ó¥Æ¥ó¥Ä¤¬Â¸ºß¤¹¤ì¤ĞºÆÀ¸Ì¿Îá¤òÁ÷¤ë
+		# Playï¼šsubstepå†…ã«ã‚³ãƒ³ãƒ†ãƒ³ãƒ„ãŒå­˜åœ¨ã™ã‚Œã°å†ç”Ÿå‘½ä»¤ã‚’é€ã‚‹
 		orders.concat(maker.play(jason_input["time"]["sec"]))
-		# Notify¡§substepÆâ¤Ë¥³¥ó¥Æ¥ó¥Ä¤¬Â¸ºß¤¹¤ì¤ĞºÆÀ¸Ì¿Îá¤òÁ÷¤ë
+		# Notifyï¼šsubstepå†…ã«ã‚³ãƒ³ãƒ†ãƒ³ãƒ„ãŒå­˜åœ¨ã™ã‚Œã°å†ç”Ÿå‘½ä»¤ã‚’é€ã‚‹
 		orders.concat(maker.notify(jason_input["time"]["sec"]))
-		# Cancel¡§ºÆÀ¸ÂÔ¤Á¥³¥ó¥Æ¥ó¥Ä¤¬¤¢¤ì¤Ğ¥­¥ã¥ó¥»¥ë
+		# Cancelï¼šå†ç”Ÿå¾…ã¡ã‚³ãƒ³ãƒ†ãƒ³ãƒ„ãŒã‚ã‚Œã°ã‚­ãƒ£ãƒ³ã‚»ãƒ«
 		orders.concat(maker.cancel())
-		# ChannelSwitch¡§ÉÔÍ×
-		# NaviDraw¡§Å¬ÀÚ¤Ëvisual¤ò½ñ¤­´¹¤¨¤¿¤â¤Î¤òÄó¼¨
+		# ChannelSwitchï¼šä¸è¦
+		# NaviDrawï¼šé©åˆ‡ã«visualã‚’æ›¸ãæ›ãˆãŸã‚‚ã®ã‚’æç¤º
 		orders.concat(maker.naviDraw())
 
-		# ÍúÎò¥Õ¥¡¥¤¥ë¤ò½ñ¤­¹ş¤à
+		# å±¥æ­´ãƒ•ã‚¡ã‚¤ãƒ«ã‚’æ›¸ãè¾¼ã‚€
 		logger()
 	rescue => e
 		p e
@@ -79,7 +79,7 @@ def channel(jason_input)
 		orders = []
 		case jason_input["operation_contents"]
 		when "GUIDE"
-			# mode¤Î½¤Àµ
+			# modeã®ä¿®æ­£
 			result = maker.modeUpdate_channel(jason_input["time"]["sec"], "GUIDE")
 			if result == "internal_error"
 				return {"status"=>"internal error"}
@@ -87,22 +87,22 @@ def channel(jason_input)
 				return {"status"=>"invalid params"}
 			end
 
-			# DetailDraw¡§modeUpdate¤·¤Ê¤¤¤Î¤Ç¡¤ºÇ¶áÁ÷¤Ã¤¿¥ª¡¼¥À¡¼¤ÈÆ±¤¸DetailDraw¤òÁ÷¤ë¤³¤È¤Ë¤Ê¤ë¡¥
+			# DetailDrawï¼šmodeUpdateã—ãªã„ã®ã§ï¼Œæœ€è¿‘é€ã£ãŸã‚ªãƒ¼ãƒ€ãƒ¼ã¨åŒã˜DetailDrawã‚’é€ã‚‹ã“ã¨ã«ãªã‚‹ï¼
 			orders.concat(maker.detailDraw())
-			# Play¡§START¤«¤éoverview¤ò·Ğ¤Æguide¤Ë°Ü¤ë¾ì¹ç¡¤¥á¥Ç¥£¥¢¤ÎºÆÀ¸¤¬É¬Í×¤«¤â¤·¤ì¤Ê¤¤¡¥
+			# Playï¼šSTARTã‹ã‚‰overviewã‚’çµŒã¦guideã«ç§»ã‚‹å ´åˆï¼Œãƒ¡ãƒ‡ã‚£ã‚¢ã®å†ç”ŸãŒå¿…è¦ã‹ã‚‚ã—ã‚Œãªã„ï¼
 			orders.concat(maker.play(jason_input["time"]["sec"]))
-			# Notify¡§START¤«¤éoverview¤ò·Ğ¤Æguide¤Ë°Ü¤ë¾ì¹ç¡¤¥á¥Ç¥£¥¢¤ÎºÆÀ¸¤¬É¬Í×¤«¤â¤·¤ì¤Ê¤¤¡¥
+			# Notifyï¼šSTARTã‹ã‚‰overviewã‚’çµŒã¦guideã«ç§»ã‚‹å ´åˆï¼Œãƒ¡ãƒ‡ã‚£ã‚¢ã®å†ç”ŸãŒå¿…è¦ã‹ã‚‚ã—ã‚Œãªã„ï¼
 			orders.concat(maker.notify(jason_input["time"]["sec"]))
-			# Cancel¡§ÉÔÍ×¡¥ºÆÀ¸ÂÔ¤Á¥³¥ó¥Æ¥ó¥Ä¤ÏÂ¸ºß¤·¤Ê¤¤¡¥
-			# ChannelSwitch¡§GUIDE¤ò»ØÄê
+			# Cancelï¼šä¸è¦ï¼å†ç”Ÿå¾…ã¡ã‚³ãƒ³ãƒ†ãƒ³ãƒ„ã¯å­˜åœ¨ã—ãªã„ï¼
+			# ChannelSwitchï¼šGUIDEã‚’æŒ‡å®š
 			orders.push({"ChannelSwitch"=>{"channel"=>"GUIDE"}})
-			# NaviDraw¡§Ä¾¶á¤Î¥Ê¥Ó²èÌÌ¤ÈÆ±¤¸¤â¤Î¤òÊÖ¤¹¤³¤È¤Ë¤Ê¤ë¡¥
+			# NaviDrawï¼šç›´è¿‘ã®ãƒŠãƒ“ç”»é¢ã¨åŒã˜ã‚‚ã®ã‚’è¿”ã™ã“ã¨ã«ãªã‚‹ï¼
 			orders.concat(maker.naviDraw())
 
-			# ÍúÎò¥Õ¥¡¥¤¥ë½ñ¤­¹ş¤à
+			# å±¥æ­´ãƒ•ã‚¡ã‚¤ãƒ«æ›¸ãè¾¼ã‚€
 			logger()
 		when "MATERIALS"
-			# mode¤Î½¤Àµ
+			# modeã®ä¿®æ­£
 			result = maker.modeUpdate_channel(jason_input["time"]["sec"], "MATERIALS")
 			if result == "internal_error"
 				return {"status"=>"internal error"}
@@ -110,19 +110,19 @@ def channel(jason_input)
 				return {"status"=>"invalid params"}
 			end
 
-			# DetailDraw¡§ÉÔÍ×¡¥Detail¤ÏÉÁ²è¤µ¤ì¤Ê¤¤
-			# Play¡§ÉÔÍ×¡¥ºÆÀ¸¥³¥ó¥Æ¥ó¥Ä¤ÏÂ¸ºß¤·¤Ê¤¤
-			# Notify¡§ÉÔÍ×¡¥ºÆÀ¸¥³¥ó¥Æ¥ó¥Ä¤ÏÂ¸ºß¤·¤Ê¤¤
-			# Cancel¡§ºÆÀ¸ÂÔ¤Á¥³¥ó¥Æ¥ó¥Ä¤¬¤¢¤ì¤Ğ¥­¥ã¥ó¥»¥ë
+			# DetailDrawï¼šä¸è¦ï¼Detailã¯æç”»ã•ã‚Œãªã„
+			# Playï¼šä¸è¦ï¼å†ç”Ÿã‚³ãƒ³ãƒ†ãƒ³ãƒ„ã¯å­˜åœ¨ã—ãªã„
+			# Notifyï¼šä¸è¦ï¼å†ç”Ÿã‚³ãƒ³ãƒ†ãƒ³ãƒ„ã¯å­˜åœ¨ã—ãªã„
+			# Cancelï¼šå†ç”Ÿå¾…ã¡ã‚³ãƒ³ãƒ†ãƒ³ãƒ„ãŒã‚ã‚Œã°ã‚­ãƒ£ãƒ³ã‚»ãƒ«
 			orders.concat(maker.cancel())
-			# ChannelSwitch¡§MATERIALS¤ò»ØÄê
+			# ChannelSwitchï¼šMATERIALSã‚’æŒ‡å®š
 			orders.push({"ChannelSwitch"=>{"channel"=>"MATERIALS"}})
-			# NaviDraw¡§ÉÔÍ×¡¥Navi¤ÏÉÁ²è¤µ¤ì¤Ê¤¤
+			# NaviDrawï¼šä¸è¦ï¼Naviã¯æç”»ã•ã‚Œãªã„
 
-			# ÍúÎò¥Õ¥¡¥¤¥ë¤ò½ñ¤­¹ş¤à
+			# å±¥æ­´ãƒ•ã‚¡ã‚¤ãƒ«ã‚’æ›¸ãè¾¼ã‚€
 			logger()
 		when "OVERVIEW"
-			# mode¤Î¹¹¿·
+			# modeã®æ›´æ–°
 			result = maker.modeUpdate_channel(jason_input["time"]["sec"], "OVERVIEW")
 			if result == "internal_error"
 				return {"status"=>"internal error"}
@@ -130,19 +130,19 @@ def channel(jason_input)
 				return {"status"=>"invalid params"}
 			end
 
-			# DetailDraw¡§ÉÔÍ×¡¥Detail¤ÏÉÁ²è¤µ¤ì¤Ê¤¤
-			# Play¡§ÉÔÍ×¡¥ºÆÀ¸¥³¥ó¥Æ¥ó¥Ä¤ÏÂ¸ºß¤·¤Ê¤¤
-			# Notify¡§ÉÔÍ×¡¥ºÆÀ¸¥³¥ó¥Æ¥ó¥Ä¤ÏÂ¸ºß¤·¤Ê¤¤
-			# Cancel¡§ºÆÀ¸ÂÔ¤Á¥³¥ó¥Æ¥ó¥Ä¤¬¤¢¤ì¤Ğ¥­¥ã¥ó¥»¥ë
+			# DetailDrawï¼šä¸è¦ï¼Detailã¯æç”»ã•ã‚Œãªã„
+			# Playï¼šä¸è¦ï¼å†ç”Ÿã‚³ãƒ³ãƒ†ãƒ³ãƒ„ã¯å­˜åœ¨ã—ãªã„
+			# Notifyï¼šä¸è¦ï¼å†ç”Ÿã‚³ãƒ³ãƒ†ãƒ³ãƒ„ã¯å­˜åœ¨ã—ãªã„
+			# Cancelï¼šå†ç”Ÿå¾…ã¡ã‚³ãƒ³ãƒ†ãƒ³ãƒ„ãŒã‚ã‚Œã°ã‚­ãƒ£ãƒ³ã‚»ãƒ«
 			orders.concat(maker.cancel())
-			# ChannelSwitch¡§OVERVIEW¤ò»ØÄê
+			# ChannelSwitchï¼šOVERVIEWã‚’æŒ‡å®š
 			orders.push({"ChannelSwitch"=>{"channel"=>"OVERVIEW"}})
-			# NaviDraw¡§ÉÔÍ×¡¥Navi¤ÏÉÁ²è¤µ¤ì¤Ê¤¤
+			# NaviDrawï¼šä¸è¦ï¼Naviã¯æç”»ã•ã‚Œãªã„
 
-			# ÍúÎò¥Õ¥¡¥¤¥ë¤ò½ñ¤­¹ş¤à
+			# å±¥æ­´ãƒ•ã‚¡ã‚¤ãƒ«ã‚’æ›¸ãè¾¼ã‚€
 			logger()
 		else
-			# ÍúÎò¥Õ¥¡¥¤¥ë¤Ë½ñ¤­¹ş¤à
+			# å±¥æ­´ãƒ•ã‚¡ã‚¤ãƒ«ã«æ›¸ãè¾¼ã‚€
 			logger()
 			errorLOG()
 			return {"status"=>"invalid params"}
@@ -159,11 +159,11 @@ def check(jason_input)
 	begin
 		orders = []
 		maker = OrdersMaker.new(jason_input["session_id"])
-		# element_name¤Î³ÎÇ§
+		# element_nameã®ç¢ºèª
 		element_name = searchElementName(jason_input["session_id"], jason_input["operation_contents"])
 
 		if element_name == "step" || element_name == "substep"
-			# mode¤Î½¤Àµ
+			# modeã®ä¿®æ­£
 			result = maker.modeUpdate_check(jason_input["time"]["sec"], jason_input["operation_contents"])
 			if result == "interlan_error"
 				return {"status"=>"internal error"}
@@ -171,22 +171,22 @@ def check(jason_input)
 				return {"status"=>"invalid params"}
 			end
 
-			# DetailDraw¡§
+			# DetailDrawï¼š
 			orders.concat(maker.detailDraw())
-			# Play¡§ÉÔÍ×¡¥¥Á¥§¥Ã¥¯¤òÆş¤ì¤ë¤À¤±¤ÇÂç¤­¤Ê²èÌÌÁ«°Ü¤Ç¤Ï¤Ê¤¤
+			# Playï¼šä¸è¦ï¼ãƒã‚§ãƒƒã‚¯ã‚’å…¥ã‚Œã‚‹ã ã‘ã§å¤§ããªç”»é¢é·ç§»ã§ã¯ãªã„
 			orders.concat(maker.play(jason_input["time"]["sec"]))
-			# Notify¡§ÉÔÍ×¡¥¥Á¥§¥Ã¥¯¤òÆş¤ì¤ë¤À¤±¤ÇÂç¤­¤Ê²èÌÌÁ«°Ü¤Ç¤Ï¤Ê¤¤ÉÔÍ×¡¥
+			# Notifyï¼šä¸è¦ï¼ãƒã‚§ãƒƒã‚¯ã‚’å…¥ã‚Œã‚‹ã ã‘ã§å¤§ããªç”»é¢é·ç§»ã§ã¯ãªã„ä¸è¦ï¼
 			orders.concat(maker.notify(jason_input["time"]["sec"]))
-			# Cancel¡§CURRENT¤Êsubstep¤ò¥Á¥§¥Ã¥¯¤µ¤ì¤¿¾ì¹ç¡¤¥á¥Ç¥£¥¢¤ò½ªÎ»¤¹¤ëÉ¬Í×¤¬¤¢¤ë¡¥
+			# Cancelï¼šCURRENTãªsubstepã‚’ãƒã‚§ãƒƒã‚¯ã•ã‚ŒãŸå ´åˆï¼Œãƒ¡ãƒ‡ã‚£ã‚¢ã‚’çµ‚äº†ã™ã‚‹å¿…è¦ãŒã‚ã‚‹ï¼
 			orders.concat(maker.cancel())
-			# ChannelSwitch¡§ÉÔÍ×¡¥
-			# NaviDraw¡§¥Á¥§¥Ã¥¯¤µ¤ì¤¿¤â¤Î¤òis_fisnished¤Ë½ñ¤­ÂØ¤¨¡¤visual¤òÅ¬ÀÚ¤Ë½ñ¤­´¹¤¨¤¿¤â¤Î¤òÄó¼¨
+			# ChannelSwitchï¼šä¸è¦ï¼
+			# NaviDrawï¼šãƒã‚§ãƒƒã‚¯ã•ã‚ŒãŸã‚‚ã®ã‚’is_fisnishedã«æ›¸ãæ›¿ãˆï¼Œvisualã‚’é©åˆ‡ã«æ›¸ãæ›ãˆãŸã‚‚ã®ã‚’æç¤º
 			orders.concat(maker.naviDraw())
 
-			# ÍúÎò¥Õ¥¡¥¤¥ë¤ò½ñ¤­¹ş¤à
+			# å±¥æ­´ãƒ•ã‚¡ã‚¤ãƒ«ã‚’æ›¸ãè¾¼ã‚€
 			logger()
 		else
-			# ÍúÎò¥Õ¥¡¥¤¥ë¤ò½ñ¤­¹ş¤à
+			# å±¥æ­´ãƒ•ã‚¡ã‚¤ãƒ«ã‚’æ›¸ãè¾¼ã‚€
 			logger()
 			errorLOG()
 			return {"status"=>"invalid params"}
@@ -200,8 +200,8 @@ def check(jason_input)
 end
 
 def start(jason_input)
-	# Navigation¤ËÉ¬Í×¤Ê¥Õ¥¡¥¤¥ë¡Ê¾ÜºÙ¤Ï¥¯¥é¥¹¥Õ¥¡¥¤¥ëÆâ¡Ë¤òºîÀ®
-	# modeUpdate¤â¤³¤Î´Ø¿ô¤Ç¤ä¤Ã¤Æ¤·¤Ş¤¦
+	# Navigationã«å¿…è¦ãªãƒ•ã‚¡ã‚¤ãƒ«ï¼ˆè©³ç´°ã¯ã‚¯ãƒ©ã‚¹ãƒ•ã‚¡ã‚¤ãƒ«å†…ï¼‰ã‚’ä½œæˆ
+	# modeUpdateã‚‚ã“ã®é–¢æ•°ã§ã‚„ã£ã¦ã—ã¾ã†
 	result = start_action(jason_input["session_id"], jason_input["operation_contents"])
 	if result == "internal_error"
 		return {"status"=>"internal error"}
@@ -210,22 +210,22 @@ def start(jason_input)
 	end
 
 	orders = []
-	### DetailDraw¡§ÉÔÍ×¡¥Detail¤ÏÉÁ²è¤µ¤ì¤Ê¤¤
-	### Play¡§ÉÔÍ×¡¥ºÆÀ¸¥³¥ó¥Æ¥ó¥Ä¤ÏÂ¸ºß¤·¤Ê¤¤
-	### Notify¡§ÉÔÍ×¡¥ºÆÀ¸¥³¥ó¥Æ¥ó¥Ä¤ÏÂ¸ºß¤·¤Ê¤¤
-	### Cancel¡§ÉÔÍ×¡¥ºÆÀ¸ÂÔ¤Á¥³¥ó¥Æ¥ó¥Ä¤ÏÂ¸ºß¤·¤Ê¤¤
-	### ChannelSwitch¡§OVERVIEW¤ò»ØÄê
+	### DetailDrawï¼šä¸è¦ï¼Detailã¯æç”»ã•ã‚Œãªã„
+	### Playï¼šä¸è¦ï¼å†ç”Ÿã‚³ãƒ³ãƒ†ãƒ³ãƒ„ã¯å­˜åœ¨ã—ãªã„
+	### Notifyï¼šä¸è¦ï¼å†ç”Ÿã‚³ãƒ³ãƒ†ãƒ³ãƒ„ã¯å­˜åœ¨ã—ãªã„
+	### Cancelï¼šä¸è¦ï¼å†ç”Ÿå¾…ã¡ã‚³ãƒ³ãƒ†ãƒ³ãƒ„ã¯å­˜åœ¨ã—ãªã„
+	### ChannelSwitchï¼šOVERVIEWã‚’æŒ‡å®š
 	orders.push({"ChannelSwitch"=>{"channel"=>"OVERVIEW"}})
-	### NaviDraw¡§ÉÔÍ×¡¥Navi¤ÏÉÁ²è¤µ¤ì¤Ê¤¤
+	### NaviDrawï¼šä¸è¦ï¼Naviã¯æç”»ã•ã‚Œãªã„
 
-	# ÍúÎò¥Õ¥¡¥¤¥ë¤Ë½ñ¤­¹ş¤à
+	# å±¥æ­´ãƒ•ã‚¡ã‚¤ãƒ«ã«æ›¸ãè¾¼ã‚€
 	logger()
 	return {"status"=>"success","body"=>orders}
 end
 
 def finish(jason_input)
 	begin
-		# media¤òSTOP¤Ë¤¹¤ë¡¥
+		# mediaã‚’STOPã«ã™ã‚‹ï¼
 		hash_mode, result = finish_action(jason_input["session_id"])
 		if result == "internal_error"
 			return {"status"=>"internal error"}
@@ -235,20 +235,20 @@ def finish(jason_input)
 
 		doc = REXML::Document.new(open("records/#{jason_input["session_id"]}/#{jason_input["session_id"]}_recipe.xml"))
 
-		### DetailDraw¡§ÉÔÍ×¡¥Detail¤ÏÉÁ²è¤µ¤ì¤Ê¤¤
-		### Play¡§ÉÔÍ×¡¥ºÆÀ¸¥³¥ó¥Æ¥ó¥Ä¤ÏÂ¸ºß¤·¤Ê¤¤
-		### Notify¡§ÉÔÍ×¡¥ºÆÀ¸¥³¥ó¥Æ¥ó¥Ä¤ÏÂ¸ºß¤·¤Ê¤¤
-		### Cancel¡§ºÆÀ¸ÂÔ¤Á¥³¥ó¥Æ¥ó¥Ä¤¬Â¸ºß¤¹¤ì¤Ğ¥­¥ã¥ó¥»¥ë
+		### DetailDrawï¼šä¸è¦ï¼Detailã¯æç”»ã•ã‚Œãªã„
+		### Playï¼šä¸è¦ï¼å†ç”Ÿã‚³ãƒ³ãƒ†ãƒ³ãƒ„ã¯å­˜åœ¨ã—ãªã„
+		### Notifyï¼šä¸è¦ï¼å†ç”Ÿã‚³ãƒ³ãƒ†ãƒ³ãƒ„ã¯å­˜åœ¨ã—ãªã„
+		### Cancelï¼šå†ç”Ÿå¾…ã¡ã‚³ãƒ³ãƒ†ãƒ³ãƒ„ãŒå­˜åœ¨ã™ã‚Œã°ã‚­ãƒ£ãƒ³ã‚»ãƒ«
 		orders, result = cancel(jason_input["session_id"], doc, hash_mode)
 		if result == "internal_error"
 			return {"status"=>"internal error"}
 		elsif result == "invalid_params"
 			return {"status"=>"invalid params"}
 		end
-		### ChannelSwitch¡§ÉÔÍ×
-		### NaviDraw¡§ÉÔÍ×¡¥Navi¤ÏÉÁ²è¤µ¤ì¤Ê¤¤
+		### ChannelSwitchï¼šä¸è¦
+		### NaviDrawï¼šä¸è¦ï¼Naviã¯æç”»ã•ã‚Œãªã„
 
-		# ÍúÎò¥Õ¥¡¥¤¥ë¤Ë½ñ¤­¹ş¤à
+		# å±¥æ­´ãƒ•ã‚¡ã‚¤ãƒ«ã«æ›¸ãè¾¼ã‚€
 		logger()
 	rescue => e
 		p e
@@ -278,12 +278,12 @@ def play_control(jason_input)
 		end
 
 		orders = []
-		### DetailDraw¡§ÉÔÍ×¡¥Detail¤ÏÉÁ²è¤µ¤ì¤Ê¤¤
-		### Play¡§
-		### Notify¡§
-		### Cancel¡§
-		### ChannelSwitch¡§ÉÔÍ×
-		### NaviDraw¡§ÉÔÍ×¡¥Navi¤ÏÉÁ²è¤µ¤ì¤Ê¤¤
+		### DetailDrawï¼šä¸è¦ï¼Detailã¯æç”»ã•ã‚Œãªã„
+		### Playï¼š
+		### Notifyï¼š
+		### Cancelï¼š
+		### ChannelSwitchï¼šä¸è¦
+		### NaviDrawï¼šä¸è¦ï¼Naviã¯æç”»ã•ã‚Œãªã„
 	rescue => e
 		p e
 		return {"status"=>"internal error"}

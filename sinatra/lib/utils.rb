@@ -38,62 +38,62 @@ end
 def set_ABLEorOTHERS(doc, hash_mode, current_step, current_substep)
 	# step
 	hash_mode["step"]["mode"].each{|key, value|
-		# NOT_YET$B$J(Bstep$B$N$_$,(BABLE$B$K$J$l$k!%(B
+		# NOT_YETなstepのみがABLEになれる．
 		if value[1] == "NOT_YET"
-			# parent$B$r;}$?$J$$(Bstep$B$O$$$D$G$b$G$-$k$N$G!$L5>r7o$G(BABLE$B$K$9$k!%(B
+			# parentを持たないstepはいつでもできるので，無条件でABLEにする．
 			if doc.elements["//step[@id=\"#{key}\"]/parent"] == nil
 				hash_mode["step"]["mode"][key][0] = "ABLE"
-			# parent$B$r;}$D(Bstep$B$O!$$=$NJ#?t$N(B($BC1?t$N>l9g$"$j(B)step$B$,A4$F(Bis_finished$B$J$i$P(BABLE$B$K$J$k!%(B
+			# parentを持つstepは，その複数の(単数の場合あり)stepが全てis_finishedならばABLEになる．
 			else
 				flag = -1
 				doc.elements["//step[@id=\"#{key}\"]/parent"].attributes.get_attribute("ref").value.split(" ").each{|v|
-					# parent$B$H$7$F;XDj$5$l$?(Bid$B$,$A$c$s$HB8:_$9$k!%(B
+					# parentとして指定されたidがちゃんと存在する．
 					if hash_mode["step"]["mode"].key?(v)
-						# parent$B$,(Bis_finished$B$J$i$P(BABLE$B$K$J$k2DG=@-$"$j!%!J$=$NB>$N(Bparent$B$K4|BT!K(B
+						# parentがis_finishedならばABLEになる可能性あり．（その他のparentに期待）
 						if hash_mode["step"]["mode"][v][1] == "is_finished"
 							flag = 1
-						# parent$B$,(Bis_finished$B$G$J$$>l9g!$(B
+						# parentがis_finishedでない場合，
 						else
-							# parent$B$,(BCURRENT$B$J(Bstep$B$G$"$j$+$D(BABLE$B$G$"$l$P!$(BABLE$B$K$J$k2DG=@-$"$j!%!J$=$NB>$N(Bparent$B$K4|BT!K(B
+							# parentがCURRENTなstepでありかつABLEであれば，ABLEになる可能性あり．（その他のparentに期待）
 							if v == current_step && hash_mode["step"]["mode"][current_step][0] == "ABLE"
 								flag = 1
-							# $B>e5-0J30$O(BABLE$B$K$J$l$J$$$N$GD>$A$K(Bbreak$B!%(B
+							# 上記以外はABLEになれないので直ちにbreak．
 							else
 								flag = -1
 								break
 							end
 						end
-					# parent$B$H$7$F;XDj$5$l$?(Bid$B$,B8:_$7$J$$>l9g!$(Brecipe.xml$B$N5-=R$,$*$+$7$$!%!J%(%i!<$H$7$F=P$9!)!K(B
+					# parentとして指定されたidが存在しない場合，recipe.xmlの記述がおかしい．（エラーとして出す？）
 					else
 						flag = 1
 					end
 				}
-				# parent$B$,A4$F(Bis_finished$B$J$i(BABLE$B$K@_Dj!%(B
+				# parentが全てis_finishedならABLEに設定．
 				if flag == 1 then
 					hash_mode["step"]["mode"][key][0] = "ABLE"
-				# ABLE$B$G$J$$(Bstep$B$OL@<(E*$K(BOTHERS$B$K!%(B
+				# ABLEでないstepは明示的にOTHERSに．
 				else
 					hash_mode["step"]["mode"][key][0] = "OTHERS"
 				end
 			end
-		# ABLE$B$G$J$$(Bstep$B$OL@<(E*$K(BOTHERS$B$K!%(B
+		# ABLEでないstepは明示的にOTHERSに．
 		else
 			hash_mode["step"]["mode"][key][0] = "OTHERS"
 		end
 	}
 	# substep
-	# $B$H$j$"$($:!$A4$F$N(Bsubstep$B$r(BOTHERS$B$K$9$k!%(B
+	# とりあえず，全てのsubstepをOTHERSにする．
 	hash_mode["substep"]["mode"].each{|key, value|
 		hash_mode["substep"]["mode"][key][0] = "OTHERS"
 	}
-	# current_substep$B$N?F%N!<%I$N(Bstep$B$,(BABLE$B$N>l9g$N$_!$;R%N!<%I(Bsubstep$B$N$$$:$l$+$,(BABLE$B$K$J$l$k!%(B
+	# current_substepの親ノードのstepがABLEの場合のみ，子ノードsubstepのいずれかがABLEになれる．
 	if hash_mode["step"]["mode"][current_step][0] == "ABLE"
 		doc.get_elements("//step[@id=\"#{current_step}\"]/substep").each{|node|
 			substep_id = node.attributes.get_attribute("id").value
-			# NOT_YET$B$J(Bsubstep$B$NCf$GM%@hEY$N0lHV9b$$$b$N!J0lHV=i$a$K8=$l$k$b$N!K$r(BABLE$B$K$9$k!%(B
+			# NOT_YETなsubstepの中で優先度の一番高いもの（一番初めに現れるもの）をABLEにする．
 			if hash_mode["substep"]["mode"][substep_id][1] == "NOT_YET"
 				hash_mode["substep"]["mode"][substep_id][0] = "ABLE"
-				# ABLE$B$J(Bsubstep$B$,(BCURRENT$B$G$+$D!$Do%N!<%I$J(Bsubstep$B$,$"$l$P$=$l$r(BABLE$B$K$9$k!%(B
+				# ABLEなsubstepがCURRENTでかつ，弟ノードなsubstepがあればそれをABLEにする．
 				if substep_id == current_substep && doc.elements["//substep[@id=\"#{substep_id}\"]"].next_sibling_node != nil
 					next_substep = doc.elements["//substep[@id=\"#{substep_id}\"]"].next_sibling_node.attributes.get_attribute("id").value
 					hash_mode["substep"]["mode"][next_substep][0] = "ABLE"
@@ -106,7 +106,7 @@ def set_ABLEorOTHERS(doc, hash_mode, current_step, current_substep)
 end
 
 def go2current(doc, hash_mode, sorted_step, current_step, current_substep)
-	# $B8=>u$G(BCURRENT$B$J(Bstep$B$H(Bsubstep$B$r(BNOT_CURRENT$B$K$9$k!%(B
+	# 現状でCURRENTなstepとsubstepをNOT_CURRENTにする．
 	hash_mode["step"]["mode"][current_step][2] = "NOT_CURRENT"
 	hash_mode["substep"]["mode"][current_substep][2] = "NOT_CURRENT"
 
@@ -140,7 +140,7 @@ def check_notification_FINISHED(doc, hash_mode, time)
 		if value[0]  == "KEEP"
 			if time > value[1]
 				hash_mode["notification"]["mode"][key] = ["FINISHED", -1]
-				# notification$B$,(Baudio$B$r$b$C$F$$$l$P!$$=$l$b(BFINISHED$B$K$9$k!%(B
+				# notificationがaudioをもっていれば，それもFINISHEDにする．
 				doc.get_elements("//notification[@id=\"#{key}\"]/audio").each{|node|
 					audio_id = node.attributes.get_attribute("id").value
 					if audio_id != nil
@@ -178,35 +178,35 @@ end
 def errorLOG()
 end
 
-# $B:F@8BT$A>uBV$N(Baudio$B!$(Bvideo$B!$(Bnotification$B$rCf;_$9$k(BCancel$BL?Na!%(B
+# 再生待ち状態のaudio，video，notificationを中止するCancel命令．
 def cancel(session_id, doc, hash_mode, *id)
 	begin
 		orders = []
-		# $BFC$KCf;_$5$;$k%a%G%#%"$K$D$$$F;XDj$,L5$$>l9g(B
+		# 特に中止させるメディアについて指定が無い場合
 		if id == []
-			# audio$B$H(Bvideo$B$N=hM}!%(B
-			# Cancel$B$5$;$k$Y$-$b$N$O!$(BSTOP$B$K$J$C$F$$$k$O$:!%(B
+			# audioとvideoの処理．
+			# Cancelさせるべきものは，STOPになっているはず．
 			media = ["audio", "video"]
 			media.each{|v|
 				if hash_mode.key?(v)
 					hash_mode[v]["mode"].each{|key, value|
 						if value[0] == "STOP"
 							orders.push({"Cancel"=>{"id"=>key}})
-							# STOP$B$+$i(BFINISHED$B$KJQ99!%(B
+							# STOPからFINISHEDに変更．
 							hash_mode[v]["mode"][key] = ["FINISHED", -1]
 						end
 					}
 				end
 			}
-			# notification$B$N=hM}!%(B
-			# Cancel$B$5$;$k$Y$-$b$N$O!$(BSTOP$B$N$J$C$F$$$k$O$:!%(B
+			# notificationの処理．
+			# Cancelさせるべきものは，STOPのなっているはず．
 			if hash_mode.key?("notification")
 				hash_mode["notification"]["mode"].each{|key, value|
 					if value[0] == "STOP"
 						orders.push({"Cancel"=>{"id"=>key}})
-						# STOP$B$+$i(BFINISHED$B$KJQ99!%(B
+						# STOPからFINISHEDに変更．
 						hash_mode["notification"]["mode"][key] = ["FINISHED", -1]
-						# audio$B$r$b$D(Bnotification$B$N>l9g!$(Baudio$B$b(BFINISHED$B$KJQ99!%(B
+						# audioをもつnotificationの場合，audioもFINISHEDに変更．
 						if doc.elements["//notification[@id=\"#{key}\"]/audio"] != nil
 							audio_id = doc.elements["//notification[@id=\"#{key}\"]/audio"].attributes.get_attribute("id").value
 							hash_mode["audio"]["mode"][audio_id] = ["FINISHED", -1]
@@ -214,31 +214,31 @@ def cancel(session_id, doc, hash_mode, *id)
 					end
 				}
 			end
-		else # $BCf;_$5$;$k%a%G%#%"$K$D$$$F;XDj$,$"$k>l9g!%(B
+		else # 中止させるメディアについて指定がある場合．
 			id.each{|v|
-				# $B;XDj$5$l$?%a%G%#%"$N(Belement name$B$rD4::!%(B
+				# 指定されたメディアのelement nameを調査．
 				element_name = searchElementName(session_id, v)
-				# audio$B$H(Bvideo$B$N>l9g!%(B
+				# audioとvideoの場合．
 				if element_name == "audio" || element_name == "video"
-					# $B;XDj$5$l$?$b$N$,:F@8BT$A$+$I$&$+$H$j$"$($:D4$Y$k!$(B
+					# 指定されたものが再生待ちかどうかとりあえず調べる，
 					if hash_mode[element_name]["mode"][v][0] == "CURRENT"
-						# Cancel$B$7$F(BFINISHED$B$K!%(B
+						# CancelしてFINISHEDに．
 						orders.push({"Cancel"=>{"id"=>v}})
 						hash_mode[element_name]["mode"][v] = ["FINISHED", -1]
 					end
-				elsif element_name == "notification" # notification$B$N>l9g!%(B
-					# $B;XDj$5$l$?(Bnotification$B$,:F@8BT$A$+$I$&$+$H$j$"$($:D4$Y$k!%(B
+				elsif element_name == "notification" # notificationの場合．
+					# 指定されたnotificationが再生待ちかどうかとりあえず調べる．
 					if hash_mode["notification"]["mode"][v][0] == "KEEP"
-						# Cancel$B$7$F(BFINISHED$B$K!%(B
+						# CancelしてFINISHEDに．
 						orders.push({"Cancel"=>{"id"=>v}})
 						hash_mode["notification"]["mode"][v][0] = ["FINISHED", -1]
-						# audio$B$r;}$D(Bnotification$B$O(Baudio$B$b(BFINISHED$B$K!%(B
+						# audioを持つnotificationはaudioもFINISHEDに．
 						if doc.elements["//notification[@id=\"#{v}\"]/audio"] != nil
 							audio_id = doc.elements["//notification[@id=\"#{v}\"]/audio"].attributes.get_attribute("id").value
 							hash_mode["audio"]["mode"][audio_id] = ["FINISHED", -1]
 						end
 					end
-				else # $B;XDj$5$l$?$b$N$,(Baudio$B!$(Bvideo$B!$(Bnotification$B$GL5$$>l9g!%(B
+				else # 指定されたものがaudio，video，notificationで無い場合．
 					return [], hash_mode, "invalid_params"
 				end
 			}

@@ -35,7 +35,7 @@ def start_action(session_id, contents)
 
 		doc = REXML::Document.new(open("records/#{session_id}/#{session_id}_recipe.xml"))
 
-		# id$B%F!<%V%k%U%!%$%k$N:n@.(B
+		# idテーブルファイルの作成
 		hash_id = Hash.new{|h, k| h[k] = {}}
 		doc.get_elements("//*").each{|node|
 			if node.attributes.get_attribute("id") != nil
@@ -55,7 +55,7 @@ def start_action(session_id, contents)
 		hash_mode = Hash.new{|h, k| h[k] = Hash.new(&h.default_proc)}
 		sorted_step = []
 
-		# mode$B%U%!%$%k5Z$S(Bsorted$B%U%!%$:n@.(B
+		# modeファイル及びsortedファイ作成
 		if hash_id.key?("step")
 			hash_id["step"]["id"].each{|value|
 				priority = 100
@@ -82,7 +82,7 @@ def start_action(session_id, contents)
 			return "invalid_params"
 		end
 
-		# recipe$B$NCf?H$N3NG'$O!$(Bstep$B$H(Bsubstep$B$NM-$kL5$7$@$1$KN1$a$F$*$/!%!J:G0-$=$l0J30$O$J$/$F$b;Y1g$G$-$k!K(B
+		# recipeの中身の確認は，stepとsubstepの有る無しだけに留めておく．（最悪それ以外はなくても支援できる）
 
 		if hash_id.key?("audio")
 			hash_id["audio"]["id"].each{|value|
@@ -100,11 +100,11 @@ def start_action(session_id, contents)
 			}
 		end
 
-		# $BI=<($5$l$F$$$k2hLL$N4IM}$N$?$a$K!J(BSTART$B;~$O(BOVERVIEW$B!K(B
+		# 表示されている画面の管理のために（START時はOVERVIEW）
 		hash_mode["display"] = "OVERVIEW"
 
 		# modeUpdate
-		# $BM%@hEY$N:G$b9b$$(Bstep$B$r(BCURRENT$B$H$7!$$=$N0lHVL\$N(Bsubstep$B$b(BCURRENT$B$K$9$k!%(B
+		# 優先度の最も高いstepをCURRENTとし，その一番目のsubstepもCURRENTにする．
 		current_step = sorted_step[0][1]
 		current_substep = nil
 		if doc.elements["//step[@id=\"#{current_step}\"]/substep[1]"].attributes.get_attribute("id") != nil
@@ -115,10 +115,10 @@ def start_action(session_id, contents)
 		end
 		hash_mode["step"]["mode"][current_step][2] = "CURRENT"
 		hash_mode["substep"]["mode"][current_substep][2] = "CURRENT"
-		# step$B$H(Bsubstep$B$rE,@Z$K(BABLE$B$K$9$k!%(B
+		# stepとsubstepを適切にABLEにする．
 		hash_mode = set_ABLEorOTHERS(doc, hash_mode, current_step, current_substep)
-		# START$B$J$N$G!$(Bis_finished$B$J$b$N$O$J$$!%(B
-		# CURRENT$B$H$J$C$?(Bsubstep$B$,(BABLE$B$J$i$P%a%G%#%"$N:F@8=`Hw$H$7$F(BCURRENT$B$K$9$k!%(B
+		# STARTなので，is_finishedなものはない．
+		# CURRENTとなったsubstepがABLEならばメディアの再生準備としてCURRENTにする．
 		if hash_mode["substep"]["mode"][current_substep][0] == "ABLE"
 			media = ["audio", "video", "notification"]
 			media.each{|v|

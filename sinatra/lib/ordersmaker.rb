@@ -21,11 +21,11 @@ class OrdersMaker
 		@doc = REXML::Document.new(open("records/#{@session_id}/#{@session_id}_recipe.xml"))
 	end
 
-	# CURRENT$B$J(Bsubstep$B$N(Bhtml_contents$B$rI=<($5$;$k(BDetailDraw$BL?Na!%(B
+	# CURRENTなsubstepのhtml_contentsを表示させるDetailDraw命令．
 	def detailDraw
 		orders = []
 		@hash_mode["substep"]["mode"].each{|key, value|
-			# CURREN$B$J(Bsubstep$B$O0l$D$@$1!J$N$O$:!K!%(B
+			# CURRENなsubstepは一つだけ（のはず）．
 			if value[2] == "CURRENT"
 				orders.push({"DetailDraw"=>{"id"=>key}})
 				break
@@ -34,23 +34,23 @@ class OrdersMaker
 		return orders
 	end
 
-	# CURRENT$B$J(Baudio$B$H(Bvideo$B$r:F@8$5$;$k(BPlay$BL?Na!%(B
+	# CURRENTなaudioとvideoを再生させるPlay命令．
 	def play(time)
 		orders = []
 		media = ["audio", "video"]
 		media.each{|v|
 			@hash_mode[v]["mode"].each{|key, value|
 				if value[0] == "CURRENT"
-					# trigger$B$N?t$,(B1$B8D0J>e$N$H$-!%(B
+					# triggerの数が1個以上のとき．
 					if @doc.elements["//#{v}[@id=\"#{key}\"]/trigger[1]"] != nil
-						# trigger$B$,J#?t8D$N>l9g!$$I$&$9$k$N$+9M$($F$$$J$$!%(B
+						# triggerが複数個の場合，どうするのか考えていない．
 						@doc.get_elements("//#{v}[@id=\"#{key}\"]/trigger[1]").each{|node|
 							orders.push({"Play"=>{"id"=>key, "delay"=>node.attributes.get_attribute("delay").value}})
 							finish_time = time + node.attributes.get_attribute("delay").value.to_i * 1000
 							@hash_mode[v]["mode"][key][1] = finish_time
 						}
-					else # trigger$B$,(B0$B8D$N$H$-!%(B
-						# trigger$B$,L5$$>l9g$O:F@8L?Na$O=P$5$J$$$,!$(Bhash_mode$B$O$I$&JQ99$9$k$N$+9M$($F$$$J$$!%(B
+					else # triggerが0個のとき．
+						# triggerが無い場合は再生命令は出さないが，hash_modeはどう変更するのか考えていない．
 						# @hash_mode[v]["mode"][key][1] = ?
 						return []
 					end
@@ -63,17 +63,17 @@ class OrdersMaker
 		return orders
 	end
 
-	# CURRENT$B$J(Bnotification$B$r:F@8$5$;$k(BNotify$BL?Na!%(B
+	# CURRENTなnotificationを再生させるNotify命令．
 	def notify(time)
 		orders = []
 		@hash_mode["notification"]["mode"].each{|key, value|
 			if value[0] == "CURRENT"
-				# notification$B$O(Btrigger$B$,I,$:$"$k!%(B
-				# trigger$B$,J#?t8D$N>l9g!$$I$&$9$k$N$+9M$($F$$$J$$!%(B
+				# notificationはtriggerが必ずある．
+				# triggerが複数個の場合，どうするのか考えていない．
 				@doc.get_elements("//notification[@id=\"#{key}\"]/trigger[1]").each{|node|
 					orders.push({"Notify"=>{"id"=>key, "delay"=>node.attributes.get_attribute("delay").value}})
 					finish_time = time + node.attributes.get_attribute("delay").value.to_i * 1000
-					# notification$B$OFC<l$J$N$G!$FCJL$K(BKEEP$B$KJQ99$9$k!%(B
+					# notificationは特殊なので，特別にKEEPに変更する．
 					@hash_mode["notification"]["mode"][key] = ["KEEP", finish_time]
 				}
 			end
@@ -84,34 +84,34 @@ class OrdersMaker
 		return orders
 	end
 
-	# $B:F@8BT$A>uBV$N(Baudio$B!$(Bvideo$B!$(Bnotification$B$rCf;_$9$k(BCancel$BL?Na!%(B
+	# 再生待ち状態のaudio，video，notificationを中止するCancel命令．
 	def cancel(*id)
 		orders = []
-		# $BFC$KCf;_$5$;$k%a%G%#%"$K$D$$$F;XDj$,L5$$>l9g(B
+		# 特に中止させるメディアについて指定が無い場合
 		if id == []
-			# audio$B$H(Bvideo$B$N=hM}!%(B
-			# Cancel$B$5$;$k$Y$-$b$N$O!$(BSTOP$B$K$J$C$F$$$k$O$:!%(B
+			# audioとvideoの処理．
+			# Cancelさせるべきものは，STOPになっているはず．
 			media = ["audio", "video"]
 			media.each{|v|
 				if @hash_mode.key?(v)
 					@hash_mode[v]["mode"].each{|key, value|
 						if value[0] == "STOP"
 							orders.push({"Cancel"=>{"id"=>key}})
-							# STOP$B$+$i(BFINISHED$B$KJQ99!%(B
+							# STOPからFINISHEDに変更．
 							@hash_mode[v]["mode"][key] = ["FINISHED", -1]
 						end
 					}
 				end
 			}
-			# notification$B$N=hM}!%(B
-			# Cancel$B$5$;$k$Y$-$b$N$O!$(BSTOP$B$N$J$C$F$$$k$O$:!%(B
+			# notificationの処理．
+			# Cancelさせるべきものは，STOPのなっているはず．
 			if @hash_mode.key?("notification")
 				@hash_mode["notification"]["mode"].each{|key, value|
 					if value[0] == "STOP"
 						orders.push({"Cancel"=>{"id"=>key}})
-						# STOP$B$+$i(BFINISHED$B$KJQ99!%(B
+						# STOPからFINISHEDに変更．
 						@hash_mode["notification"]["mode"][key] = ["FINISHED", -1]
-						# audio$B$r$b$D(Bnotification$B$N>l9g!$(Baudio$B$b(BFINISHED$B$KJQ99!%(B
+						# audioをもつnotificationの場合，audioもFINISHEDに変更．
 						if @doc.elements["//notification[@id=\"#{key}\"]/audio"] != nil
 							audio_id = @doc.elements["//notification[@id=\"#{key}\"]/audio"].attributes.get_attribute("id").value
 							@hash_mode["audio"]["mode"][audio_id] = ["FINISHED", -1]
@@ -119,31 +119,31 @@ class OrdersMaker
 					end
 				}
 			end
-		else # $BCf;_$5$;$k%a%G%#%"$K$D$$$F;XDj$,$"$k>l9g!%(B
+		else # 中止させるメディアについて指定がある場合．
 			id.each{|v|
-				# $B;XDj$5$l$?%a%G%#%"$N(Belement name$B$rD4::!%(B
+				# 指定されたメディアのelement nameを調査．
 				element_name = searchElementName(@session_id, v)
-				# audio$B$H(Bvideo$B$N>l9g!%(B
+				# audioとvideoの場合．
 				if element_name == "audio" || element_name == "video"
-					# $B;XDj$5$l$?$b$N$,:F@8BT$A$+$I$&$+$H$j$"$($:D4$Y$k!$(B
+					# 指定されたものが再生待ちかどうかとりあえず調べる，
 					if @hash_mode[element_name]["mode"][v][0] == "CURRENT"
-						# Cancel$B$7$F(BFINISHED$B$K!%(B
+						# CancelしてFINISHEDに．
 						orders.push({"Cancel"=>{"id"=>v}})
 						@hash_mode[element_name]["mode"][v] = ["FINISHED", -1]
 					end
-				elsif element_name == "notification" # notification$B$N>l9g!%(B
-					# $B;XDj$5$l$?(Bnotification$B$,:F@8BT$A$+$I$&$+$H$j$"$($:D4$Y$k!%(B
+				elsif element_name == "notification" # notificationの場合．
+					# 指定されたnotificationが再生待ちかどうかとりあえず調べる．
 					if @hash_mode["notification"]["mode"][v][0] == "KEEP"
-						# Cancel$B$7$F(BFINISHED$B$K!%(B
+						# CancelしてFINISHEDに．
 						orders.push({"Cancel"=>{"id"=>v}})
 						@hash_mode["notification"]["mode"][v][0] = ["FINISHED", -1]
-						# audio$B$r;}$D(Bnotification$B$O(Baudio$B$b(BFINISHED$B$K!%(B
+						# audioを持つnotificationはaudioもFINISHEDに．
 						if @doc.elements["//notification[@id=\"#{v}\"]/audio"] != nil
 							audio_id = @doc.elements["//notification[@id=\"#{v}\"]/audio"].attributes.get_attribute("id").value
 							@hash_mode["audio"]["mode"][audio_id] = ["FINISHED", -1]
 						end
 					end
-				else # $B;XDj$5$l$?$b$N$,(Baudio$B!$(Bvideo$B!$(Bnotification$B$GL5$$>l9g!%(B
+				else # 指定されたものがaudio，video，notificationで無い場合．
 					return [{}]
 				end
 			}
@@ -154,9 +154,9 @@ class OrdersMaker
 		return orders
 	end
 
-	# $B%J%S2hLL$NI=<($r7hDj$9$k(BNaviDraw$BL?Na!%(B
+	# ナビ画面の表示を決定するNaviDraw命令．
 	def naviDraw
-		# sorted_step$B$N=g$KI=<($5$;$k!%(B
+		# sorted_stepの順に表示させる．
 		orders = Array.new()
 		orders.push({"NaviDraw"=>{"steps"=>[]}})
 		flag = 0
@@ -173,10 +173,10 @@ class OrdersMaker
 			elsif @hash_mode["step"]["mode"][id][1] == "NOT_YET"
 				orders[0]["NaviDraw"]["steps"].push({"id"=>id, "visual"=>visual, "is_finished"=>0})
 			end
-			# CURRENT$B$J(Bstep$B$N>l9g!$(Bsubstep$B$bI=<($5$;$k!%(B
+			# CURRENTなstepの場合，substepも表示させる．
 			if visual == "CURRENT"
 				if flag == 1
-					p "error" # CURRENT$B$J(Bstep$B$,J#?t8D$"$k>l9g!$%(%i!<$rEG$/!)9M$($F$$$J$$!%(B
+					p "error" # CURRENTなstepが複数個ある場合，エラーを吐く？考えていない．
 				end
 				@doc.get_elements("//step[@id=\"#{v[1]}\"]/substep").each{|node|
 					id = node.attributes.get_attribute("id").value
@@ -198,7 +198,7 @@ class OrdersMaker
 		return orders
 	end
 
-	# NAVI_MENU$B%j%/%(%9%H$N>l9g$N(Bmode$B%"%C%W%G!<%H(B
+	# NAVI_MENUリクエストの場合のmodeアップデート
 	def modeUpdate_navimenu(time, id)
 		begin
 			unless @hash_mode["display"] == "GUIDE"
@@ -206,15 +206,15 @@ class OrdersMaker
 				return "invalid_params"
 			end
 			element_name = searchElementName(@session_id, id)
-			# $BA+0\MW5a@h$,(Bstep$B$+(Bsubstep$B$+$G>l9gJ,$1(B
+			# 遷移要求先がstepかsubstepかで場合分け
 			case element_name
 			when "step"
-				# $B$^$:$O!$(BCURRENT$B!$(BNOT_CURRENT$B$NA`:n!%(B
-				# $B8=>u$G(BCURRENT$B$J(Bsubstep$B$r(BNOT_CURRENT$B$K$9$k!%(B
+				# まずは，CURRENT，NOT_CURRENTの操作．
+				# 現状でCURRENTなsubstepをNOT_CURRENTにする．
 				@hash_mode["substep"]["mode"].each{|key, value|
 					if value[2] == "CURRENT"
 						@hash_mode["substep"]["mode"][key][2] = "NOT_CURRENT"
-						# substep$B$K4^$^$l$k(Baudio$B!$(Bvideo$B$O:F@8:Q$_!&:F@8Cf!&:F@8BT$A4X$o$i$:(BSTOP$B$K!%(B
+						# substepに含まれるaudio，videoは再生済み・再生中・再生待ち関わらずSTOPに．
 						media = ["audio", "video"]
 						media.each{|v|
 							@hash_mode[v]["mode"].each{|key, value|
@@ -223,20 +223,20 @@ class OrdersMaker
 								end
 							}
 						}
-						break # CURRENT$B$J(Bsubstep$B$O0l$D$@$1$N$O$:!%(B
+						break # CURRENTなsubstepは一つだけのはず．
 					end
 				}
-				# $B8=>u$G(BCURRENT$B$@$C$?(Bstep$B$r(BNOT_CURRENT$B$K$9$k!%(B
+				# 現状でCURRENTだったstepをNOT_CURRENTにする．
 				@hash_mode["step"]["mode"].each{|key, value|
 					if value[2] == "CURRENT"
 						@hash_mode["step"]["mode"][key][2] = "NOT_CURRENT"
-						break # CURRENT$B$J(Bstep$B$O0l$D$@$1$N$O$:!%(B
+						break # CURRENTなstepは一つだけのはず．
 					end
 				}
-				# $B%/%j%C%/$5$l$?(Bstep$B$r(BCURRENT$B$K!%(B
+				# クリックされたstepをCURRENTに．
 				@hash_mode["step"]["mode"][id][2] = "CURRENT"
-				# $B%/%j%C%/$5$l$?(Bstep$BFb$G(BNOT_YET$B$J(Bsubstep$B$N0lHVL\$r(BCURRENT$B$K!%(B
-				# NOT_YET$B$J(Bsubstep$B$,B8:_$7$J$1$l$P!$Bh0lHVL\$N(Bsubstep$B$r(BCURRENT$B$K!%(B
+				# クリックされたstep内でNOT_YETなsubstepの一番目をCURRENTに．
+				# NOT_YETなsubstepが存在しなければ，第一番目のsubstepをCURRENTに．
 				current_substep = nil
 				@doc.get_elements("//step[@id=\"#{id}\"]/substep").each{|node|
 					substep_id = node.attributes.get_attribute("id").value
@@ -247,24 +247,24 @@ class OrdersMaker
 						next
 					end
 				}
-				if current_substep != nil # NOT_YET$B$J(Bsubstep$B$,B8:_$9$k!%(B
-					# $B0lHVL\$K(BNOT_YET$B$J(Bsubstep$B$r(BCURRENT$B$K!%(B
+				if current_substep != nil # NOT_YETなsubstepが存在する．
+					# 一番目にNOT_YETなsubstepをCURRENTに．
 					@hash_mode["substep"]["mode"][current_substep][2] = "CURRENT"
-				else # NOT_YET$B$J(Bsubstep$B$,B8:_$7$J$$!%(B
-					# $B0lHVL\$N(B(is_finished$B$J(B)substep$B$r(BCURRENT$B$K!%(B
+				else # NOT_YETなsubstepが存在しない．
+					# 一番目の(is_finishedな)substepをCURRENTに．
 					current_substep = @doc.elements["//step[@id=\"#{id}\"]/substep[1]"].attributes.get_attribute("id").value
 					@hash_mode["substep"]["mode"][current_substep][2] = "CURRENT"
 				end
-				# $B%/%j%C%/$5$l$?@h$N%a%G%#%"$O:F@8$5$;$J$$!%(B
-				# step$B$H(Bsubstep$B$rE,@Z$K(BABLE$B$K$9$k!%(B
+				# クリックされた先のメディアは再生させない．
+				# stepとsubstepを適切にABLEにする．
 				@hash_mode = set_ABLEorOTHERS(@doc, @hash_mode, id, current_substep)
 			when "substep"
-				# $B$^$:$O!$(BCURRENT$B!$(BNOT_CURRENT$B$NA`:n!%(B
-				# $B8=>u$G(BCURRENT$B$J(Bsubstep$B$r(BNOT_CURRENT$B$K!%(B
+				# まずは，CURRENT，NOT_CURRENTの操作．
+				# 現状でCURRENTなsubstepをNOT_CURRENTに．
 				@hash_mode["substep"]["mode"].each{|key, value|
 					if value[2] == "CURRENT"
 						@hash_mode["substep"]["mode"][key][2] = "NOT_CURRENT"
-						# substep$B$K4^$^$l$k(Baudio$B!$(Bvideo$B$O:F@8:Q$_!&:F@8Cf!&:F@8BT$A4X$o$i$:(BSTOP$B$K!%(B
+						# substepに含まれるaudio，videoは再生済み・再生中・再生待ち関わらずSTOPに．
 						media = ["audio", "video"]
 						media.each{|v|
 							@hash_mode[v]["mode"].each{|key, value|
@@ -276,16 +276,16 @@ class OrdersMaker
 						break
 					end
 				}
-				# $B%/%j%C%/$5$l$?(Bsubstep$B$r(BCURRENT$B$K!%(B
+				# クリックされたsubstepをCURRENTに．
 				@hash_mode["substep"]["mode"][id][2] = "CURRENT"
-				# CURRENT$B$J(Bstep$B$NC5:w!%(B
+				# CURRENTなstepの探索．
 				current_step = @doc.elements["//substep[@id=\"#{id}\"]"].parent.attributes.get_attribute("id").value
-				# step$B$H(Bsubstep$B$rE,@Z$K(BABLE$B$K$9$k!%(B
+				# stepとsubstepを適切にABLEにする．
 				@hash_mode = set_ABLEorOTHERS(@doc, @hash_mode, current_step, id)
-			else # $BA+0\MW5a@h$,$*$+$7$$!%(B
+			else # 遷移要求先がおかしい．
 				return "invalid_params"
 			end
-			# notification$B$,:F@8:Q$_$+$I$&$+$O!$7d$"$i$PD4$Y$^$7$g$&!%(B
+			# notificationが再生済みかどうかは，隙あらば調べましょう．
 			@hash_mode = check_notification_FINISHED(@doc, @hash_mode, time)
 			open("records/#{@session_id}/#{@session_id}_mode.txt", "w"){|io|
 				io.puts(JSON.pretty_generate(@hash_mode))
@@ -298,24 +298,24 @@ class OrdersMaker
 		return "success"
 	end
 
-	# EXTERNAL_INPUT$B%j%/%(%9%H$N>l9g$N(Bmode$B%"%C%W%G!<%H(B
+	# EXTERNAL_INPUTリクエストの場合のmodeアップデート
 	def modeUpdate_externalinput(time, id)
 		begin
 			element_name = searchElementName(@session_id, id)
-			# $BF~NO$5$l$?(Bid$B$,(Bnotification$B$N>l9g!%(B
+			# 入力されたidがnotificationの場合．
 			if element_name == "notification"
-				# $B;XDj$5$l$?(Bnotification$B$,L$:F@8$J$i:F@8L?Na$HH=CG$7$F(BCURRENT$B$K!%(B
+				# 指定されたnotificationが未再生なら再生命令と判断してCURRENTに．
 				if @hash_mode["notification"]["mode"][id][0] == "NOT_YET"
 					@hash_mode["notification"]["mode"][id][0] = "CURRENT"
-				elsif @hash_mode["notification"]["mode"][id][0] == "KEEP" # $B;XDj$5$l$?(Bnotification$B$,:F@8BT5!Cf$J$i(BCancel$BL?Na$HH=CG$7$F(BSTOP$B$K!%(B
+				elsif @hash_mode["notification"]["mode"][id][0] == "KEEP" # 指定されたnotificationが再生待機中ならCancel命令と判断してSTOPに．
 					@hash_mode["notification"]["mode"][id][0] = "STOP"
 				end
 			else
-				# $BM%@hEY=g$K!$F~NO$5$l$?%*%V%8%'%/%H$r%H%j%,!<$H$9$k(Bsubstep$B$rC5:w!%(B
+				# 優先度順に，入力されたオブジェクトをトリガーとするsubstepを探索．
 				current_substep = nil
 				@sorted_step.each{|v|
 					flag = -1
-					# ABLE$B$J(Bstep$B$NCf$N(BNOT_YET$B$J(Bsubstep$B$+$iC5:w!%!J8=>u$G(BCURRENT$B$J(Bsubstep$B$bC5:wBP>]!%0lC6%*%V%8%'%/%H$rCV$$$F$^$?$d$j;O$a$?$@$1$+$b$7$l$J$$!%!K(B
+					# ABLEなstepの中のNOT_YETなsubstepから探索．（現状でCURRENTなsubstepも探索対象．一旦オブジェクトを置いてまたやり始めただけかもしれない．）
 					if @hash_mode["step"]["mode"][v[1]][0] == "ABLE"
 						@doc.get_elements("//step[@id=\"#{v[1]}\"]/substep").each{|node1|
 							substep_id = node1.attributes.get_attribute("id").value
@@ -324,15 +324,15 @@ class OrdersMaker
 									if node2.attributes.get_attribute("ref").value == id
 										current_substep = node2.parent.attributes.get_attribute("id").value
 										flag = 1
-										break # trigger$BC5:w$+$i$N(Bbreak
+										break # trigger探索からのbreak
 									end
 								}
 							end
 							if flag == 1
-								break # substep$BC5:w$+$i$N(Bbreak
+								break # substep探索からのbreak
 							end
 						}
-					elsif @hash_mode["step"]["mode"][v[1]][1] == "NOT_YET" && @hash_mode["step"]["mode"][v[1]][2] == "CURRENT" # ABLE$B$G$J$/$F$b!$(Bnavi_menu$BEy$G(BCURRENT$B$J(Bstep$B$bC5:wBP>](B
+					elsif @hash_mode["step"]["mode"][v[1]][1] == "NOT_YET" && @hash_mode["step"]["mode"][v[1]][2] == "CURRENT" # ABLEでなくても，navi_menu等でCURRENTなstepも探索対象
 						@doc.get_elements("//step[@id=\"#{v[1]}\"]/substep").each{|node|
 							substep_id = node.attributes.get_attribute("id").value
 							if @hash_mode["substep"]["mode"][substep_id][1] == "NOT_YET"
@@ -350,7 +350,7 @@ class OrdersMaker
 						}
 					end
 					if flag == 1
-						break # step$BC5:w$+$i$N(Bbreak
+						break # step探索からのbreak
 					end
 				}
 				previous_substep = nil
@@ -397,7 +397,7 @@ class OrdersMaker
 				if current_substep == nil
 					# Do nothing
 				else
-					# $B8=>u$G(BCURRENT$B$J(Bsubstep$B$r(BNOT_CURRENT$B$+$D(Bis_finished$B$K!%(B
+					# 現状でCURRENTなsubstepをNOT_CURRENTかつis_finishedに．
 					previous_substep = nil
 					@hash_mode["substep"]["mode"].each{|key, value|
 						if value[2] == "CURRENT"
@@ -405,8 +405,8 @@ class OrdersMaker
 							if previous_substep != current_substep
 								@hash_mode["substep"]["mode"][previous_substep][2] = "NOT_CURRENT"
 								@hash_mode["substep"]["mode"][previous_substep][1] = "is_finished"
-								# $B;R$N;~E@$G$O%a%G%#%"$O(BSTOP$B$7$J$$!%(B
-								# $B?F%N!<%I$b(BNOT_CURRENT$B$K$9$k!%$+$D!$>e5-$N(Bsubstep$B$,(Bstep$BFb$G:G8e$N(Bsubstep$B$G$"$l$P!$(Bstep$B$r(Bis_finished$B$K$9$k!%(B
+								# 子の時点ではメディアはSTOPしない．
+								# 親ノードもNOT_CURRENTにする．かつ，上記のsubstepがstep内で最後のsubstepであれば，stepをis_finishedにする．
 								parent_step = @doc.elements["//substep[@id=\"#{previous_substep}\"]"].parent.attributes.get_attribute("id").value
 								@hash_mode["step"]["mode"][parent_step][2] = "NOT_CURRENT"
 								if @doc.elements["//substep[@id=\"#{previous_substep}\"]"].next_sibling_node == nil
@@ -416,11 +416,11 @@ class OrdersMaker
 							break
 						end
 					}
-					# $B<!$K(BCURRENT$B$H$J$k(Bsubstep$B$r(BCURRENT$B$K!%(B
+					# 次にCURRENTとなるsubstepをCURRENTに．
 					@hash_mode["substep"]["mode"][current_substep][2] = "CURRENT"
 					current_step = @doc.elements["//substep[@id=\"#{current_substep}\"]"].parent.attributes.get_attribute("id").value
 					@hash_mode["step"]["mode"][current_step][2] = "CURRENT"
-					# $B8=>u$G(BCURRENT$B$J(Bsubstep$B$H<!$K(BCURRENT$B$J(Bsubstep$B$,0[$J$k>l9g$O!$%a%G%#%"$r:F@8$5$;$k!%(B
+					# 現状でCURRENTなsubstepと次にCURRENTなsubstepが異なる場合は，メディアを再生させる．
 					if current_substep != previous_substep
 						media = ["audio", "video", "notification"]
 						media.each{|v|
@@ -431,7 +431,7 @@ class OrdersMaker
 								end
 							}
 						}
-						# previous_substep$B$N%a%G%#%"$O(BSTOP$B$9$k!%(B
+						# previous_substepのメディアはSTOPする．
 						media = ["audio", "video"]
 						media.each{|v|
 							@doc.get_elements("//substep[@id=\"#{previous_substep}\"]/#{v}").each{|node|
@@ -440,9 +440,9 @@ class OrdersMaker
 							}
 						}
 					end
-					# step$B$H(Bsubstep$B$rE,@Z$K(BABLE$B$K!%(B
+					# stepとsubstepを適切にABLEに．
 					@hash_mode = set_ABLEorOTHERS(@doc, @hash_mode, current_step, current_substep)
-					# notification$B$,:F@8:Q$_$+$I$&$+$O!$7d$"$i$PD4$Y$^$7$g$&(B
+					# notificationが再生済みかどうかは，隙あらば調べましょう
 					@hash_mode = check_notification_FINISHED(@doc, @hash_mode, time)
 				end
 			end
@@ -457,15 +457,15 @@ class OrdersMaker
 		return "success"
 	end
 
-	# CHANNEL$B%j%/%(%9%H$N>l9g$N(Bmpode$B%"%C%W%G!<%H(B
+	# CHANNELリクエストの場合のmpodeアップデート
 	def modeUpdate_channel(time, flag)
 		begin
 			if @hash_mode["display"] == flag
 				p "#{@hash_mode["display"]} is displayed now. You try to display same one."
 				return "invalid_params"
 			end
-			# CURRENT$B$J(Baudio$B$H(Bvideo$B$r(BSTOP$B$9$k!%(B
-			# notification$B$O(BSTOP$B$7$J$$!%(B
+			# CURRENTなaudioとvideoをSTOPする．
+			# notificationはSTOPしない．
 			if flag == "MATERIALS" || flag == "OVERVIEW"
 				media = ["audio", "video"]
 				media.each{|v|
@@ -476,9 +476,9 @@ class OrdersMaker
 					}
 				}
 			end
-			# notification$B$,:F@8:Q$_$+$I$&$+$O!$7d$"$i$PD4$Y$^$7$g$&!%(B
+			# notificationが再生済みかどうかは，隙あらば調べましょう．
 			@hash_mode = check_notification_FINISHED(@doc, @hash_mode, time)
-			# $B%A%c%s%M%k$N@Z$jBX$((B
+			# チャンネルの切り替え
 			@hash_mode["display"] = flag
 			open("records/#{@session_id}/#{@session_id}_mode.txt", "w"){|io|
 				io.puts(JSON.pretty_generate(@hash_mode))
@@ -498,19 +498,19 @@ class OrdersMaker
 				return "invalid_params"
 			end
 			element_name = searchElementName(@session_id, id)
-			# $B%A%'%C%/$5$l$?$b$N$K$h$C$F>l9gJ,$1!%(B
+			# チェックされたものによって場合分け．
 			case element_name
 			when "step"
-				# is_finished$B$^$?$O(BNOT_YET$B$NA`:n!%(B
-				if @hash_mode["step"]["mode"][id][1] == "NOT_YET" # NOT_YET$B$J$i(Bis_finished$B$K!%(B
-					# $B%A%'%C%/$5$l$?(Bstep$B$r(Bis_finished$B$K!%(B
+				# is_finishedまたはNOT_YETの操作．
+				if @hash_mode["step"]["mode"][id][1] == "NOT_YET" # NOT_YETならis_finishedに．
+					# チェックされたstepをis_finishedに．
 					@hash_mode["step"]["mode"][id][1] = "is_finished"
-					# $B%A%'%C%/$5$l$?(Bstep$B$K4^$^$l$k(Bsubstep$B$rA4$F(Bis_finished$B$K!%(B
+					# チェックされたstepに含まれるsubstepを全てis_finishedに．
 					@doc.get_elements("//step[@id=\"#{id}\"]/substep").each{|node|
 						substep_id = node.attributes.get_attribute("id").value
 						@hash_mode["substep"]["mode"][substep_id][1] = "is_finished"
-						# substep$B$K4^$^$l$k%a%G%#%"$r(BFINISHED$B$K$9$k!%(B
-						# $B$b$7$b8=>u$G(BCURRENT$B$^$?$O(BKEEP$B$@$C$?$i!$:F@8BT$A$^$?$O:F@8Cf$J$N$G(BSTOP$B$K$9$k!%(B
+						# substepに含まれるメディアをFINISHEDにする．
+						# もしも現状でCURRENTまたはKEEPだったら，再生待ちまたは再生中なのでSTOPにする．
 						media = ["audio", "video", "notification"]
 						media.each{|v|
 							@doc.get_elements("//substep[@id=\"#{substep_id}\"]/#{v}").each{|node|
@@ -525,17 +525,17 @@ class OrdersMaker
 					}
 					#
 					#
-					# $BK\Ev$O!$%A%'%C%/$5$l$?(Bstep$B$,(Bparent$B$K;}$D(Bstep$B$b(Bis_finished$B$K$7$J$1$l$P$J$i$J$$!%(B
-					# 
+					# 本当は，チェックされたstepがparentに持つstepもis_finishedにしなければならない．
 					#
-				else # is_finished$B$J$i(BNOT_YET$B$K!%(B
-					# $B%A%'%C%/$5$l$?(Bstep$B$r(BNOT_YET$B$K!%(B
+					#
+				else # is_finishedならNOT_YETに．
+					# チェックされたstepをNOT_YETに．
 					@hash_mode["step"]["mode"][id][1] = "NOT_YET"
-					# $B%A%'%C%/$5$l$?(Bstep$B$K4^$^$l$k(Bsubstep$B$rA4$F(BNOT_YET$B$K!%(B
+					# チェックされたstepに含まれるsubstepを全てNOT_YETに．
 					@doc.get_elements("//step[@id=\"#{id}\"]/substep").each{|node|
 						substep_id = node.attributes.get_attribute("id").value
 						@hash_mode["substep"]["mode"][substep_id][1] = "NOT_YET"
-						# substep$B$K4^$^$l$k%a%G%#%"$r(BNOT_YET$B$K$9$k!%(B
+						# substepに含まれるメディアをNOT_YETにする．
 						media = ["audio", "video", "notification"]
 						media.each{|v|
 							@doc.get_elements("//substep[@id=\"#{substep_id}\"]/#{v}").each{|node|
@@ -544,54 +544,68 @@ class OrdersMaker
 							}
 						}
 					}
-					# $B%A%'%C%/$5$l$?(Bstep$B$r(Bparent$B$K;}$D(Bis_finished$B$J(Bstep$B$rA4$F(BNOT_YET$B$K$9$k!%(B
-					@hash_mode["step"]["mode"].each{|key, value|
-						if value[1] == "is_finished"
-							if @doc.elements["//step[@id=\"#{key}\"]/parent"] != nil
-								@doc.elements["//step[@id=\"#{key}\"]/parent"].attributes.get_attribute("ref").value.split(" ").each{|v|
-									if v == id
-										@hash_mode["step"]["mode"][key][1] = "NOT_YET"
-										# NOT_YET$B$K$5$l$?(Bstep$B$K4^$^$l$k(Bsubstep$B$rA4$F(BNOT_YET$B$K!%(B
-										@doc.get_elements("//step[@id=\"#{key}\"]/substep").each{|node|
-											substep_id = node.attributes.get_attribute("id").value
-											@hash_mode["substep"]["mode"][substep_id][1] = "NOT_YET"
-											# substep$B$K4^$^$l$k%a%G%#%"$r(BNOT_YET$B$K$9$k!%(B
-											media = ["audio", "video", "notification"]
-											media.each{|v|
-												@doc.get_elements("//substep[@id=\"#{substep_id}\"]/#{v}").each{|node|
-													media_id = node.attributes.get_attribute("id").value
-													@hash_mode[v]["mode"][media_id][0] = "NOT_YET"
-												}
-											}
-										}
-										break
-									end
-								}
-							end
-						end
-					}
+					#
+					#
+					# 本当は，チェックされたstepをparentに持つstepもNOT_YETにしなければならない．
+					#
+					#
+#					@hash_mode["step"]["mode"].each{|key, value|
+#						if value[1] == "is_finished"
+#							if @doc.elements["//step[@id=\"#{key}\"]/parent"] != nil
+#								@doc.elements["//step[@id=\"#{key}\"]/parent"].attributes.get_attribute("ref").value.split(" ").each{|v|
+#									if v == id
+#										@hash_mode["step"]["mode"][key][1] = "NOT_YET"
+#										# NOT_YETにされたstepに含まれるsubstepを全てNOT_YETに．
+#										@doc.get_elements("//step[@id=\"#{key}\"]/substep").each{|node|
+#											substep_id = node.attributes.get_attribute("id").value
+#											@hash_mode["substep"]["mode"][substep_id][1] = "NOT_YET"
+#											# substepに含まれるメディアをNOT_YETにする．
+#											media = ["audio", "video", "notification"]
+#											media.each{|v|
+#												@doc.get_elements("//substep[@id=\"#{substep_id}\"]/#{v}").each{|node|
+#													media_id = node.attributes.get_attribute("id").value
+#													@hash_mode[v]["mode"][media_id][0] = "NOT_YET"
+#												}
+#											}
+#										}
+#										break
+#									end
+#								}
+#							end
+#						end
+#					}
 				end
-				# ABLE$B$^$?$O(BOTHERS$B$NA`:n$N$?$a$K!$(BCURRENT$B$J(Bstep$B$H(Bsubstep$B$N(Bid$B$rD4$Y$k!%(B
+				# ABLEまたはOTHERSの操作のために，CURRENTなstepとsubstepのidを調べる．
 				current_step, current_substep = search_CURRENT(@doc, @hash_mode)
-				# ABLE$B$^$?$O(BOTHERS$B$NA`:n!%(B
+				# ABLEまたはOTHERSの操作．
 				@hash_mode = set_ABLEorOTHERS(@doc, @hash_mode, current_step, current_substep)
-				# $B2DG=$J(Bsubstep$B$KA+0\$9$k(B
-				@hash_mode = go2current(@doc, @hash_mode, @sorted_step, current_step, current_substep)
-				# $B:FEY(BABLE$B$NH=Dj$r9T$&(B
-				current_step, current_substep = search_CURRENT(@doc, @hash_mode)
-				# ABLE$B$^$?$O(BOTHERS$B$NA`:n!%(B
-				@hash_mode = set_ABLEorOTHERS(@doc, @hash_mode, current_step, current_substep)
+				# 全てis_finishedならばCURRENT探索はしない
+				flag = -1
+				@hash_mode["step"]["mode"].each{|key, value|
+					if value[1] == "NOT_YET"
+						flag = 1
+						break
+					end
+				}
+				if flag == 1 # NOT_YETなstepが存在する場合のみ，CURRENTの移動を行う
+					# 可能なsubstepに遷移する
+					@hash_mode = go2current(@doc, @hash_mode, @sorted_step, current_step, current_substep)
+					# 再度ABLEの判定を行う
+					current_step, current_substep = search_CURRENT(@doc, @hash_mode)
+					# ABLEまたはOTHERSの操作．
+					@hash_mode = set_ABLEorOTHERS(@doc, @hash_mode, current_step, current_substep)
+				end
 			when "substep"
-				# is_finished$B$^$?$O(BNOT_YET$B$NA`:n!%(B
-				if @hash_mode["substep"]["mode"][id][1] == "NOT_YET" # NOT_YET$B$J$i$P(Bis_finished$B$K!%(B
+				# is_finishedまたはNOT_YETの操作．
+				if @hash_mode["substep"]["mode"][id][1] == "NOT_YET" # NOT_YETならばis_finishedに．
 					parent_step = @doc.elements["//substep[@id=\"#{id}\"]"].parent.attributes.get_attribute("id").value
 					media = ["audio", "video", "notification"]
-					# $B%A%'%C%/$5$l$?(Bsubstep$B$r4^$a$=$l0JA0$N(Bsubstep$BA4$F$r(Bis_finished$B$K!%(B
+					# チェックされたsubstepを含めそれ以前のsubstep全てをis_finishedに．
 					@doc.get_elements("//step[@id=\"#{parent_step}\"]/substep").each{|node1|
 						child_substep = node1.attributes.get_attribute("id").value
 						@hash_mode["substep"]["mode"][child_substep][1] = "is_finished"
-						# $B$=$N(Bsubstep$B$K4^$^$l$k%a%G%#%"$r(BFINISHED$B$K!%(B
-						# $B$b$7$b8=>u$G(BCURRENT$B$^$?$O(BKEEP$B$J$i$P!$:F@8Cf$^$?$O:F@8BT$A$J$N$G(BSTOP$B$K!%(B
+						# そのsubstepに含まれるメディアをFINISHEDに．
+						# もしも現状でCURRENTまたはKEEPならば，再生中または再生待ちなのでSTOPに．
 						media.each{|v|
 							@doc.get_elements("//substep[@id=\"#{child_substep}\"]/#{v}").each{|node2|
 								media_id = node2.attributes.get_attribute("id").value
@@ -602,37 +616,34 @@ class OrdersMaker
 								end
 							}
 						}
-						# $B%A%'%C%/$5$l$?(Bsubstep$B$r(Bis_finished$B$K$7$?$i%k!<%W=*N;!%(B
+						# チェックされたsubstepをis_finishedにしたらループ終了．
 						if child_substep == id
-							# $B%A%'%C%/$5$l$?(Bsubstep$B$,(Bstep$BFb$N:G=*(Bsubstep$B$J$i$P!$?F%N!<%I$b(Bis_finished$B$K$9$k!%(B
+							# チェックされたsubstepがstep内の最終substepならば，親ノードもis_finishedにする．
 							if node1.next_sibling_node == nil
 								@hash_mode["step"]["mode"][parent_step][1] = "is_finished"
-								# current$B$NC5:w(B
-								current_step, current_substep = search_CURRENT(@doc, @hash_mode)
-								# step$B$H(Bsubstep$B$rE,@Z$K(BABLE$B$K!%(B
-								@hash_mode = set_ABLEorOTHERS(@doc, @hash_mode, current_step, current_substep)
 							end
 							break
 						end
 					}
-					# current$B$NC5:w(B
+					# currentの探索
 					current_step, current_substep = search_CURRENT(@doc, @hash_mode)
-					# $B2DG=$J(Bsubstep$B$KA+0\$9$k(B
-					@hash_mode = go2current(@doc, @hash_mode, @sorted_step, current_step, current_substep)
-					# $B:FEY(Bcurrent$B$NC5:w(B
-					current_step, current_substep = search_CURRENT(@doc, @hash_mode)
-					# ABLE$B$^$?$O(BOTHERS$B$NA`:n!%(B
+					# stepとsubstepを適切にABLEに．
 					@hash_mode = set_ABLEorOTHERS(@doc, @hash_mode, current_step, current_substep)
-				else # is_finished$B$J$i$P(BNOT_YET$B$K!%(B
+					#
+					#
+					# かつ，is_finishedとなったstepがparentにもつstepもis_finishedにしなければならない
+					#
+					#
+				else # is_finishedならばNOT_YETに．
 					parent_step = @doc.elements["//substep[@id=\"#{id}\"]"].parent.attributes.get_attribute("id").value
 					media = ["audio", "video", "notification"]
-					# $B%A%'%C%/$5$l$?(Bsubstep$B$r4^$`$=$l0J9_$N!JF10l(Bstep$BFb$N!K(Bsubstep$B$r(BNOT_YET$B$K!%(B
+					# チェックされたsubstepを含むそれ以降の（同一step内の）substepをNOT_YETに．
 					flag = -1
 					@doc.get_elements("//step[@id=\"#{parent_step}\"]/substep").each{|node|
 						child_substep = node.attributes.get_attribute("id").value
 						if flag == 1
 							@hash_mode["substep"]["mode"][child_substep][1] = "NOT_YET"
-							# $B$=$N(Bsubstep$B$K4^$^$l$k%a%G%#%"$r(BNOT_YET$B$K!%(B
+							# そのsubstepに含まれるメディアをNOT_YETに．
 							media.each{|v|
 								@doc.get_elements("//substep[@id=\"#{child_substep}\"]/#{v}").each{|node2|
 									media_id = node2.attributes.get_attribute("id").value
@@ -643,33 +654,45 @@ class OrdersMaker
 						if child_substep == id
 							flag = 1
 							@hash_mode["substep"]["mode"][child_substep][1] = "NOT_YET"
-							# $B$=$N(Bsubstep$B$K4^$^$l$k%a%G%#%"$r(BNOT_YET$B$K!%(B
+							# そのsubstepに含まれるメディアをNOT_YETに．
 							media.each{|v|
 								@doc.get_elements("//substep[@id=\"#{child_substep}\"]/#{v}").each{|node2|
 									media_id = node2.attributes.get_attribute("id").value
 									@hash_mode[v]["mode"][media_id][0] = "NOT_YET"
 								}
 							}
-							# $B%A%'%C%/$5$l$?(Bsubstep$B$,F10l(Bstep$BFb$N:G=*(Bsubstep$B$J$i$P!$?F%N!<%I$N(Bstep$B$r(BNOT_YET$B$K$7$F!$(BABLE$B$NA`:n$r$9$k!%(B
-							if node.next_sibling_node == nil
-								@hash_mode["step"]["mode"][parent_step][1] = "NOT_YET"
-								@hash_mode = set_ABLEorOTHERS(@doc, @hash_mode, parent_step, id)
-							end
 						end
 					}
-					# current$B$NC5:w(B
+					# 親ノードのstepを明示的にNOT_YETにして，ABLEの操作をする．
+					@hash_mode["step"]["mode"][parent_step][1] = "NOT_YET"
+					@hash_mode = set_ABLEorOTHERS(@doc, @hash_mode, parent_step, id)
+					#
+					#
+					# かつ，NOT_YETとなったstepをparentにもつstepもNOT_YETにしなければならない
+					#
+					#
+				end
+				flag = -1
+				@hash_mode["step"]["mode"].each{|key,value|
+					if value[1] == "NOT_YET"
+						flag = 1
+						break
+					end
+				}
+				if flag == 1
+					# currentの探索
 					current_step, current_substep = search_CURRENT(@doc, @hash_mode)
-					# $B2DG=$J(Bsubstep$B$KA+0\$9$k(B
+					# 可能なsubstepに遷移する
 					@hash_mode = go2current(@doc, @hash_mode, @sorted_step, current_step, current_substep)
-					# $B:FEY(Bcurrent$B$NC5:w(B
+					# 再度currentの探索
 					current_step, current_substep = search_CURRENT(@doc, @hash_mode)
-					# ABLE$B$N@_Dj(B
+					# ABLEの設定
 					@hash_mode = set_ABLEorOTHERS(@doc, @hash_mode, current_step, current_substep)
 				end
 			else
 				return "invalid_params"
 			end
-			# notification$B$,:F@8:Q$_$+$I$&$+$O!$7d$"$i$PD4$Y$^$7$g$&!%(B
+			# notificationが再生済みかどうかは，隙あらば調べましょう．
 			@hash_mode = check_notification_FINISHED(@doc, @hash_mode, time)
 			open("records/#{@session_id}/#{@session_id}_mode.txt", "w"){|io|
 				io.puts(JSON.pretty_generate(@hash_mode))
