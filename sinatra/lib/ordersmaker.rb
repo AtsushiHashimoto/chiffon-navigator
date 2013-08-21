@@ -619,7 +619,15 @@ class OrdersMaker
 						# チェックされたsubstepをis_finishedにしたらループ終了．
 						if child_substep == id
 							# チェックされたsubstepがstep内の最終substepならば，親ノードもis_finishedにする．
-							if node1.next_sibling_node == nil
+							flag = -1
+							@doc.get_elements("//step[@id=\"#{parent_step}\"]/substep").each{|node2|
+								substep_id = node2.attributes.get_attribute("id").value
+								if @hash_mode["substep"]["mode"][substep_id][1] == "NOT_YET"
+									flag = 1
+									break
+								end
+							}
+							if flag == -1
 								@hash_mode["step"]["mode"][parent_step][1] = "is_finished"
 							end
 							break
