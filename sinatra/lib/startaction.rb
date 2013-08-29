@@ -10,27 +10,27 @@ def start_action(session_id, contents)
 	begin
 		unless system("mkdir -p records/#{session_id}")
 			p "Cannot mkdir"
-			return "internal_error"
+			return "internal error"
 		end
 		unless system("touch records/#{session_id}/#{session_id}.log")
 			p "Cannot touch log file"
-			return "internal_error"
+			return "internal error"
 		end
 		unless system("touch records/#{session_id}/#{session_id}_error.log")
 			p "Cannot touch error_log file"
-			return "internal_error"
+			return "internal error"
 		end
 
 		unless system("touch records/#{session_id}/#{session_id}_recipe.xml")
 			p "Cannot touch recipe file"
-			return "internal_error"
+			return "internal error"
 		end
 		open("records/#{session_id}/hoge.xml", "w"){|io|
 			io.puts(contents)
 		}
 		unless system("cat records/#{session_id}/hoge.xml | tr -d '\r' | tr -d '\n'  | tr -d '\t' > records/#{session_id}/#{session_id}_recipe.xml")
 			p "Cannot 'tr' hoge file"
-			return "internal_error"
+			return "internal error"
 		end
 
 		doc = REXML::Document.new(open("records/#{session_id}/#{session_id}_recipe.xml"))
@@ -49,7 +49,7 @@ def start_action(session_id, contents)
 		}
 		if hash_id == {}
 			p "Given recipe.xml seems to be empty"
-			return "invalid_params"
+			return "invalid params"
 		end
 
 		hash_mode = Hash.new{|h, k| h[k] = Hash.new(&h.default_proc)}
@@ -70,7 +70,7 @@ def start_action(session_id, contents)
 			}
 		else
 			p "Given recipe.xml does not have 'step'"
-			return "invalid_params"
+			return "invalid params"
 		end
 
 		if hash_id.key?("substep")
@@ -79,7 +79,7 @@ def start_action(session_id, contents)
 			}
 		else
 			p "Given recipe.xml does not have 'substep'"
-			return "invalid_params"
+			return "invalid params"
 		end
 
 		# recipeの中身の確認は，stepとsubstepの有る無しだけに留めておく．（最悪それ以外はなくても支援できる）
@@ -111,7 +111,7 @@ def start_action(session_id, contents)
 			current_substep = doc.elements["//step[@id=\"#{current_step}\"]/substep[1]"].attributes.get_attribute("id").value
 		else
 			p "substep does not have 'id'"
-			return "invalid_params"
+			return "invalid params"
 		end
 		hash_mode["step"]["mode"][current_step][2] = "CURRENT"
 		hash_mode["substep"]["mode"][current_substep][2] = "CURRENT"
@@ -139,7 +139,7 @@ def start_action(session_id, contents)
 		}
 	rescue => e
 		p e
-		return "internal_error"
+		return "internal error"
 	end
 
 	return "success"

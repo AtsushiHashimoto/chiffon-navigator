@@ -16,7 +16,7 @@ def finish_action(session_id)
 		}
 	rescue => e
 		p e
-		return [], "internal_error"
+		return [], "internal error"
 	end
 
 	return hash_mode, "success"
