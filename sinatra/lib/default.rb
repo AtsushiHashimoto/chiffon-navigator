@@ -4,30 +4,41 @@ require 'lib/functions.rb'
 class DefaultNavigator
 
 	def counsel(jason_input)
-		orders = nil
-		# generate orders along to jason_input
-		if jason_input["situation"] == nil or jason_input["situation"] == ""
-			orders = {"status"=>"invalid params"}
+		status = nil
+		body = []
+		orders = {}
+		# jason_inputに従ってordersを生成する
+		if jason_input["situation"] == nil || jason_input["situation"] == ""
+			status = "invalid params"
 		else
 			case jason_input["situation"]
 			when "NAVI_MENU"
-				orders = navi_menu(jason_input)
+				status, body = navi_menu(jason_input)
 			when "EXTERNAL_INPUT"
-				orders = external_input(jason_input)
+				status, body = external_input(jason_input)
 			when "CHANNEL"
-				orders = channel(jason_input)
+				status, body = channel(jason_input)
 			when "CHECK"
-				orders = check(jason_input)
+				status, body = check(jason_input)
 			when "START"
-				orders = start(jason_input)
+				status, body = start(jason_input)
 			when "END"
-				orders = finish(jason_input)
+				status, body = finish(jason_input)
 			when "PLAY_CONTROL"
-				orders = play_control(jason_input)
+				status, body = play_control(jason_input)
 			else
-				orders = {"status"=>"invalid params"}
+				status = "invalid params"
 			end
 		end
+
+		if status == "internal error" || status == "invalid params"
+			orders = {"status"=>status}
+		elsif status == "success"
+			orders = {"status"=>status, "body"=>body}
+		else
+			orders = {"status"=>"internal error"}
+		end
+
 		return orders
 	end
 end

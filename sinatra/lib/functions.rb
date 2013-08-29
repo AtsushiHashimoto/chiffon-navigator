@@ -7,136 +7,139 @@ require 'lib/ordersmaker.rb'
 require 'lib/finishaction.rb'
 
 def navi_menu(jason_input)
+	status = nil
+	body = []
 	begin
 		maker = OrdersMaker.new(jason_input["session_id"])
 		# modeの修正
-		result = maker.modeUpdate_navimenu(jason_input["time"]["sec"], jason_input["operation_contents"])
-		if result == "internal_error"
-			return {"status"=>"internal error"}
-		elsif result == "invalid_params"
-			return {"status"=>"invalid params"}
+		status = maker.modeUpdate_navimenu(jason_input["time"]["sec"], jason_input["operation_contents"])
+		if result == "internal error"
+			return status, body
+		elsif result == "invalid params"
+			return status, body
 		end
 
-		orders = []
 		# DetailDraw：入力されたstepをCURRENTとして提示
-		orders.concat(maker.detailDraw())
+		body.concat(maker.detailDraw())
 		# Play：不要．クリックされたstepの調理行動を始めれば，EXTERNAL_INPUTで再生される
 		# Notify：不要．クリックされたstepの調理行動を始めれば，EXTERNAL_INPUTで再生される
 		# Cancel：再生待ちコンテンツがあればキャンセル
-		orders.concat(maker.cancel())
+		body.concat(maker.cancel())
 		# ChannelSwitch：不要
 		# NaviDraw：適切にvisualを書き換えたものを提示
-		orders.concat(maker.naviDraw())
+		body.concat(maker.naviDraw())
 
 		# 履歴ファイルを書き込む
 		logger()
 	rescue => e
 		p e
-		return {"status"=>"internal error"}
+		return "internal error", body
 	end
 
-	return {"status"=>"success","body"=>orders}
+	return status, body
 end
 
 def external_input(jason_input)
+	status = nil
+	body = []
 	begin
 		maker = OrdersMaker.new(jason_input["session_id"])
 		# modeの修正
-		result = maker.modeUpdate_externalinput(jason_input["time"]["sec"], jason_input["operation_contents"])
-		if result == "internal_error"
-			return {"status"=>"internal error"}
-		elsif result == "invalid_params"
-			return {"status"=>"invalid params"}
+		status = maker.modeUpdate_externalinput(jason_input["time"]["sec"], jason_input["operation_contents"])
+		if status == "internal error"
+			return status, body
+		elsif status == "invalid params"
+			return status, body
 		end
 
-		orders = []
 		# DetailDraw：調理者がとったものに合わせたsubstepのidを提示
-		orders.concat(maker.detailDraw)
+		body.concat(maker.detailDraw)
 		# Play：substep内にコンテンツが存在すれば再生命令を送る
-		orders.concat(maker.play(jason_input["time"]["sec"]))
+		body.concat(maker.play(jason_input["time"]["sec"]))
 		# Notify：substep内にコンテンツが存在すれば再生命令を送る
-		orders.concat(maker.notify(jason_input["time"]["sec"]))
+		body.concat(maker.notify(jason_input["time"]["sec"]))
 		# Cancel：再生待ちコンテンツがあればキャンセル
-		orders.concat(maker.cancel())
+		body.concat(maker.cancel())
 		# ChannelSwitch：不要
 		# NaviDraw：適切にvisualを書き換えたものを提示
-		orders.concat(maker.naviDraw())
+		body.concat(maker.naviDraw())
 
 		# 履歴ファイルを書き込む
 		logger()
 	rescue => e
 		p e
-		return {"status"=>"internal error"}
+		return "internal error", body
 	end
 
-	return {"status"=>"success","body"=>orders}
+	return status, body
 end
 
 def channel(jason_input)
+	status = nil
+	body = []
 	begin
 		maker = OrdersMaker.new(jason_input["session_id"])
 
-		orders = []
 		case jason_input["operation_contents"]
 		when "GUIDE"
 			# modeの修正
-			result = maker.modeUpdate_channel(jason_input["time"]["sec"], "GUIDE")
-			if result == "internal_error"
-				return {"status"=>"internal error"}
-			elsif result == "invalid_params"
-				return {"status"=>"invalid params"}
+			status = maker.modeUpdate_channel(jason_input["time"]["sec"], "GUIDE")
+			if status == "internal error"
+				return status, body
+			elsif status == "invalid params"
+				return status, body
 			end
 
 			# DetailDraw：modeUpdateしないので，最近送ったオーダーと同じDetailDrawを送ることになる．
-			orders.concat(maker.detailDraw())
+			body.concat(maker.detailDraw())
 			# Play：STARTからoverviewを経てguideに移る場合，メディアの再生が必要かもしれない．
-			orders.concat(maker.play(jason_input["time"]["sec"]))
+			body.concat(maker.play(jason_input["time"]["sec"]))
 			# Notify：STARTからoverviewを経てguideに移る場合，メディアの再生が必要かもしれない．
-			orders.concat(maker.notify(jason_input["time"]["sec"]))
+			body.concat(maker.notify(jason_input["time"]["sec"]))
 			# Cancel：不要．再生待ちコンテンツは存在しない．
 			# ChannelSwitch：GUIDEを指定
-			orders.push({"ChannelSwitch"=>{"channel"=>"GUIDE"}})
+			body.push({"ChannelSwitch"=>{"channel"=>"GUIDE"}})
 			# NaviDraw：直近のナビ画面と同じものを返すことになる．
-			orders.concat(maker.naviDraw())
+			body.concat(maker.naviDraw())
 
 			# 履歴ファイル書き込む
 			logger()
 		when "MATERIALS"
 			# modeの修正
-			result = maker.modeUpdate_channel(jason_input["time"]["sec"], "MATERIALS")
-			if result == "internal_error"
-				return {"status"=>"internal error"}
-			elsif result == "invalid_params"
-				return {"status"=>"invalid params"}
+			status = maker.modeUpdate_channel(jason_input["time"]["sec"], "MATERIALS")
+			if status == "internal error"
+				return status, body
+			elsif status == "invalid params"
+				return status, body
 			end
 
 			# DetailDraw：不要．Detailは描画されない
 			# Play：不要．再生コンテンツは存在しない
 			# Notify：不要．再生コンテンツは存在しない
 			# Cancel：再生待ちコンテンツがあればキャンセル
-			orders.concat(maker.cancel())
+			body.concat(maker.cancel())
 			# ChannelSwitch：MATERIALSを指定
-			orders.push({"ChannelSwitch"=>{"channel"=>"MATERIALS"}})
+			body.push({"ChannelSwitch"=>{"channel"=>"MATERIALS"}})
 			# NaviDraw：不要．Naviは描画されない
 
 			# 履歴ファイルを書き込む
 			logger()
 		when "OVERVIEW"
 			# modeの更新
-			result = maker.modeUpdate_channel(jason_input["time"]["sec"], "OVERVIEW")
-			if result == "internal_error"
-				return {"status"=>"internal error"}
-			elsif result == "invalid_params"
-				return {"status"=>"invalid params"}
+			status = maker.modeUpdate_channel(jason_input["time"]["sec"], "OVERVIEW")
+			if status == "internal error"
+				return status, body
+			elsif status == "invalid params"
+				return status, body
 			end
 
 			# DetailDraw：不要．Detailは描画されない
 			# Play：不要．再生コンテンツは存在しない
 			# Notify：不要．再生コンテンツは存在しない
 			# Cancel：再生待ちコンテンツがあればキャンセル
-			orders.concat(maker.cancel())
+			body.concat(maker.cancel())
 			# ChannelSwitch：OVERVIEWを指定
-			orders.push({"ChannelSwitch"=>{"channel"=>"OVERVIEW"}})
+			body.push({"ChannelSwitch"=>{"channel"=>"OVERVIEW"}})
 			# NaviDraw：不要．Naviは描画されない
 
 			# 履歴ファイルを書き込む
@@ -145,43 +148,44 @@ def channel(jason_input)
 			# 履歴ファイルに書き込む
 			logger()
 			errorLOG()
-			return {"status"=>"invalid params"}
+			return "invalid params", body
 		end
 	rescue => e
 		p e
-		return {"status"=>"internal error"}
+		return "internal error", body
 	end
 
-	return {"status"=>"success","body"=>orders}
+	return status, body
 end
 
 def check(jason_input)
+	status = nil
+	body = []
 	begin
-		orders = []
 		maker = OrdersMaker.new(jason_input["session_id"])
 		# element_nameの確認
 		element_name = searchElementName(jason_input["session_id"], jason_input["operation_contents"])
 
 		if element_name == "step" || element_name == "substep"
 			# modeの修正
-			result = maker.modeUpdate_check(jason_input["time"]["sec"], jason_input["operation_contents"])
-			if result == "interlan_error"
-				return {"status"=>"internal error"}
-			elsif result == "invalid_params"
-				return {"status"=>"invalid params"}
+			status = maker.modeUpdate_check(jason_input["time"]["sec"], jason_input["operation_contents"])
+			if status == "internal error"
+				return status, body
+			elsif result == "invalid params"
+				return status, body
 			end
 
 			# DetailDraw：
-			orders.concat(maker.detailDraw())
+			body.concat(maker.detailDraw())
 			# Play：不要．チェックを入れるだけで大きな画面遷移ではない
-			orders.concat(maker.play(jason_input["time"]["sec"]))
+			body.concat(maker.play(jason_input["time"]["sec"]))
 			# Notify：不要．チェックを入れるだけで大きな画面遷移ではない不要．
-			orders.concat(maker.notify(jason_input["time"]["sec"]))
+			body.concat(maker.notify(jason_input["time"]["sec"]))
 			# Cancel：CURRENTなsubstepをチェックされた場合，メディアを終了する必要がある．
-			orders.concat(maker.cancel())
+			body.concat(maker.cancel())
 			# ChannelSwitch：不要．
 			# NaviDraw：チェックされたものをis_fisnishedに書き替え，visualを適切に書き換えたものを提示
-			orders.concat(maker.naviDraw())
+			body.concat(maker.naviDraw())
 
 			# 履歴ファイルを書き込む
 			logger()
@@ -189,48 +193,51 @@ def check(jason_input)
 			# 履歴ファイルを書き込む
 			logger()
 			errorLOG()
-			return {"status"=>"invalid params"}
+			return "invalid params", body
 		end
 	rescue => e
 		 p e
-		 return {"status"=>"internal error"}
+		 return "internal error", body
 	end
 
-	return {"status"=>"success","body"=>orders}
+	return status, body
 end
 
 def start(jason_input)
+	status = nil
+	body = []
 	# Navigationに必要なファイル（詳細はクラスファイル内）を作成
 	# modeUpdateもこの関数でやってしまう
-	result = start_action(jason_input["session_id"], jason_input["operation_contents"])
-	if result == "internal_error"
-		return {"status"=>"internal error"}
-	elsif result == "invalid_params"
-		return {"status"=>"invalid params"}
+	status = start_action(jason_input["session_id"], jason_input["operation_contents"])
+	if status == "internal error"
+		return status, body
+	elsif status == "invalid params"
+		return status, body
 	end
 
-	orders = []
 	### DetailDraw：不要．Detailは描画されない
 	### Play：不要．再生コンテンツは存在しない
 	### Notify：不要．再生コンテンツは存在しない
 	### Cancel：不要．再生待ちコンテンツは存在しない
 	### ChannelSwitch：OVERVIEWを指定
-	orders.push({"ChannelSwitch"=>{"channel"=>"OVERVIEW"}})
+	body.push({"ChannelSwitch"=>{"channel"=>"OVERVIEW"}})
 	### NaviDraw：不要．Naviは描画されない
 
 	# 履歴ファイルに書き込む
 	logger()
-	return {"status"=>"success","body"=>orders}
+	return status, body
 end
 
 def finish(jason_input)
+	status = nil
+	body = []
 	begin
 		# mediaをSTOPにする．
-		hash_mode, result = finish_action(jason_input["session_id"])
-		if result == "internal_error"
-			return {"status"=>"internal error"}
-		elsif result == "invalid_params"
-			return {"status"=>"invalid params"}
+		hash_mode, status = finish_action(jason_input["session_id"])
+		if status == "internal error"
+			return status, body
+		elsif status == "invalid params"
+			return status, body
 		end
 
 		doc = REXML::Document.new(open("records/#{jason_input["session_id"]}/#{jason_input["session_id"]}_recipe.xml"))
@@ -239,11 +246,11 @@ def finish(jason_input)
 		### Play：不要．再生コンテンツは存在しない
 		### Notify：不要．再生コンテンツは存在しない
 		### Cancel：再生待ちコンテンツが存在すればキャンセル
-		orders, result = cancel(jason_input["session_id"], doc, hash_mode)
-		if result == "internal_error"
-			return {"status"=>"internal error"}
-		elsif result == "invalid_params"
-			return {"status"=>"invalid params"}
+		body, status = cancel(jason_input["session_id"], doc, hash_mode)
+		if status == "internal error"
+			return status, body
+		elsif status == "invalid params"
+			return status, body
 		end
 		### ChannelSwitch：不要
 		### NaviDraw：不要．Naviは描画されない
@@ -252,13 +259,15 @@ def finish(jason_input)
 		logger()
 	rescue => e
 		p e
-		return {"status"=>"internal error"}
+		return "internal error", body
 	end
 
-	return {"status"=>"success","body"=>orders}
+	return status, body
 end
 
 def play_control(jason_input)
+	status = nil
+	body = []
 	begin
 		element_name = searchElementName(jason_input["session_id"], jason_input["operation_contents"]["id"])
 		if element_name == "audio" || element_name == "video"
@@ -271,13 +280,12 @@ def play_control(jason_input)
 			when "MUTE"
 			when "VOLUME"
 			else
-				return {"status"=>"invalid params"}
+				return "invalid params", body
 			end
 		else
-			return {"status"=>"invalid params"}
+			return "invalid params", body
 		end
 
-		orders = []
 		### DetailDraw：不要．Detailは描画されない
 		### Play：
 		### Notify：
@@ -286,8 +294,8 @@ def play_control(jason_input)
 		### NaviDraw：不要．Naviは描画されない
 	rescue => e
 		p e
-		return {"status"=>"internal error"}
+		return "internal error", body
 	end
 
-	return {"status"=>"success","body"=>orders}
+	return "success", body
 end

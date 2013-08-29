@@ -239,13 +239,13 @@ def cancel(session_id, doc, hash_mode, *id)
 						end
 					end
 				else # 指定されたものがaudio，video，notificationで無い場合．
-					return [], hash_mode, "invalid_params"
+					return [], hash_mode, "invalid params"
 				end
 			}
 		end
 	rescue => e
 		p e
-		return [], hash_mode, "internal_error"
+		return [], hash_mode, "internal error"
 	end
 
 	return orders, hash_mode, "success"

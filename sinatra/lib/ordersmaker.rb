@@ -203,7 +203,7 @@ class OrdersMaker
 		begin
 			unless @hash_mode["display"] == "GUIDE"
 				p "#{@hash_mode["display"]} is displayed now."
-				return "invalid_params"
+				return "invalid params"
 			end
 			element_name = searchElementName(@session_id, id)
 			# 遷移要求先がstepかsubstepかで場合分け
@@ -283,7 +283,7 @@ class OrdersMaker
 				# stepとsubstepを適切にABLEにする．
 				@hash_mode = set_ABLEorOTHERS(@doc, @hash_mode, current_step, id)
 			else # 遷移要求先がおかしい．
-				return "invalid_params"
+				return "invalid params"
 			end
 			# notificationが再生済みかどうかは，隙あらば調べましょう．
 			@hash_mode = check_notification_FINISHED(@doc, @hash_mode, time)
@@ -292,7 +292,7 @@ class OrdersMaker
 			}
 		rescue => e
 			p e
-			return "internal_error"
+			return "internal error"
 		end
 
 		return "success"
@@ -451,7 +451,7 @@ class OrdersMaker
 			}
 		rescue => e
 			p e
-			return "internal_error"
+			return "internal error"
 		end
 
 		return "success"
@@ -462,7 +462,7 @@ class OrdersMaker
 		begin
 			if @hash_mode["display"] == flag
 				p "#{@hash_mode["display"]} is displayed now. You try to display same one."
-				return "invalid_params"
+				return "invalid params"
 			end
 			# CURRENTなaudioとvideoをSTOPする．
 			# notificationはSTOPしない．
@@ -485,7 +485,7 @@ class OrdersMaker
 			}
 		rescue => e
 			p e
-			return "internal_error"
+			return "internal error"
 		end
 
 		return "success"
@@ -495,7 +495,7 @@ class OrdersMaker
 		begin
 			unless @hash_mode["display"] == "GUIDE"
 				p "#{@hash_mode["display"]} is displayed now."
-				return "invalid_params"
+				return "invalid params"
 			end
 			element_name = searchElementName(@session_id, id)
 			# チェックされたものによって場合分け．
@@ -547,7 +547,7 @@ class OrdersMaker
 					#
 					#
 					# 本当は，チェックされたstepをparentに持つstepもNOT_YETにしなければならない．
-					#
+					# 下記の記述は，NOT_YETにしようとして失敗したもの
 					#
 #					@hash_mode["step"]["mode"].each{|key, value|
 #						if value[1] == "is_finished"
@@ -698,7 +698,7 @@ class OrdersMaker
 					@hash_mode = set_ABLEorOTHERS(@doc, @hash_mode, current_step, current_substep)
 				end
 			else
-				return "invalid_params"
+				return "invalid params"
 			end
 			# notificationが再生済みかどうかは，隙あらば調べましょう．
 			@hash_mode = check_notification_FINISHED(@doc, @hash_mode, time)
@@ -707,7 +707,7 @@ class OrdersMaker
 			}
 		rescue => e
 			 p e
-			 return "internal_error"
+			 return "internal error"
 		end
 
 		return "success"
