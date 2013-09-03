@@ -551,8 +551,8 @@ class OrdersMaker
 					#
 #					@hash_mode["step"]["mode"].each{|key, value|
 #						if value[1] == "is_finished"
-#							if @doc.elements["//step[@id=\"#{key}\"]/parent"] != nil
-#								@doc.elements["//step[@id=\"#{key}\"]/parent"].attributes.get_attribute("ref").value.split(" ").each{|v|
+#							if @doc.elements["//step[@id=\"#{key}\"]"].attributes.get_attribute("parent") != nil
+#								@doc.elements["//step[@id=\"#{key}\"]"].attributes.get_attribute("parent").value.split(" ").each{|v|
 #									if v == id
 #										@hash_mode["step"]["mode"][key][1] = "NOT_YET"
 #										# NOT_YETにされたstepに含まれるsubstepを全てNOT_YETに．

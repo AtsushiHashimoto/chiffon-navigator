@@ -41,12 +41,12 @@ def set_ABLEorOTHERS(doc, hash_mode, current_step, current_substep)
 		# NOT_YETなstepのみがABLEになれる．
 		if value[1] == "NOT_YET"
 			# parentを持たないstepはいつでもできるので，無条件でABLEにする．
-			if doc.elements["//step[@id=\"#{key}\"]/parent"] == nil
+			if doc.elements["//step[@id=\"#{key}\"]"].attributes.get_attribute("parent") == nil
 				hash_mode["step"]["mode"][key][0] = "ABLE"
 			# parentを持つstepは，その複数の(単数の場合あり)stepが全てis_finishedならばABLEになる．
 			else
 				flag = -1
-				doc.elements["//step[@id=\"#{key}\"]/parent"].attributes.get_attribute("ref").value.split(" ").each{|v|
+				doc.elements["//step[@id=\"#{key}\"]"].attributes.get_attribute("parent").value.split(" ").each{|v|
 					# parentとして指定されたidがちゃんと存在する．
 					if hash_mode["step"]["mode"].key?(v)
 						# parentがis_finishedならばABLEになる可能性あり．（その他のparentに期待）
@@ -95,8 +95,10 @@ def set_ABLEorOTHERS(doc, hash_mode, current_step, current_substep)
 				hash_mode["substep"]["mode"][substep_id][0] = "ABLE"
 				# ABLEなsubstepがCURRENTでかつ，弟ノードなsubstepがあればそれをABLEにする．
 				if substep_id == current_substep && doc.elements["//substep[@id=\"#{substep_id}\"]"].next_sibling_node != nil
-					next_substep = doc.elements["//substep[@id=\"#{substep_id}\"]"].next_sibling_node.attributes.get_attribute("id").value
-					hash_mode["substep"]["mode"][next_substep][0] = "ABLE"
+					if doc.elements["//substep[@id=\"#{substep_id}\"]"].next_sibling_node.name == "substep"
+						next_substep = doc.elements["//substep[@id=\"#{substep_id}\"]"].next_sibling_node.attributes.get_attribute("id").value
+						hash_mode["substep"]["mode"][next_substep][0] = "ABLE"
+					end
 				end
 				break
 			end

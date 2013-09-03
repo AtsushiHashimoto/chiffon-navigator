@@ -13,9 +13,9 @@ def navi_menu(jason_input)
 		maker = OrdersMaker.new(jason_input["session_id"])
 		# modeの修正
 		status = maker.modeUpdate_navimenu(jason_input["time"]["sec"], jason_input["operation_contents"])
-		if result == "internal error"
+		if status == "internal error"
 			return status, body
-		elsif result == "invalid params"
+		elsif status == "invalid params"
 			return status, body
 		end
 
@@ -171,7 +171,7 @@ def check(jason_input)
 			status = maker.modeUpdate_check(jason_input["time"]["sec"], jason_input["operation_contents"])
 			if status == "internal error"
 				return status, body
-			elsif result == "invalid params"
+			elsif status == "invalid params"
 				return status, body
 			end
 
