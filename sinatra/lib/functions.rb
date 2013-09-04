@@ -245,7 +245,7 @@ def finish(jason_input, hash_recipe)
 		### Play：不要．再生コンテンツは存在しない
 		### Notify：不要．再生コンテンツは存在しない
 		### Cancel：再生待ちコンテンツが存在すればキャンセル
-		body, status = cancel(jason_input["session_id"], hash_recipe, hash_mode)
+		body, hash_mode, status = cancel(jason_input["session_id"], hash_recipe, hash_mode)
 		if status == "internal error"
 			return status, body
 		elsif status == "invalid params"
