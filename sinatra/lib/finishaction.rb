@@ -1,6 +1,6 @@
 #!/usr/bin/ruby
 
-def finish_action(session_id)
+def finish_action(session_id, hash_recipe)
 	begin
 		hash_mode = Hash.new()
 		open("records/#{session_id}/#{session_id}_mode.txt", "r"){|io|

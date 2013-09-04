@@ -8,7 +8,7 @@ $LOAD_PATH.push(File.dirname(__FILE__))
 require 'lib/utils.rb'
 
 class OrdersMaker
-	def initialize(input)
+	def initialize(input, hash)
 		@session_id = input
 		@hash_mode = Hash.new()
 		open("records/#{@session_id}/#{@session_id}_mode.txt", "r"){|io|
@@ -18,7 +18,11 @@ class OrdersMaker
 		open("records/#{@session_id}/#{@session_id}_sortedstep.txt", "r"){|io|
 			@sorted_step = JSON.load(io)
 		}
-		@doc = REXML::Document.new(open("records/#{@session_id}/#{@session_id}_recipe.xml"))
+		@hash_recipe = Hash.new()
+		@hash_recipe = hash
+#		open("records/#{@session_id}/#{@session_id}_recipe.txt", "r"){|io|
+#			@hash_recipe = JSON.load(io)
+#		}
 	end
 
 	# CURRENTなsubstepのhtml_contentsを表示させるDetailDraw命令．
@@ -42,13 +46,11 @@ class OrdersMaker
 			@hash_mode[v]["mode"].each{|key, value|
 				if value[0] == "CURRENT"
 					# triggerの数が1個以上のとき．
-					if @doc.elements["//#{v}[@id=\"#{key}\"]/trigger[1]"] != nil
+					if @hash_recipe[v][key].key?("trigger")
 						# triggerが複数個の場合，どうするのか考えていない．
-						@doc.get_elements("//#{v}[@id=\"#{key}\"]/trigger[1]").each{|node|
-							orders.push({"Play"=>{"id"=>key, "delay"=>node.attributes.get_attribute("delay").value}})
-							finish_time = time + node.attributes.get_attribute("delay").value.to_i * 1000
-							@hash_mode[v]["mode"][key][1] = finish_time
-						}
+						orders.push({"Play"=>{"id"=>key, "delay"=>@hash_recipe[v][key]["trigger"][0][2].to_i}})
+						finish_time = time + @hash_recipe[v][key]["trigger"][0][2].to_i * 1000
+						@hash_mode[v]["mode"][key][1] = finish_time
 					else # triggerが0個のとき．
 						# triggerが無い場合は再生命令は出さないが，hash_modeはどう変更するのか考えていない．
 						# @hash_mode[v]["mode"][key][1] = ?
@@ -70,12 +72,10 @@ class OrdersMaker
 			if value[0] == "CURRENT"
 				# notificationはtriggerが必ずある．
 				# triggerが複数個の場合，どうするのか考えていない．
-				@doc.get_elements("//notification[@id=\"#{key}\"]/trigger[1]").each{|node|
-					orders.push({"Notify"=>{"id"=>key, "delay"=>node.attributes.get_attribute("delay").value}})
-					finish_time = time + node.attributes.get_attribute("delay").value.to_i * 1000
-					# notificationは特殊なので，特別にKEEPに変更する．
-					@hash_mode["notification"]["mode"][key] = ["KEEP", finish_time]
-				}
+				orders.push({"Notify"=>{"id"=>key, "delay"=>@hash_recipe["notification"][key]["trigger"][0][2].to_i}})
+				finish_time = time + @hash_recipe["notification"][key]["trigger"][0][2].to_i * 1000
+				# notificationは特殊なので，特別にKEEPに変更する．
+				@hash_mode["notification"]["mode"][key] = ["KEEP", finish_time]
 			end
 		}
 		open("records/#{@session_id}/#{@session_id}_mode.txt", "w"){|io|
@@ -112,8 +112,8 @@ class OrdersMaker
 						# STOPからFINISHEDに変更．
 						@hash_mode["notification"]["mode"][key] = ["FINISHED", -1]
 						# audioをもつnotificationの場合，audioもFINISHEDに変更．
-						if @doc.elements["//notification[@id=\"#{key}\"]/audio"] != nil
-							audio_id = @doc.elements["//notification[@id=\"#{key}\"]/audio"].attributes.get_attribute("id").value
+						if @hash_recipe["notification"][key].key?("audio")
+							audio_id = @hash_recipe["notification"][key]["audio"]
 							@hash_mode["audio"]["mode"][audio_id] = ["FINISHED", -1]
 						end
 					end
@@ -122,7 +122,7 @@ class OrdersMaker
 		else # 中止させるメディアについて指定がある場合．
 			id.each{|v|
 				# 指定されたメディアのelement nameを調査．
-				element_name = searchElementName(@session_id, v)
+				element_name = search_ElementName(@hash_recipe, v)
 				# audioとvideoの場合．
 				if element_name == "audio" || element_name == "video"
 					# 指定されたものが再生待ちかどうかとりあえず調べる，
@@ -138,8 +138,8 @@ class OrdersMaker
 						orders.push({"Cancel"=>{"id"=>v}})
 						@hash_mode["notification"]["mode"][v][0] = ["FINISHED", -1]
 						# audioを持つnotificationはaudioもFINISHEDに．
-						if @doc.elements["//notification[@id=\"#{v}\"]/audio"] != nil
-							audio_id = @doc.elements["//notification[@id=\"#{v}\"]/audio"].attributes.get_attribute("id").value
+						if @hash_recipe["notification"][v].key?("audio")
+							audio_id = @hash_recipe["notification"][v]["audio"]
 							@hash_mode["audio"]["mode"][audio_id] = ["FINISHED", -1]
 						end
 					end
@@ -178,8 +178,7 @@ class OrdersMaker
 				if flag == 1
 					p "error" # CURRENTなstepが複数個ある場合，エラーを吐く？考えていない．
 				end
-				@doc.get_elements("//step[@id=\"#{v[1]}\"]/substep").each{|node|
-					id = node.attributes.get_attribute("id").value
+				@hash_recipe["step"][v[1]]["substep"].each{|id|
 					visual = nil
 					if @hash_mode["substep"]["mode"][id][2] == "CURRENT"
 						visual = "CURRENT"
@@ -205,7 +204,7 @@ class OrdersMaker
 				p "#{@hash_mode["display"]} is displayed now."
 				return "invalid params"
 			end
-			element_name = searchElementName(@session_id, id)
+			element_name = search_ElementName(@hash_recipe, id)
 			# 遷移要求先がstepかsubstepかで場合分け
 			case element_name
 			when "step"
@@ -238,10 +237,9 @@ class OrdersMaker
 				# クリックされたstep内でNOT_YETなsubstepの一番目をCURRENTに．
 				# NOT_YETなsubstepが存在しなければ，第一番目のsubstepをCURRENTに．
 				current_substep = nil
-				@doc.get_elements("//step[@id=\"#{id}\"]/substep").each{|node|
-					substep_id = node.attributes.get_attribute("id").value
+				@hash_recipe["step"][id]["substep"].each{|substep_id|
 					if @hash_mode["substep"]["mode"][substep_id][1] == "NOT_YET"
-						current_substep = node.attributes.get_attribute("id").value
+						current_substep = substep_id
 						break
 					else
 						next
@@ -252,12 +250,12 @@ class OrdersMaker
 					@hash_mode["substep"]["mode"][current_substep][2] = "CURRENT"
 				else # NOT_YETなsubstepが存在しない．
 					# 一番目の(is_finishedな)substepをCURRENTに．
-					current_substep = @doc.elements["//step[@id=\"#{id}\"]/substep[1]"].attributes.get_attribute("id").value
+					current_substep = @hash_recipe["step"][id]["substep"][0]
 					@hash_mode["substep"]["mode"][current_substep][2] = "CURRENT"
 				end
 				# クリックされた先のメディアは再生させない．
 				# stepとsubstepを適切にABLEにする．
-				@hash_mode = set_ABLEorOTHERS(@doc, @hash_mode, id, current_substep)
+				@hash_mode = set_ABLEorOTHERS(@hash_recipe, @hash_mode, id, current_substep)
 			when "substep"
 				# まずは，CURRENT，NOT_CURRENTの操作．
 				# 現状でCURRENTなsubstepをNOT_CURRENTに．
@@ -279,14 +277,14 @@ class OrdersMaker
 				# クリックされたsubstepをCURRENTに．
 				@hash_mode["substep"]["mode"][id][2] = "CURRENT"
 				# CURRENTなstepの探索．
-				current_step = @doc.elements["//substep[@id=\"#{id}\"]"].parent.attributes.get_attribute("id").value
+				current_step = @hash_recipe["substep"][id]["parent_step"]
 				# stepとsubstepを適切にABLEにする．
-				@hash_mode = set_ABLEorOTHERS(@doc, @hash_mode, current_step, id)
+				@hash_mode = set_ABLEorOTHERS(@hash_recipe, @hash_mode, current_step, id)
 			else # 遷移要求先がおかしい．
 				return "invalid params"
 			end
 			# notificationが再生済みかどうかは，隙あらば調べましょう．
-			@hash_mode = check_notification_FINISHED(@doc, @hash_mode, time)
+			@hash_mode = check_notification_FINISHED(@hash_recipe, @hash_mode, time)
 			open("records/#{@session_id}/#{@session_id}_mode.txt", "w"){|io|
 				io.puts(JSON.pretty_generate(@hash_mode))
 			}
@@ -301,7 +299,7 @@ class OrdersMaker
 	# EXTERNAL_INPUTリクエストの場合のmodeアップデート
 	def modeUpdate_externalinput(time, id)
 		begin
-			element_name = searchElementName(@session_id, id)
+			element_name = search_ElementName(@hash_recipe, id)
 			# 入力されたidがnotificationの場合．
 			if element_name == "notification"
 				# 指定されたnotificationが未再生なら再生命令と判断してCURRENTに．
@@ -317,32 +315,34 @@ class OrdersMaker
 					flag = -1
 					# ABLEなstepの中のNOT_YETなsubstepから探索．（現状でCURRENTなsubstepも探索対象．一旦オブジェクトを置いてまたやり始めただけかもしれない．）
 					if @hash_mode["step"]["mode"][v[1]][0] == "ABLE"
-						@doc.get_elements("//step[@id=\"#{v[1]}\"]/substep").each{|node1|
-							substep_id = node1.attributes.get_attribute("id").value
+						@hash_recipe["step"][v[1]]["substep"].each{|substep_id|
 							if @hash_mode["substep"]["mode"][substep_id][1] == "NOT_YET"
-								@doc.get_elements("//substep[@id=\"#{substep_id}\"]/trigger").each{|node2|
-									if node2.attributes.get_attribute("ref").value == id
-										current_substep = node2.parent.attributes.get_attribute("id").value
-										flag = 1
-										break # trigger探索からのbreak
-									end
-								}
+								if @hash_recipe["substep"][substep_id].key?("trigger")
+									@hash_recipe["substep"][substep_id]["trigger"].each{|v|
+										if v[1] == id
+											current_substep = node2.parent.attributes.get_attribute("id").value
+											flag = 1
+											break # trigger探索からのbreak
+										end
+									}
+								end
 							end
 							if flag == 1
 								break # substep探索からのbreak
 							end
 						}
 					elsif @hash_mode["step"]["mode"][v[1]][1] == "NOT_YET" && @hash_mode["step"]["mode"][v[1]][2] == "CURRENT" # ABLEでなくても，navi_menu等でCURRENTなstepも探索対象
-						@doc.get_elements("//step[@id=\"#{v[1]}\"]/substep").each{|node|
-							substep_id = node.attributes.get_attribute("id").value
+						@hash_recipe["step"][v[1]]["substep"].each{|substep_id|
 							if @hash_mode["substep"]["mode"][substep_id][1] == "NOT_YET"
-								@doc.get_elements("//substep[@id=\"#{substep_id}\"]/trigger").each{|node2|
-									if node2.attributes.get_attribute("ref").value == id
-										current_substep = node2.parent.attributes.get_attribute("id").value
-										flag = 1
-										break
-									end
-								}
+								if @hash_recipe["substep"][substep_id].key?("trigger")
+									@hash_recipe["substep"][substep_id]["trigger"].each{|v|
+										if v[1] == id
+											current_substep = substep_id
+											flag = 1
+											break
+										end
+									}
+								end
 							end
 							if flag == 1
 								break
@@ -362,14 +362,13 @@ class OrdersMaker
 						end
 					}
 					if @hash_mode["substep"]["mode"][previous_substep][0] == "ABLE"
-						if @doc.elements["//substep[@id=\"#{previous_substep}\"]"].next_sibling_node != nil
-							current_substep = @doc.elements["//substep[@id=\"#{previous_substep}\"]"].next_sibling_node.attributes.get_attribute("id").value
+						if @hash_recipe["substep"][previous_substep].key?("next_substep")
+							current_substep = @hash_recipe["substep"][previous_substep]["next_substep"]
 						else
-							parent_id = @doc.elements["//substep[@id=\"#{previous_substep}\"]"].parent.attributes.get_attribute("id").value
+							parent_id = @hash_recipe["substep"][previous_substep]["parent_substep"]
 							@sorted_step.each{|v|
 								if v[1] != parent_id && @hash_mode["step"]["mode"][v[1]][0] == "ABLE"
-									@doc.get_elements("//step[@id=\"#{v[1]}\"]/substep").each{|node|
-										substep_id = node.attributes.get_attribute("id").value
+									@hash_recipe["step"][v[1]]["substep"].each{|substep_id|
 										if @hash_mode["substep"]["mode"][substep_id][1] == "NOT_YET"
 											current_substep = substep_id
 											break
@@ -382,8 +381,7 @@ class OrdersMaker
 					else
 						@sorted_step.each{|v|
 							if @hash_mode["step"]["mode"][v[1]][0] == "ABLE"
-								@doc.get_elements("//step[@id=\"#{v[1]}\"]/substep").each{|node|
-									substep_id = node.attributes.get_attribute("id").value
+								@hash_recipe["step"][v[1]]["substep"].each{|substep_id|
 									if @hash_mode["substep"]["mode"][substep_id][1] == "NOT_YET"
 										previous_substep = substep_id
 										break
@@ -407,9 +405,9 @@ class OrdersMaker
 								@hash_mode["substep"]["mode"][previous_substep][1] = "is_finished"
 								# 子の時点ではメディアはSTOPしない．
 								# 親ノードもNOT_CURRENTにする．かつ，上記のsubstepがstep内で最後のsubstepであれば，stepをis_finishedにする．
-								parent_step = @doc.elements["//substep[@id=\"#{previous_substep}\"]"].parent.attributes.get_attribute("id").value
+								parent_step = @hash_recipe["substep"][previous_substep]["parent_step"]
 								@hash_mode["step"]["mode"][parent_step][2] = "NOT_CURRENT"
-								if @doc.elements["//substep[@id=\"#{previous_substep}\"]"].next_sibling_node == nil
+								if @hash_recipe["substep"][previous_substep].key?("next_substep")
 									@hash_mode["step"]["mode"][parent_step][1] = "is_finished"
 								end
 							end
@@ -418,32 +416,34 @@ class OrdersMaker
 					}
 					# 次にCURRENTとなるsubstepをCURRENTに．
 					@hash_mode["substep"]["mode"][current_substep][2] = "CURRENT"
-					current_step = @doc.elements["//substep[@id=\"#{current_substep}\"]"].parent.attributes.get_attribute("id").value
+					current_step = @hash_recipe["substep"][current_substep]["parent_step"]
 					@hash_mode["step"]["mode"][current_step][2] = "CURRENT"
 					# 現状でCURRENTなsubstepと次にCURRENTなsubstepが異なる場合は，メディアを再生させる．
 					if current_substep != previous_substep
 						media = ["audio", "video", "notification"]
 						media.each{|v|
-							@doc.get_elements("//substep[@id=\"#{current_substep}\"]/#{v}").each{|node|
-								media_id = node.attributes.get_attribute("id").value
-								if @hash_mode[v]["mode"][media_id][0] == "NOT_YET"
-									@hash_mode[v]["mode"][media_id][0] = "CURRENT"
-								end
-							}
+							if @hash_recipe["substep"][current_substep].key?(v)
+								@hash_recipe["substep"][current_substep][v].each{|media_id|
+									if @hash_mode[v]["mode"][media_id][0] == "NOT_YET"
+										@hash_mode[v]["mode"][media_id][0] = "CURRENT"
+									end
+								}
+							end
 						}
 						# previous_substepのメディアはSTOPする．
 						media = ["audio", "video"]
 						media.each{|v|
-							@doc.get_elements("//substep[@id=\"#{previous_substep}\"]/#{v}").each{|node|
-								media_id = node.attributes.get_attribute("id").value
-								@hash_mode[v]["mode"][media_id][0] = "STOP"
-							}
+							if @hash_recipe["substep"][previous_substep].key?(v)
+								@hash_recipe["substep"][previous_substep][v].each{|media_id|
+									@hash_mode[v]["mode"][media_id][0] = "STOP"
+								}
+							end
 						}
 					end
 					# stepとsubstepを適切にABLEに．
-					@hash_mode = set_ABLEorOTHERS(@doc, @hash_mode, current_step, current_substep)
+					@hash_mode = set_ABLEorOTHERS(@hash_recipe, @hash_mode, current_step, current_substep)
 					# notificationが再生済みかどうかは，隙あらば調べましょう
-					@hash_mode = check_notification_FINISHED(@doc, @hash_mode, time)
+					@hash_mode = check_notification_FINISHED(@hash_recipe, @hash_mode, time)
 				end
 			end
 			open("records/#{@session_id}/#{@session_id}_mode.txt", "w"){|io|
@@ -477,7 +477,7 @@ class OrdersMaker
 				}
 			end
 			# notificationが再生済みかどうかは，隙あらば調べましょう．
-			@hash_mode = check_notification_FINISHED(@doc, @hash_mode, time)
+			@hash_mode = check_notification_FINISHED(@hash_recipe, @hash_mode, time)
 			# チャンネルの切り替え
 			@hash_mode["display"] = flag
 			open("records/#{@session_id}/#{@session_id}_mode.txt", "w"){|io|
@@ -497,7 +497,7 @@ class OrdersMaker
 				p "#{@hash_mode["display"]} is displayed now."
 				return "invalid params"
 			end
-			element_name = searchElementName(@session_id, id)
+			element_name = search_ElementName(@hash_recipe, id)
 			# チェックされたものによって場合分け．
 			case element_name
 			when "step"
@@ -506,21 +506,21 @@ class OrdersMaker
 					# チェックされたstepをis_finishedに．
 					@hash_mode["step"]["mode"][id][1] = "is_finished"
 					# チェックされたstepに含まれるsubstepを全てis_finishedに．
-					@doc.get_elements("//step[@id=\"#{id}\"]/substep").each{|node|
-						substep_id = node.attributes.get_attribute("id").value
+					@hash_recipe["step"][id]["substep"].each{|substep_id|
 						@hash_mode["substep"]["mode"][substep_id][1] = "is_finished"
 						# substepに含まれるメディアをFINISHEDにする．
 						# もしも現状でCURRENTまたはKEEPだったら，再生待ちまたは再生中なのでSTOPにする．
 						media = ["audio", "video", "notification"]
 						media.each{|v|
-							@doc.get_elements("//substep[@id=\"#{substep_id}\"]/#{v}").each{|node|
-								media_id = node.attributes.get_attribute("id").value
-								if @hash_mode[v]["mode"][media_id][0] == "NOT_YET"
-									@hash_mode[v]["mode"][media_id][0] = "FINISHED"
-								elsif @hash_mode[v]["mode"][media_id][0] == "CURRENT" || @hash_mode[v]["mode"][media_id][0] == "KEEP"
-									@hash_mode[v]["mode"][media_id][0] = "STOP"
-								end
-							}
+							if @hash_recipe["substep"][substep_id].key?(v)
+								@hash_recipe["substep"][substep_id][v].each{|media_id|
+									if @hash_mode[v]["mode"][media_id][0] == "NOT_YET"
+										@hash_mode[v]["mode"][media_id][0] = "FINISHED"
+									elsif @hash_mode[v]["mode"][media_id][0] == "CURRENT" || @hash_mode[v]["mode"][media_id][0] == "KEEP"
+										@hash_mode[v]["mode"][media_id][0] = "STOP"
+									end
+								}
+							end
 						}
 					}
 					#
@@ -532,16 +532,16 @@ class OrdersMaker
 					# チェックされたstepをNOT_YETに．
 					@hash_mode["step"]["mode"][id][1] = "NOT_YET"
 					# チェックされたstepに含まれるsubstepを全てNOT_YETに．
-					@doc.get_elements("//step[@id=\"#{id}\"]/substep").each{|node|
-						substep_id = node.attributes.get_attribute("id").value
+					@hash_recipe["step"][id]["substep"].each{|substep_id|
 						@hash_mode["substep"]["mode"][substep_id][1] = "NOT_YET"
 						# substepに含まれるメディアをNOT_YETにする．
 						media = ["audio", "video", "notification"]
 						media.each{|v|
-							@doc.get_elements("//substep[@id=\"#{substep_id}\"]/#{v}").each{|node|
-								media_id = node.attributes.get_attribute("id").value
-								@hash_mode[v]["mode"][media_id][0] = "NOT_YET"
-							}
+							if @hash_recipe["substep"][substep_id].key?(v)
+								@hash_recipe["substep"][substep_id][v].each{|media_id|
+									@hash_mode[v]["mode"][media_id][0] = "NOT_YET"
+								}
+							end
 						}
 					}
 					#
@@ -551,21 +551,21 @@ class OrdersMaker
 					#
 #					@hash_mode["step"]["mode"].each{|key, value|
 #						if value[1] == "is_finished"
-#							if @doc.elements["//step[@id=\"#{key}\"]"].attributes.get_attribute("parent") != nil
-#								@doc.elements["//step[@id=\"#{key}\"]"].attributes.get_attribute("parent").value.split(" ").each{|v|
+#							if @hash_recipe["step"][key].key?(parent)
+#								@hash_recipe["step"][key]["parent"].each{|v|
 #									if v == id
 #										@hash_mode["step"]["mode"][key][1] = "NOT_YET"
 #										# NOT_YETにされたstepに含まれるsubstepを全てNOT_YETに．
-#										@doc.get_elements("//step[@id=\"#{key}\"]/substep").each{|node|
-#											substep_id = node.attributes.get_attribute("id").value
+#										@hash_recipe["step"][key]["substep"].each{|substep_id|
 #											@hash_mode["substep"]["mode"][substep_id][1] = "NOT_YET"
 #											# substepに含まれるメディアをNOT_YETにする．
 #											media = ["audio", "video", "notification"]
 #											media.each{|v|
-#												@doc.get_elements("//substep[@id=\"#{substep_id}\"]/#{v}").each{|node|
-#													media_id = node.attributes.get_attribute("id").value
-#													@hash_mode[v]["mode"][media_id][0] = "NOT_YET"
-#												}
+#												if @hash_recipe["substep"][substep_id].key?(v)
+#													@hash_recipe["substep"][substep_id][v].each{|media_id|
+#														@hash_mode[v]["mode"][media_id][0] = "NOT_YET"
+#													}
+#												end
 #											}
 #										}
 #										break
@@ -576,9 +576,9 @@ class OrdersMaker
 #					}
 				end
 				# ABLEまたはOTHERSの操作のために，CURRENTなstepとsubstepのidを調べる．
-				current_step, current_substep = search_CURRENT(@doc, @hash_mode)
+				current_step, current_substep = search_CURRENT(@hash_recipe, @hash_mode)
 				# ABLEまたはOTHERSの操作．
-				@hash_mode = set_ABLEorOTHERS(@doc, @hash_mode, current_step, current_substep)
+				@hash_mode = set_ABLEorOTHERS(@hash_recipe, @hash_mode, current_step, current_substep)
 				# 全てis_finishedならばCURRENT探索はしない
 				flag = -1
 				@hash_mode["step"]["mode"].each{|key, value|
@@ -589,39 +589,38 @@ class OrdersMaker
 				}
 				if flag == 1 # NOT_YETなstepが存在する場合のみ，CURRENTの移動を行う
 					# 可能なsubstepに遷移する
-					@hash_mode = go2current(@doc, @hash_mode, @sorted_step, current_step, current_substep)
+					@hash_mode = go2current(@hash_recipe, @hash_mode, @sorted_step, current_step, current_substep)
 					# 再度ABLEの判定を行う
-					current_step, current_substep = search_CURRENT(@doc, @hash_mode)
+					current_step, current_substep = search_CURRENT(@hash_recipe, @hash_mode)
 					# ABLEまたはOTHERSの操作．
-					@hash_mode = set_ABLEorOTHERS(@doc, @hash_mode, current_step, current_substep)
+					@hash_mode = set_ABLEorOTHERS(@hash_recipe, @hash_mode, current_step, current_substep)
 				end
 			when "substep"
 				# is_finishedまたはNOT_YETの操作．
 				if @hash_mode["substep"]["mode"][id][1] == "NOT_YET" # NOT_YETならばis_finishedに．
-					parent_step = @doc.elements["//substep[@id=\"#{id}\"]"].parent.attributes.get_attribute("id").value
+					parent_step = @hash_recipe["substep"][id]["parent_step"]
 					media = ["audio", "video", "notification"]
 					# チェックされたsubstepを含めそれ以前のsubstep全てをis_finishedに．
-					@doc.get_elements("//step[@id=\"#{parent_step}\"]/substep").each{|node1|
-						child_substep = node1.attributes.get_attribute("id").value
+					@hash_recipe["step"][parent_step]["substep"].each{|child_substep|
 						@hash_mode["substep"]["mode"][child_substep][1] = "is_finished"
 						# そのsubstepに含まれるメディアをFINISHEDに．
 						# もしも現状でCURRENTまたはKEEPならば，再生中または再生待ちなのでSTOPに．
 						media.each{|v|
-							@doc.get_elements("//substep[@id=\"#{child_substep}\"]/#{v}").each{|node2|
-								media_id = node2.attributes.get_attribute("id").value
-								if @hash_mode[v]["mode"][media_id][0] == "NOT_YET"
-									@hash_mode[v]["mode"][media_id][0] = "FINISHED"
-								elsif @hash_mode[v]["mode"][media_id][0] == "CURRENT" || @hash_mode[v]["mode"][media_id][0] == "KEEP"
-									@hash_mode[v]["mode"][media_id][0] = "STOP"
-								end
-							}
+							if @hash_recipe["substep"][child_substep].key?(v)
+								@hash_recipe["substep"][child_substep][v].each{|media_id|
+									if @hash_mode[v]["mode"][media_id][0] == "NOT_YET"
+										@hash_mode[v]["mode"][media_id][0] = "FINISHED"
+									elsif @hash_mode[v]["mode"][media_id][0] == "CURRENT" || @hash_mode[v]["mode"][media_id][0] == "KEEP"
+										@hash_mode[v]["mode"][media_id][0] = "STOP"
+									end
+								}
+							end
 						}
 						# チェックされたsubstepをis_finishedにしたらループ終了．
 						if child_substep == id
 							# チェックされたsubstepがstep内の最終substepならば，親ノードもis_finishedにする．
 							flag = -1
-							@doc.get_elements("//step[@id=\"#{parent_step}\"]/substep").each{|node2|
-								substep_id = node2.attributes.get_attribute("id").value
+							@hash_recipe["step"][parent_step]["substep"].each{|substep_id|
 								if @hash_mode["substep"]["mode"][substep_id][1] == "NOT_YET"
 									flag = 1
 									break
@@ -634,29 +633,29 @@ class OrdersMaker
 						end
 					}
 					# currentの探索
-					current_step, current_substep = search_CURRENT(@doc, @hash_mode)
+					current_step, current_substep = search_CURRENT(@hash_recipe, @hash_mode)
 					# stepとsubstepを適切にABLEに．
-					@hash_mode = set_ABLEorOTHERS(@doc, @hash_mode, current_step, current_substep)
+					@hash_mode = set_ABLEorOTHERS(@hash_recipe, @hash_mode, current_step, current_substep)
 					#
 					#
 					# かつ，is_finishedとなったstepがparentにもつstepもis_finishedにしなければならない
 					#
 					#
 				else # is_finishedならばNOT_YETに．
-					parent_step = @doc.elements["//substep[@id=\"#{id}\"]"].parent.attributes.get_attribute("id").value
+					parent_step = @hash_recipe["substep"][id]["parent_step"]
 					media = ["audio", "video", "notification"]
 					# チェックされたsubstepを含むそれ以降の（同一step内の）substepをNOT_YETに．
 					flag = -1
-					@doc.get_elements("//step[@id=\"#{parent_step}\"]/substep").each{|node|
-						child_substep = node.attributes.get_attribute("id").value
+					@hash_recipe["step"][parent_step]["substep"].each{|child_substep|
 						if flag == 1
 							@hash_mode["substep"]["mode"][child_substep][1] = "NOT_YET"
 							# そのsubstepに含まれるメディアをNOT_YETに．
 							media.each{|v|
-								@doc.get_elements("//substep[@id=\"#{child_substep}\"]/#{v}").each{|node2|
-									media_id = node2.attributes.get_attribute("id").value
-									@hash_mode[v]["mode"][media_id][0] = "NOT_YET"
-								}
+								if @hash_recipe["substep"][child_substep].key?(v)
+									@hash_recipe["substep"][child_substep][v].each{|media_id|
+										@hash_mode[v]["mode"][media_id][0] = "NOT_YET"
+									}
+								end
 							}
 						end
 						if child_substep == id
@@ -664,16 +663,17 @@ class OrdersMaker
 							@hash_mode["substep"]["mode"][child_substep][1] = "NOT_YET"
 							# そのsubstepに含まれるメディアをNOT_YETに．
 							media.each{|v|
-								@doc.get_elements("//substep[@id=\"#{child_substep}\"]/#{v}").each{|node2|
-									media_id = node2.attributes.get_attribute("id").value
-									@hash_mode[v]["mode"][media_id][0] = "NOT_YET"
-								}
+								if @hash_recipe["substep"][child_substep].key?(v)
+									@hash_recipe["substep"][child_substep][v].each{|media_id|
+										@hash_mode[v]["mode"][media_id][0] = "NOT_YET"
+									}
+								end
 							}
 						end
 					}
 					# 親ノードのstepを明示的にNOT_YETにして，ABLEの操作をする．
 					@hash_mode["step"]["mode"][parent_step][1] = "NOT_YET"
-					@hash_mode = set_ABLEorOTHERS(@doc, @hash_mode, parent_step, id)
+					@hash_mode = set_ABLEorOTHERS(@hash_recipe, @hash_mode, parent_step, id)
 					#
 					#
 					# かつ，NOT_YETとなったstepをparentにもつstepもNOT_YETにしなければならない
@@ -689,19 +689,19 @@ class OrdersMaker
 				}
 				if flag == 1
 					# currentの探索
-					current_step, current_substep = search_CURRENT(@doc, @hash_mode)
+					current_step, current_substep = search_CURRENT(@hash_recipe, @hash_mode)
 					# 可能なsubstepに遷移する
-					@hash_mode = go2current(@doc, @hash_mode, @sorted_step, current_step, current_substep)
+					@hash_mode = go2current(@hash_recipe, @hash_mode, @sorted_step, current_step, current_substep)
 					# 再度currentの探索
-					current_step, current_substep = search_CURRENT(@doc, @hash_mode)
+					current_step, current_substep = search_CURRENT(@hash_recipe, @hash_mode)
 					# ABLEの設定
-					@hash_mode = set_ABLEorOTHERS(@doc, @hash_mode, current_step, current_substep)
+					@hash_mode = set_ABLEorOTHERS(@hash_recipe, @hash_mode, current_step, current_substep)
 				end
 			else
 				return "invalid params"
 			end
 			# notificationが再生済みかどうかは，隙あらば調べましょう．
-			@hash_mode = check_notification_FINISHED(@doc, @hash_mode, time)
+			@hash_mode = check_notification_FINISHED(@hash_recipe, @hash_mode, time)
 			open("records/#{@session_id}/#{@session_id}_mode.txt", "w"){|io|
 				io.puts(JSON.pretty_generate(@hash_mode))
 			}

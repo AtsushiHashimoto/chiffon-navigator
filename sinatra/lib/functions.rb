@@ -6,11 +6,11 @@ require 'lib/startaction.rb'
 require 'lib/ordersmaker.rb'
 require 'lib/finishaction.rb'
 
-def navi_menu(jason_input)
+def navi_menu(jason_input, hash_recipe)
 	status = nil
 	body = []
 	begin
-		maker = OrdersMaker.new(jason_input["session_id"])
+		maker = OrdersMaker.new(jason_input["session_id"], hash_recipe)
 		# modeの修正
 		status = maker.modeUpdate_navimenu(jason_input["time"]["sec"], jason_input["operation_contents"])
 		if status == "internal error"
@@ -39,11 +39,11 @@ def navi_menu(jason_input)
 	return status, body
 end
 
-def external_input(jason_input)
+def external_input(jason_input, hash_recipe)
 	status = nil
 	body = []
 	begin
-		maker = OrdersMaker.new(jason_input["session_id"])
+		maker = OrdersMaker.new(jason_input["session_id"], hash_recipe)
 		# modeの修正
 		status = maker.modeUpdate_externalinput(jason_input["time"]["sec"], jason_input["operation_contents"])
 		if status == "internal error"
@@ -74,11 +74,11 @@ def external_input(jason_input)
 	return status, body
 end
 
-def channel(jason_input)
+def channel(jason_input, hash_recipe)
 	status = nil
 	body = []
 	begin
-		maker = OrdersMaker.new(jason_input["session_id"])
+		maker = OrdersMaker.new(jason_input["session_id"], hash_recipe)
 
 		case jason_input["operation_contents"]
 		when "GUIDE"
@@ -158,14 +158,13 @@ def channel(jason_input)
 	return status, body
 end
 
-def check(jason_input)
+def check(jason_input, hash_recipe)
 	status = nil
 	body = []
 	begin
-		maker = OrdersMaker.new(jason_input["session_id"])
+		maker = OrdersMaker.new(jason_input["session_id"], hash_recipe)
 		# element_nameの確認
-		element_name = searchElementName(jason_input["session_id"], jason_input["operation_contents"])
-
+		element_name = search_ElementName(hash_recipe, jason_input["operation_contents"])
 		if element_name == "step" || element_name == "substep"
 			# modeの修正
 			status = maker.modeUpdate_check(jason_input["time"]["sec"], jason_input["operation_contents"])
@@ -203,12 +202,12 @@ def check(jason_input)
 	return status, body
 end
 
-def start(jason_input)
+def start(jason_input, hash_recipe)
 	status = nil
 	body = []
 	# Navigationに必要なファイル（詳細はクラスファイル内）を作成
 	# modeUpdateもこの関数でやってしまう
-	status = start_action(jason_input["session_id"], jason_input["operation_contents"])
+	status, hash_recipe = start_action(jason_input["session_id"], jason_input["operation_contents"])
 	if status == "internal error"
 		return status, body
 	elsif status == "invalid params"
@@ -225,28 +224,28 @@ def start(jason_input)
 
 	# 履歴ファイルに書き込む
 	logger()
-	return status, body
+	return status, body, hash_recipe
 end
 
-def finish(jason_input)
+def finish(jason_input, hash_recipe)
 	status = nil
 	body = []
 	begin
 		# mediaをSTOPにする．
-		hash_mode, status = finish_action(jason_input["session_id"])
+		hash_mode, status = finish_action(jason_input["session_id"], hash_recipe)
 		if status == "internal error"
 			return status, body
 		elsif status == "invalid params"
 			return status, body
 		end
 
-		doc = REXML::Document.new(open("records/#{jason_input["session_id"]}/#{jason_input["session_id"]}_recipe.xml"))
+#		doc = REXML::Document.new(open("records/#{jason_input["session_id"]}/#{jason_input["session_id"]}_recipe.xml"))
 
 		### DetailDraw：不要．Detailは描画されない
 		### Play：不要．再生コンテンツは存在しない
 		### Notify：不要．再生コンテンツは存在しない
 		### Cancel：再生待ちコンテンツが存在すればキャンセル
-		body, status = cancel(jason_input["session_id"], doc, hash_mode)
+		body, status = cancel(jason_input["session_id"], hash_recipe, hash_mode)
 		if status == "internal error"
 			return status, body
 		elsif status == "invalid params"
@@ -265,11 +264,11 @@ def finish(jason_input)
 	return status, body
 end
 
-def play_control(jason_input)
+def play_control(jason_input, hash_recipe)
 	status = nil
 	body = []
 	begin
-		element_name = searchElementName(jason_input["session_id"], jason_input["operation_contents"]["id"])
+		element_name = search_ElementName(hash_recipe, jason_input["operation_contents"]["id"])
 		if element_name == "audio" || element_name == "video"
 			case jason_input["operation_contents"]["operation"]
 			when "PLAY"

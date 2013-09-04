@@ -3,6 +3,10 @@ require 'lib/functions.rb'
 
 class DefaultNavigator
 
+	def initialize
+		@hash_recipe = Hash.new{|h,k| h[k]=Hash.new(&h.default_proc)}
+	end
+
 	def counsel(jason_input)
 		status = nil
 		body = []
@@ -13,19 +17,19 @@ class DefaultNavigator
 		else
 			case jason_input["situation"]
 			when "NAVI_MENU"
-				status, body = navi_menu(jason_input)
+				status, body = navi_menu(jason_input, @hash_recipe)
 			when "EXTERNAL_INPUT"
-				status, body = external_input(jason_input)
+				status, body = external_input(jason_input, @hash_recipe)
 			when "CHANNEL"
-				status, body = channel(jason_input)
+				status, body = channel(jason_input, @hash_recipe)
 			when "CHECK"
-				status, body = check(jason_input)
+				status, body = check(jason_input, @hash_recipe)
 			when "START"
-				status, body = start(jason_input)
+				status, body, @hash_recipe = start(jason_input, @hash_recipe)
 			when "END"
-				status, body = finish(jason_input)
+				status, body = finish(jason_input, @hash_recipe)
 			when "PLAY_CONTROL"
-				status, body = play_control(jason_input)
+				status, body = play_control(jason_input, @hash_recipe)
 			else
 				status = "invalid params"
 			end

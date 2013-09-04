@@ -13,40 +13,48 @@ def read_hash(session_id)
 	open("records/#{session_id}/#{session_id}_sortedstep.txt", "r"){|io|
 		sorted_step = JSON.load(io)
 	}
-	doc = REXML::Document.new(open("records/#{session_id}/#{session_id}_recipe.xml"))
-	return doc, hash_mode, sorted_step
+	hash_recipe = Hash.new()
+	open("records/#{session_id}/#{session_id}_recipe.txt", "r"){|io|
+		hash_recipe = JSON.load(io)
+	}
+	return hash_recipe, hash_mode, sorted_step
 end
 
 
-def searchElementName(session_id, id)
-	hash_id = Hash.new()
-	open("records/#{session_id}/#{session_id}_table.txt", "r"){|io|
-		hash_id = JSON.load(io)
-	}
+def search_ElementName(hash_recipe, id)
+#	hash_id = Hash.new()
+#	open("records/#{session_id}/#{session_id}_table.txt", "r"){|io|
+#		hash_id = JSON.load(io)
+#	}
 	element_name = nil
-	hash_id.each{|key1, value1|
-		value1["id"].each{|value2|
-			if value2 == id then
-				element_name = key1
-				break
-			end
-		}
+	hash_recipe.each{|key, value|
+		if value.key?(id)
+			element_name = key
+		end
 	}
+#	hash_id.each{|key1, value1|
+#		value1["id"].each{|value2|
+#			if value2 == id then
+#				element_name = key1
+#				break
+#			end
+#		}
+#	}
 	return element_name
 end
 
-def set_ABLEorOTHERS(doc, hash_mode, current_step, current_substep)
+def set_ABLEorOTHERS(hash_recipe, hash_mode, current_step, current_substep)
 	# step
 	hash_mode["step"]["mode"].each{|key, value|
 		# NOT_YETなstepのみがABLEになれる．
 		if value[1] == "NOT_YET"
 			# parentを持たないstepはいつでもできるので，無条件でABLEにする．
-			if doc.elements["//step[@id=\"#{key}\"]"].attributes.get_attribute("parent") == nil
+			unless hash_recipe["step"][key].key?("parent")
 				hash_mode["step"]["mode"][key][0] = "ABLE"
 			# parentを持つstepは，その複数の(単数の場合あり)stepが全てis_finishedならばABLEになる．
 			else
 				flag = -1
-				doc.elements["//step[@id=\"#{key}\"]"].attributes.get_attribute("parent").value.split(" ").each{|v|
+				hash_recipe["step"][key]["parent"].each{|v|
 					# parentとして指定されたidがちゃんと存在する．
 					if hash_mode["step"]["mode"].key?(v)
 						# parentがis_finishedならばABLEになる可能性あり．（その他のparentに期待）
@@ -88,17 +96,14 @@ def set_ABLEorOTHERS(doc, hash_mode, current_step, current_substep)
 	}
 	# current_substepの親ノードのstepがABLEの場合のみ，子ノードsubstepのいずれかがABLEになれる．
 	if hash_mode["step"]["mode"][current_step][0] == "ABLE"
-		doc.get_elements("//step[@id=\"#{current_step}\"]/substep").each{|node|
-			substep_id = node.attributes.get_attribute("id").value
+		hash_recipe["step"][current_step]["substep"].each{|substep_id|
 			# NOT_YETなsubstepの中で優先度の一番高いもの（一番初めに現れるもの）をABLEにする．
 			if hash_mode["substep"]["mode"][substep_id][1] == "NOT_YET"
 				hash_mode["substep"]["mode"][substep_id][0] = "ABLE"
 				# ABLEなsubstepがCURRENTでかつ，弟ノードなsubstepがあればそれをABLEにする．
-				if substep_id == current_substep && doc.elements["//substep[@id=\"#{substep_id}\"]"].next_sibling_node != nil
-					if doc.elements["//substep[@id=\"#{substep_id}\"]"].next_sibling_node.name == "substep"
-						next_substep = doc.elements["//substep[@id=\"#{substep_id}\"]"].next_sibling_node.attributes.get_attribute("id").value
-						hash_mode["substep"]["mode"][next_substep][0] = "ABLE"
-					end
+				if substep_id == current_substep && hash_recipe["substep"][substep_id].key?("next_substep")
+					next_substep = hash_recipe["substep"][substep_id]["next_substep"]
+					hash_mode["substep"]["mode"][next_substep][0] = "ABLE"
 				end
 				break
 			end
@@ -107,7 +112,7 @@ def set_ABLEorOTHERS(doc, hash_mode, current_step, current_substep)
 	return hash_mode
 end
 
-def go2current(doc, hash_mode, sorted_step, current_step, current_substep)
+def go2current(hash_recipe, hash_mode, sorted_step, current_step, current_substep)
 	# 現状でCURRENTなstepとsubstepをNOT_CURRENTにする．
 	hash_mode["step"]["mode"][current_step][2] = "NOT_CURRENT"
 	hash_mode["substep"]["mode"][current_substep][2] = "NOT_CURRENT"
@@ -115,18 +120,18 @@ def go2current(doc, hash_mode, sorted_step, current_step, current_substep)
 	sorted_step.each{|v|
 		if hash_mode["step"]["mode"][v[1]][0] == "ABLE"
 			hash_mode["step"]["mode"][v[1]][2] = "CURRENT"
-			doc.get_elements("//step[@id=\"#{v[1]}\"]/substep").each{|node|
-				substep_id = node.attributes.get_attribute("id").value
+			hash_recipe["step"][v[1]]["substep"].each{|substep_id|
 				if hash_mode["substep"]["mode"][substep_id][1] == "NOT_YET"
 					hash_mode["substep"]["mode"][substep_id][2] = "CURRENT"
 					media = ["audio", "video", "notification"]
 					media.each{|v|
-						doc.get_elements("//substep[@id=\"#{substep_id}\"]/#{v}").each{|node2|
-							media_id = node2.attributes.get_attribute("id").value
-							if hash_mode[v]["mode"][media_id][0] == "NOT_YET"
-								hash_mode[v]["mode"][media_id][0] = "CURRENT"
-							end
-						}
+						if hash_recipe["substep"][substep_id].key?(v)
+							hash_recipe["substep"][substep_id][v].each{|media_id|
+								if hash_mode[v]["mode"][media_id][0] == "NOT_YET"
+									hash_mode[v]["mode"][media_id][0] = "CURRENT"
+								end
+							}
+						end
 					}
 					break
 				end
@@ -137,32 +142,29 @@ def go2current(doc, hash_mode, sorted_step, current_step, current_substep)
 	return hash_mode
 end
 
-def check_notification_FINISHED(doc, hash_mode, time)
+def check_notification_FINISHED(hash_recipe, hash_mode, time)
 	hash_mode["notification"]["mode"].each{|key, value|
 		if value[0]  == "KEEP"
 			if time > value[1]
 				hash_mode["notification"]["mode"][key] = ["FINISHED", -1]
 				# notificationがaudioをもっていれば，それもFINISHEDにする．
-				doc.get_elements("//notification[@id=\"#{key}\"]/audio").each{|node|
-					audio_id = node.attributes.get_attribute("id").value
-					if audio_id != nil
-						hash_mode["audio"]["mode"][audio_id] = ["FINISHED", -1]
-					end
-				}
+				if hash_recipe["notification"][key].key?("audio")
+					audio_id = hash_recipe["notification"][key]["audio"]
+					hash_mode["audio"]["mode"][audio_id] = ["FINISHED", -1]
+				end
 			end
 		end
 	}
 	return hash_mode
 end
 
-def search_CURRENT(doc, hash_mode)
+def search_CURRENT(hash_recipe, hash_mode)
 	current_step = nil
 	current_substep = nil
 	hash_mode["step"]["mode"].each{|key, value|
 		if hash_mode["step"]["mode"][key][2] == "CURRENT"
 			current_step = key
-			doc.get_elements("//step[@id=\"#{key}\"]/substep").each{|node|
-				substep_id = node.attributes.get_attribute("id").value
+			hash_recipe["step"][key]["substep"].each{|substep_id|
 				if hash_mode["substep"]["mode"][substep_id][2] == "CURRENT"
 					current_substep = substep_id
 					break
@@ -181,7 +183,7 @@ def errorLOG()
 end
 
 # 再生待ち状態のaudio，video，notificationを中止するCancel命令．
-def cancel(session_id, doc, hash_mode, *id)
+def cancel(session_id, hash_recipe, hash_mode, *id)
 	begin
 		orders = []
 		# 特に中止させるメディアについて指定が無い場合
@@ -209,8 +211,8 @@ def cancel(session_id, doc, hash_mode, *id)
 						# STOPからFINISHEDに変更．
 						hash_mode["notification"]["mode"][key] = ["FINISHED", -1]
 						# audioをもつnotificationの場合，audioもFINISHEDに変更．
-						if doc.elements["//notification[@id=\"#{key}\"]/audio"] != nil
-							audio_id = doc.elements["//notification[@id=\"#{key}\"]/audio"].attributes.get_attribute("id").value
+						if hash_recipe["notification"][key].key?("audio")
+							audio_id = hash_recipe["notification"][key]["audio"]
 							hash_mode["audio"]["mode"][audio_id] = ["FINISHED", -1]
 						end
 					end
@@ -219,7 +221,7 @@ def cancel(session_id, doc, hash_mode, *id)
 		else # 中止させるメディアについて指定がある場合．
 			id.each{|v|
 				# 指定されたメディアのelement nameを調査．
-				element_name = searchElementName(session_id, v)
+				element_name = search_ElementName(hash_recipe, v)
 				# audioとvideoの場合．
 				if element_name == "audio" || element_name == "video"
 					# 指定されたものが再生待ちかどうかとりあえず調べる，
@@ -235,8 +237,8 @@ def cancel(session_id, doc, hash_mode, *id)
 						orders.push({"Cancel"=>{"id"=>v}})
 						hash_mode["notification"]["mode"][v][0] = ["FINISHED", -1]
 						# audioを持つnotificationはaudioもFINISHEDに．
-						if doc.elements["//notification[@id=\"#{v}\"]/audio"] != nil
-							audio_id = doc.elements["//notification[@id=\"#{v}\"]/audio"].attributes.get_attribute("id").value
+						if hash_recipe["notification"][v].key?("audio")
+							audio_id = hash_recipe["notification"][v]["audio"]
 							hash_mode["audio"]["mode"][audio_id] = ["FINISHED", -1]
 						end
 					end
