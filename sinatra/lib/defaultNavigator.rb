@@ -12,9 +12,9 @@ class DefaultNavigator < NavigatorBase
 		status = nil
 		body = []
 		begin
-			maker = OrdersMaker.new(jason_input["session_id"], @hash_recipe)
+			maker = OrdersMaker.new(jason_input["session_id"], @hash_recipe, @hash_mode)
 			# modeの修正
-			status = maker.modeUpdate_navimenu(jason_input["time"]["sec"], jason_input["operation_contents"])
+			status, @hash_mode = maker.modeUpdate_navimenu(jason_input["time"]["sec"], jason_input["operation_contents"])
 			if status == "internal error"
 				return status, body
 			elsif status == "invalid params"
@@ -22,17 +22,24 @@ class DefaultNavigator < NavigatorBase
 			end
 
 			# DetailDraw：入力されたstepをCURRENTとして提示
-			body.concat(maker.detailDraw())
+			parts, @hash_mode = maker.detailDraw()
+			body.concat(parts)
 			# Play：不要．クリックされたstepの調理行動を始めれば，EXTERNAL_INPUTで再生される
 			# Notify：不要．クリックされたstepの調理行動を始めれば，EXTERNAL_INPUTで再生される
 			# Cancel：再生待ちコンテンツがあればキャンセル
-			body.concat(maker.cancel())
+			parts, @hash_mode = maker.cancel()
+			body.concat(parts)
 			# ChannelSwitch：不要
 			# NaviDraw：適切にvisualを書き換えたものを提示
-			body.concat(maker.naviDraw())
+			parts, @hash_mode = maker.naviDraw()
+			body.concat(parts)
 
 			# 履歴ファイルを書き込む
 			logger()
+			session_id = jason_input["session_id"]
+			open("records/#{session_id}/#{session_id}_mode.txt", "w"){|io|
+				io.puts(JSON.pretty_generate(@hash_mode))
+			}
 		rescue => e
 			p e
 			return "internal error", body
@@ -45,9 +52,9 @@ class DefaultNavigator < NavigatorBase
 		status = nil
 		body = []
 		begin
-			maker = OrdersMaker.new(jason_input["session_id"], @hash_recipe)
+			maker = OrdersMaker.new(jason_input["session_id"], @hash_recipe, @hash_mode)
 			# modeの修正
-			status = maker.modeUpdate_externalinput(jason_input["time"]["sec"], jason_input["operation_contents"])
+			status, @hash_mode = maker.modeUpdate_externalinput(jason_input["time"]["sec"], jason_input["operation_contents"])
 			if status == "internal error"
 				return status, body
 			elsif status == "invalid params"
@@ -55,19 +62,28 @@ class DefaultNavigator < NavigatorBase
 			end
 
 			# DetailDraw：調理者がとったものに合わせたsubstepのidを提示
-			body.concat(maker.detailDraw)
+			parts, @hash_mode = maker.detailDraw()
+			body.concat(parts)
 			# Play：substep内にコンテンツが存在すれば再生命令を送る
-			body.concat(maker.play(jason_input["time"]["sec"]))
+			parts, @hash_mode = maker.play(jason_input["time"]["sec"])
+			body.concat(parts)
 			# Notify：substep内にコンテンツが存在すれば再生命令を送る
-			body.concat(maker.notify(jason_input["time"]["sec"]))
+			parts, @hash_mode = maker.notify(jason_input["time"]["sec"])
+			body.concat(parts)
 			# Cancel：再生待ちコンテンツがあればキャンセル
-			body.concat(maker.cancel())
+			parts, @hash_mode = maker.cancel()
+			body.concat(parts)
 			# ChannelSwitch：不要
 			# NaviDraw：適切にvisualを書き換えたものを提示
-			body.concat(maker.naviDraw())
+			parts, @hash_mode = maker.naviDraw()
+			body.concat(parts)
 
 			# 履歴ファイルを書き込む
 			logger()
+			session_id = jason_input["session_id"]
+			open("records/#{session_id}/#{session_id}_mode.txt", "w"){|io|
+				io.puts(JSON.pretty_generate(@hash_mode))
+			}
 		rescue => e
 			p e
 			return "internal error", body
@@ -80,12 +96,12 @@ class DefaultNavigator < NavigatorBase
 		status = nil
 		body = []
 		begin
-			maker = OrdersMaker.new(jason_input["session_id"], @hash_recipe)
+			maker = OrdersMaker.new(jason_input["session_id"], @hash_recipe, @hash_mode)
 
 			case jason_input["operation_contents"]
 			when "GUIDE"
 				# modeの修正
-				status = maker.modeUpdate_channel(jason_input["time"]["sec"], "GUIDE")
+				status, @hash_mode = maker.modeUpdate_channel(jason_input["time"]["sec"], "GUIDE")
 				if status == "internal error"
 					return status, body
 				elsif status == "invalid params"
@@ -93,22 +109,30 @@ class DefaultNavigator < NavigatorBase
 				end
 
 				# DetailDraw：modeUpdateしないので，最近送ったオーダーと同じDetailDrawを送ることになる．
-				body.concat(maker.detailDraw())
+				parts, @hash_mode = maker.detailDraw()
+				body.concat(parts)
 				# Play：STARTからoverviewを経てguideに移る場合，メディアの再生が必要かもしれない．
-				body.concat(maker.play(jason_input["time"]["sec"]))
+				parts, @hash_mode = maker.play(jason_input["time"]["sec"])
+				body.concat(parts)
 				# Notify：STARTからoverviewを経てguideに移る場合，メディアの再生が必要かもしれない．
-				body.concat(maker.notify(jason_input["time"]["sec"]))
+				parts, @hash_mode = maker.notify(jason_input["time"]["sec"])
+				body.concat(parts)
 				# Cancel：不要．再生待ちコンテンツは存在しない．
 				# ChannelSwitch：GUIDEを指定
 				body.push({"ChannelSwitch"=>{"channel"=>"GUIDE"}})
 				# NaviDraw：直近のナビ画面と同じものを返すことになる．
-				body.concat(maker.naviDraw())
+				parts, @hash_mode = maker.naviDraw()
+				body.concat(parts)
 
 				# 履歴ファイル書き込む
 				logger()
+				session_id = jason_input["session_id"]
+				open("records/#{session_id}/#{session_id}_mode.txt", "w"){|io|
+					io.puts(JSON.pretty_generate(@hash_mode))
+				}
 			when "MATERIALS"
 				# modeの修正
-				status = maker.modeUpdate_channel(jason_input["time"]["sec"], "MATERIALS")
+				status, @hash_mode = maker.modeUpdate_channel(jason_input["time"]["sec"], "MATERIALS")
 				if status == "internal error"
 					return status, body
 				elsif status == "invalid params"
@@ -119,16 +143,21 @@ class DefaultNavigator < NavigatorBase
 				# Play：不要．再生コンテンツは存在しない
 				# Notify：不要．再生コンテンツは存在しない
 				# Cancel：再生待ちコンテンツがあればキャンセル
-				body.concat(maker.cancel())
+				parts, @hash_mode = maker.cancel()
+				body.concat(parts)
 				# ChannelSwitch：MATERIALSを指定
 				body.push({"ChannelSwitch"=>{"channel"=>"MATERIALS"}})
 				# NaviDraw：不要．Naviは描画されない
 
 				# 履歴ファイルを書き込む
 				logger()
+				session_id = jason_input["session_id"]
+				open("records/#{session_id}/#{session_id}_mode.txt", "w"){|io|
+					io.puts(JSON.pretty_generate(@hash_mode))
+				}
 			when "OVERVIEW"
 				# modeの更新
-				status = maker.modeUpdate_channel(jason_input["time"]["sec"], "OVERVIEW")
+				status, @hash_mode = maker.modeUpdate_channel(jason_input["time"]["sec"], "OVERVIEW")
 				if status == "internal error"
 					return status, body
 				elsif status == "invalid params"
@@ -139,13 +168,18 @@ class DefaultNavigator < NavigatorBase
 				# Play：不要．再生コンテンツは存在しない
 				# Notify：不要．再生コンテンツは存在しない
 				# Cancel：再生待ちコンテンツがあればキャンセル
-				body.concat(maker.cancel())
+				parts, @hash_mode = maker.cancel()
+				body.concat(parts)
 				# ChannelSwitch：OVERVIEWを指定
 				body.push({"ChannelSwitch"=>{"channel"=>"OVERVIEW"}})
 				# NaviDraw：不要．Naviは描画されない
 
 				# 履歴ファイルを書き込む
 				logger()
+				session_id = jason_input["session_id"]
+				open("records/#{session_id}/#{session_id}_mode.txt", "w"){|io|
+					io.puts(JSON.pretty_generate(@hash_mode))
+				}
 			else
 				# 履歴ファイルに書き込む
 				logger()
@@ -164,12 +198,12 @@ class DefaultNavigator < NavigatorBase
 		status = nil
 		body = []
 		begin
-			maker = OrdersMaker.new(jason_input["session_id"], @hash_recipe)
+			maker = OrdersMaker.new(jason_input["session_id"], @hash_recipe, @hash_mode)
 			# element_nameの確認
 			id = jason_input["operation_contents"]
 			if @hash_recipe["step"].key?(id) || @hash_recipe["substep"].key?(id)
 				# modeの修正
-				status = maker.modeUpdate_check(jason_input["time"]["sec"], id)
+				status, @hash_mode = maker.modeUpdate_check(jason_input["time"]["sec"], id)
 				if status == "internal error"
 					return status, body
 				elsif status == "invalid params"
@@ -177,19 +211,28 @@ class DefaultNavigator < NavigatorBase
 				end
 
 				# DetailDraw：別のsubstepに遷移するかもしれないので必要．
-				body.concat(maker.detailDraw())
+				parts, @hash_mode = maker.detailDraw()
+				body.concat(parts)
 				# Play：別のsubstepに遷移するかもしれないので必要．
-				body.concat(maker.play(jason_input["time"]["sec"]))
+				parts, @hash_mode = maker.play(jason_input["time"]["sec"])
+				body.concat(parts)
 				# Notify：別のsubstepに遷移するかもしれないので必要．
-				body.concat(maker.notify(jason_input["time"]["sec"]))
+				parts, @hash_mode = maker.notify(jason_input["time"]["sec"])
+				body.concat(parts)
 				# Cancel：別のsubstepに遷移するかもしれないので必要．
-				body.concat(maker.cancel())
+				parts, @hash_mode = maker.cancel()
+				body.concat(parts)
 				# ChannelSwitch：不要．
 				# NaviDraw：チェックされたものをis_fisnishedに書き替え，visualを適切に書き換えたものを提示
-				body.concat(maker.naviDraw())
+				parts, @hash_mode = maker.naviDraw()
+				body.concat(parts)
 
 				# 履歴ファイルを書き込む
 				logger()
+				session_id = jason_input["session_id"]
+				open("records/#{session_id}/#{session_id}_mode.txt", "w"){|io|
+					io.puts(JSON.pretty_generate(@hash_mode))
+				}
 			else
 				# 履歴ファイルを書き込む
 				logger()

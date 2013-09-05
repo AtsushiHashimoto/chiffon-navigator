@@ -8,14 +8,12 @@ $LOAD_PATH.push(File.dirname(__FILE__))
 require 'lib/utils.rb'
 
 class OrdersMaker
-	def initialize(input, hash)
+	def initialize(input, recipe, mode)
 		@session_id = input
-		@hash_mode = Hash.new()
-		open("records/#{@session_id}/#{@session_id}_mode.txt", "r"){|io|
-			@hash_mode = JSON.load(io)
-		}
 		@hash_recipe = Hash.new()
-		@hash_recipe = hash
+		@hash_recipe = recipe
+		@hash_mode = Hash.new()
+		@hash_mode = mode
 	end
 
 	# CURRENTなsubstepのhtml_contentsを表示させるDetailDraw命令．
@@ -28,7 +26,7 @@ class OrdersMaker
 				break
 			end
 		}
-		return orders
+		return orders, @hash_mode
 	end
 
 	# CURRENTなaudioとvideoを再生させるPlay命令．
@@ -52,10 +50,7 @@ class OrdersMaker
 				end
 			}
 		}
-		open("records/#{@session_id}/#{@session_id}_mode.txt", "w"){|io|
-			io.puts(JSON.pretty_generate(@hash_mode))
-		}
-		return orders
+		return orders, @hash_mode
 	end
 
 	# CURRENTなnotificationを再生させるNotify命令．
@@ -71,10 +66,7 @@ class OrdersMaker
 				@hash_mode["notification"]["mode"][key] = ["KEEP", finish_time]
 			end
 		}
-		open("records/#{@session_id}/#{@session_id}_mode.txt", "w"){|io|
-			io.puts(JSON.pretty_generate(@hash_mode))
-		}
-		return orders
+		return orders, @hash_mode
 	end
 
 	# 再生待ち状態のaudio，video，notificationを中止するCancel命令．
@@ -141,10 +133,7 @@ class OrdersMaker
 				end
 			}
 		end
-		open("records/#{@session_id}/#{@session_id}_mode.txt", "w"){|io|
-			io.puts(JSON.pretty_generate(@hash_mode))
-		}
-		return orders
+		return orders, @hash_mode
 	end
 
 	# ナビ画面の表示を決定するNaviDraw命令．
@@ -187,7 +176,7 @@ class OrdersMaker
 				flag = 1
 			end
 		}
-		return orders
+		return orders, @hash_mode
 	end
 
 	# NAVI_MENUリクエストの場合のmodeアップデート
@@ -195,7 +184,7 @@ class OrdersMaker
 		begin
 			unless @hash_mode["display"] == "GUIDE"
 				p "#{@hash_mode["display"]} is displayed now."
-				return "invalid params"
+				return "invalid params", @hash_mode
 			end
 			element_name = search_ElementName(@hash_recipe, id)
 			# 遷移要求先がstepかsubstepかで場合分け
@@ -277,16 +266,12 @@ class OrdersMaker
 				return "invalid params"
 			end
 			# notificationが再生済みかどうかは，隙あらば調べましょう．
-			@hash_mode = check_notification_FINISHED(@hash_recipe, @hash_mode, time)
-			open("records/#{@session_id}/#{@session_id}_mode.txt", "w"){|io|
-				io.puts(JSON.pretty_generate(@hash_mode))
-			}
 		rescue => e
 			p e
-			return "internal error"
+			return "internal error", @hash_mode
 		end
 
-		return "success"
+		return "success", @hash_mode
 	end
 
 	# EXTERNAL_INPUTリクエストの場合のmodeアップデート
@@ -439,15 +424,12 @@ class OrdersMaker
 					@hash_mode = check_notification_FINISHED(@hash_recipe, @hash_mode, time)
 				end
 			end
-			open("records/#{@session_id}/#{@session_id}_mode.txt", "w"){|io|
-				io.puts(JSON.pretty_generate(@hash_mode))
-			}
 		rescue => e
 			p e
-			return "internal error"
+			return "internal error", @hash_mode
 		end
 
-		return "success"
+		return "success", @hash_mode
 	end
 
 	# CHANNELリクエストの場合のmpodeアップデート
@@ -455,7 +437,7 @@ class OrdersMaker
 		begin
 			if @hash_mode["display"] == flag
 				p "#{@hash_mode["display"]} is displayed now. You try to display same one."
-				return "invalid params"
+				return "invalid params", @hash_mode
 			end
 			# CURRENTなaudioとvideoをSTOPする．
 			# notificationはSTOPしない．
@@ -473,22 +455,19 @@ class OrdersMaker
 			@hash_mode = check_notification_FINISHED(@hash_recipe, @hash_mode, time)
 			# チャンネルの切り替え
 			@hash_mode["display"] = flag
-			open("records/#{@session_id}/#{@session_id}_mode.txt", "w"){|io|
-				io.puts(JSON.pretty_generate(@hash_mode))
-			}
 		rescue => e
 			p e
-			return "internal error"
+			return "internal error", @hash_mode
 		end
 
-		return "success"
+		return "success", @hash_mode
 	end
 
 	def modeUpdate_check(time, id)
 		begin
 			unless @hash_mode["display"] == "GUIDE"
 				p "#{@hash_mode["display"]} is displayed now."
-				return "invalid params"
+				return "invalid params", @hash_mode
 			end
 			element_name = search_ElementName(@hash_recipe, id)
 			# チェックされたものによって場合分け．
@@ -695,14 +674,11 @@ class OrdersMaker
 			end
 			# notificationが再生済みかどうかは，隙あらば調べましょう．
 			@hash_mode = check_notification_FINISHED(@hash_recipe, @hash_mode, time)
-			open("records/#{@session_id}/#{@session_id}_mode.txt", "w"){|io|
-				io.puts(JSON.pretty_generate(@hash_mode))
-			}
 		rescue => e
 			 p e
-			 return "internal error"
+			 return "internal error", @hash_mode
 		end
 
-		return "success"
+		return "success", @hash_mode
 	end
 end

@@ -9,6 +9,7 @@ require 'lib/utils.rb'
 class NavigatorBase
 	def initialize
 		@hash_recipe = Hash.new{|h,k| h[k]=Hash.new(&h.default_proc)}
+		@hash_mode = Hash.new{|h,k| h[k]=Hash.new(&h.default_proc)}
 	end
 
 	def counsel(jason_input)
@@ -74,60 +75,53 @@ class NavigatorBase
 			@hash_recipe = parse_xml("records/#{session_id}/#{session_id}_recipe.xml")
 
 			# stepやmediaの管理をするhahs_modeの作成
-			hash_mode = Hash.new{|h, k| h[k] = Hash.new(&h.default_proc)}
 			if @hash_recipe.key?("step")
 				@hash_recipe["step"].each{|key, value|
-					hash_mode["step"]["mode"][key] = ["OTHERS","NOT_YET","NOT_CURRENT"]
+					@hash_mode["step"]["mode"][key] = ["OTHERS","NOT_YET","NOT_CURRENT"]
 				}
 			end
 			if @hash_recipe.key?("substep")
 				@hash_recipe["substep"].each{|key, value|
-					hash_mode["substep"]["mode"][key] = ["OTHERS","NOT_YET","NOT_CURRENT"]
+					@hash_mode["substep"]["mode"][key] = ["OTHERS","NOT_YET","NOT_CURRENT"]
 				}
 			end
 			if @hash_recipe.key?("audio")
 				@hash_recipe["audio"].each{|key, value|
-					hash_mode["audio"]["mode"][key] = ["NOT_YET", -1]
+					@hash_mode["audio"]["mode"][key] = ["NOT_YET", -1]
 				}
 			end
 			if @hash_recipe.key?("video")
 				@hash_recipe["video"].each{|key, value|
-					hash_mode["video"]["mode"][key] = ["NOT_YET", -1]
+					@hash_mode["video"]["mode"][key] = ["NOT_YET", -1]
 				}
 			end
 			if @hash_recipe.key?("notification")
 				@hash_recipe["notification"].each{|key, value|
-					hash_mode["notification"]["mode"][key] = ["NOT_YET", -1]
+					@hash_mode["notification"]["mode"][key] = ["NOT_YET", -1]
 				}
 			end
 			# 表示されている画面の管理のために（START時はOVERVIEW）
-			hash_mode["display"] = "OVERVIEW"
+			@hash_mode["display"] = "OVERVIEW"
 
 			# hahs_modeにおける各要素の初期設定
 			# 優先度の最も高いstepをCURRENTとし，その一番目のsubstepもCURRENTにする．
 			current_step = @hash_recipe["sorted_step"][0][1]
 			current_substep = @hash_recipe["step"][current_step]["substep"][0]
-			hash_mode["step"]["mode"][current_step][2] = "CURRENT"
-			hash_mode["substep"]["mode"][current_substep][2] = "CURRENT"
+			@hash_mode["step"]["mode"][current_step][2] = "CURRENT"
+			@hash_mode["substep"]["mode"][current_substep][2] = "CURRENT"
 			# stepとsubstepを適切にABLEにする．
-			hash_mode = set_ABLEorOTHERS(@hash_recipe, hash_mode, current_step, current_substep)
+			@hash_mode = set_ABLEorOTHERS(@hash_recipe, @hash_mode, current_step, current_substep)
 			# STARTなので，is_finishedなものはない．
 			# CURRENTとなったsubstepがABLEならばメディアの再生準備としてCURRENTにする．
-			if hash_mode["substep"]["mode"][current_substep][0] == "ABLE"
+			if @hash_mode["substep"]["mode"][current_substep][0] == "ABLE"
 				media = ["audio", "video", "notification"]
 				media.each{|v|
 					if @hash_recipe["substep"][current_substep].key?(v)
 						@hash_recipe["substep"][current_substep][v].each{|media_id|
-							hash_mode[v]["mode"][media_id][0] = "CURRENT"
+							@hash_mode[v]["mode"][media_id][0] = "CURRENT"
 						}
 					end
 				}
-			end
-			open("records/#{session_id}/#{session_id}_mode.txt", "w") do |io|
-				io.puts(JSON.pretty_generate(hash_mode))
-			end
-			open("records/#{session_id}/#{session_id}_recipe.txt", "w") do |io|
-				io.puts(JSON.pretty_generate(@hash_recipe))
 			end
 
 			### DetailDraw：不要
@@ -137,6 +131,13 @@ class NavigatorBase
 			### ChannelSwitch：OVERVIEWを指定
 			body.push({"ChannelSwitch"=>{"channel"=>"OVERVIEW"}})
 			### NaviDraw：不要
+
+			open("records/#{session_id}/#{session_id}_mode.txt", "w"){|io|
+				io.puts(JSON.pretty_generate(@hash_mode))
+			}
+			open("records/#{session_id}/#{session_id}_recipe.txt", "w"){|io|
+				io.puts(JSON.pretty_generate(@hash_recipe))
+			}
 		rescue => e
 			p e
 			# 履歴
@@ -155,15 +156,11 @@ class NavigatorBase
 		begin
 			# mediaをSTOPにする．
 			session_id = jason_input["session_id"]
-			hash_mode = Hash.new()
-			open("records/#{session_id}/#{session_id}_mode.txt", "r"){|io|
-				hash_mode = JSON.load(io)
-			}
 			media = ["audio", "video", "notification"]
 			media.each{|v|
-				hash_mode[v]["mode"].each{|key, value|
+				@hash_mode[v]["mode"].each{|key, value|
 					if value[0] == "CURRENT"
-						hash_mode[v]["mode"][key][0] = "STOP"
+						@hash_mode[v]["mode"][key][0] = "STOP"
 					end
 				}
 			}
@@ -172,7 +169,7 @@ class NavigatorBase
 			### Play：不要
 			### Notify：不要
 			### Cancel：再生待ちコンテンツが存在すればキャンセル
-			body, hash_mode, status = cancel(jason_input["session_id"], @hash_recipe, hash_mode)
+			body, @hash_mode, status = cancel(jason_input["session_id"], @hash_recipe, @hash_mode)
 			if status == "internal error"
 				# 履歴
 				logger()
@@ -184,6 +181,11 @@ class NavigatorBase
 			end
 			### ChannelSwitch：不要
 			### NaviDraw：不要
+
+
+			open("records/#{@session_id}/#{@session_id}_mode.txt", "w"){|io|
+				io.puts(JSON.pretty_generate(@hash_mode))
+			}
 		rescue => e
 			p e
 			# 履歴
@@ -227,6 +229,10 @@ class NavigatorBase
 			### Cancel：不要
 			### ChannelSwitch：不要
 			### NaviDraw：不要
+
+			open("records/#{@session_id}/#{@session_id}_mode.txt", "w"){|io|
+				io.puts(JSON.pretty_generate(@hash_mode))
+			}
 		rescue => e
 			p e
 			# 履歴
