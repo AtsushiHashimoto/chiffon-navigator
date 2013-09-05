@@ -11,6 +11,7 @@ require 'nokogiri'
 # hash["step"][id]["priority"] = number : stepのpriority．
 # hash["step"][id]["trigger"] = [[timing, ref, delay], [...], ...] : stepのtriggerリスト
 # hash["step"][id]["substep"] = [id, id, ...] : stepのsubstepリスト
+# hash["sorted_step"] = [[priproty, id], [...], ...] : stepのpriority順にソートしたstepのidリスト
 def get_step(doc, hash)
 	priority_list = []
 	doc.xpath("//recipe/directions/step").each{|node|
@@ -96,6 +97,15 @@ def get_step(doc, hash)
 	for i in 0..(priority_list.size-1)
 		hash["step"][priority_list[i][0]]["priority"] = 100 - i
 	end
+	# stepをpriorityの順に並べたhash[sorted_step]を作成
+	hash["sorted_step"] = []
+	hash["step"].each{|key, value|
+		hash["sorted_step"].push([value["priority"], key])
+	}
+	hash["sorted_step"].sort!{|v1, v2|
+		v2[0] <=> v1[0]
+	}
+
 	return hash
 end
 

@@ -18,10 +18,6 @@ def start_action(session_id, contents)
 			p "Cannot touch log file"
 			return "internal error", {}
 		end
-		unless system("touch records/#{session_id}/#{session_id}_error.log")
-			p "Cannot touch error_log file"
-			return "internal error", {}
-		end
 
 		unless system("touch records/#{session_id}/#{session_id}_recipe.xml")
 			p "Cannot touch recipe file"
@@ -60,17 +56,12 @@ def start_action(session_id, contents)
 		}
 
 		hash_mode = Hash.new{|h, k| h[k] = Hash.new(&h.default_proc)}
-		sorted_step = []
 
 		# modeファイル及びsortedファイ作成
 		if hash_recipe.key?("step")
 			hash_recipe["step"].each{|key, value|
 				priority = hash_recipe["step"][key]["priority"]
 				hash_mode["step"]["mode"][key] = ["OTHERS","NOT_YET","NOT_CURRENT"]
-				sorted_step.push([priority, key])
-			}
-			sorted_step.sort!{|v1, v2|
-				v2[0] <=> v1[0]
 			}
 		else
 			p "Given recipe.xml does not have 'step'"
@@ -109,7 +100,7 @@ def start_action(session_id, contents)
 
 		# modeUpdate
 		# 優先度の最も高いstepをCURRENTとし，その一番目のsubstepもCURRENTにする．
-		current_step = sorted_step[0][1]
+		current_step = hash_recipe["sorted_step"][0][1]
 		current_substep = hash_recipe["step"][current_step]["substep"][0]
 
 		hash_mode["step"]["mode"][current_step][2] = "CURRENT"
@@ -130,9 +121,6 @@ def start_action(session_id, contents)
 		end
 		open("records/#{session_id}/#{session_id}_mode.txt", "w"){|io|
 			io.puts(JSON.pretty_generate(hash_mode))
-		}
-		open("records/#{session_id}/#{session_id}_sortedstep.txt", "w"){|io|
-			io.puts(JSON.pretty_generate(sorted_step))
 		}
 		open("records/#{session_id}/#{session_id}_recipe.txt", "w"){|io|
 			io.puts(JSON.pretty_generate(hash_recipe))

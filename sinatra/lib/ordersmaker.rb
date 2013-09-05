@@ -14,15 +14,8 @@ class OrdersMaker
 		open("records/#{@session_id}/#{@session_id}_mode.txt", "r"){|io|
 			@hash_mode = JSON.load(io)
 		}
-		@sorted_step = []
-		open("records/#{@session_id}/#{@session_id}_sortedstep.txt", "r"){|io|
-			@sorted_step = JSON.load(io)
-		}
 		@hash_recipe = Hash.new()
 		@hash_recipe = hash
-#		open("records/#{@session_id}/#{@session_id}_recipe.txt", "r"){|io|
-#			@hash_recipe = JSON.load(io)
-#		}
 	end
 
 	# CURRENTなsubstepのhtml_contentsを表示させるDetailDraw命令．
@@ -160,7 +153,7 @@ class OrdersMaker
 		orders = Array.new()
 		orders.push({"NaviDraw"=>{"steps"=>[]}})
 		flag = 0
-		@sorted_step.each{|v|
+		@hash_recipe["sorted_step"].each{|v|
 			id = v[1]
 			visual = nil
 			if @hash_mode["step"]["mode"][id][2] == "CURRENT"
@@ -311,7 +304,7 @@ class OrdersMaker
 			else
 				# 優先度順に，入力されたオブジェクトをトリガーとするsubstepを探索．
 				current_substep = nil
-				@sorted_step.each{|v|
+				@hash_recipe["sorted_step"].each{|v|
 					flag = -1
 					# ABLEなstepの中のNOT_YETなsubstepから探索．（現状でCURRENTなsubstepも探索対象．一旦オブジェクトを置いてまたやり始めただけかもしれない．）
 					if @hash_mode["step"]["mode"][v[1]][0] == "ABLE"
@@ -366,7 +359,7 @@ class OrdersMaker
 							current_substep = @hash_recipe["substep"][previous_substep]["next_substep"]
 						else
 							parent_id = @hash_recipe["substep"][previous_substep]["parent_substep"]
-							@sorted_step.each{|v|
+							@hash_recipe["sorted_step"].each{|v|
 								if v[1] != parent_id && @hash_mode["step"]["mode"][v[1]][0] == "ABLE"
 									@hash_recipe["step"][v[1]]["substep"].each{|substep_id|
 										if @hash_mode["substep"]["mode"][substep_id][1] == "NOT_YET"
@@ -379,7 +372,7 @@ class OrdersMaker
 							}
 						end
 					else
-						@sorted_step.each{|v|
+						@hash_recipe["sorted_step"].each{|v|
 							if @hash_mode["step"]["mode"][v[1]][0] == "ABLE"
 								@hash_recipe["step"][v[1]]["substep"].each{|substep_id|
 									if @hash_mode["substep"]["mode"][substep_id][1] == "NOT_YET"
@@ -589,7 +582,7 @@ class OrdersMaker
 				}
 				if flag == 1 # NOT_YETなstepが存在する場合のみ，CURRENTの移動を行う
 					# 可能なsubstepに遷移する
-					@hash_mode = go2current(@hash_recipe, @hash_mode, @sorted_step, current_step, current_substep)
+					@hash_mode = go2current(@hash_recipe, @hash_mode, current_step, current_substep)
 					# 再度ABLEの判定を行う
 					current_step, current_substep = search_CURRENT(@hash_recipe, @hash_mode)
 					# ABLEまたはOTHERSの操作．
@@ -691,7 +684,7 @@ class OrdersMaker
 					# currentの探索
 					current_step, current_substep = search_CURRENT(@hash_recipe, @hash_mode)
 					# 可能なsubstepに遷移する
-					@hash_mode = go2current(@hash_recipe, @hash_mode, @sorted_step, current_step, current_substep)
+					@hash_mode = go2current(@hash_recipe, @hash_mode, current_step, current_substep)
 					# 再度currentの探索
 					current_step, current_substep = search_CURRENT(@hash_recipe, @hash_mode)
 					# ABLEの設定

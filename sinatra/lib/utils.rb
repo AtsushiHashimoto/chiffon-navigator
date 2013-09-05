@@ -9,37 +9,25 @@ def read_hash(session_id)
 	open("records/#{session_id}/#{session_id}_mode.txt", "r"){|io|
 		hash_mode = JSON.load(io)
 	}
-	sorted_step = []
-	open("records/#{session_id}/#{session_id}_sortedstep.txt", "r"){|io|
-		sorted_step = JSON.load(io)
-	}
 	hash_recipe = Hash.new()
 	open("records/#{session_id}/#{session_id}_recipe.txt", "r"){|io|
 		hash_recipe = JSON.load(io)
 	}
-	return hash_recipe, hash_mode, sorted_step
+	return hash_recipe, hash_mode
 end
 
 
 def search_ElementName(hash_recipe, id)
-#	hash_id = Hash.new()
-#	open("records/#{session_id}/#{session_id}_table.txt", "r"){|io|
-#		hash_id = JSON.load(io)
-#	}
 	element_name = nil
 	hash_recipe.each{|key, value|
+		if key == "event" || key == "sorted_step"
+			next
+		end
 		if value.key?(id)
 			element_name = key
+			break
 		end
 	}
-#	hash_id.each{|key1, value1|
-#		value1["id"].each{|value2|
-#			if value2 == id then
-#				element_name = key1
-#				break
-#			end
-#		}
-#	}
 	return element_name
 end
 
@@ -112,12 +100,12 @@ def set_ABLEorOTHERS(hash_recipe, hash_mode, current_step, current_substep)
 	return hash_mode
 end
 
-def go2current(hash_recipe, hash_mode, sorted_step, current_step, current_substep)
+def go2current(hash_recipe, hash_mode, current_step, current_substep)
 	# 現状でCURRENTなstepとsubstepをNOT_CURRENTにする．
 	hash_mode["step"]["mode"][current_step][2] = "NOT_CURRENT"
 	hash_mode["substep"]["mode"][current_substep][2] = "NOT_CURRENT"
 
-	sorted_step.each{|v|
+	hash_recipe["sorted_step"].each{|v|
 		if hash_mode["step"]["mode"][v[1]][0] == "ABLE"
 			hash_mode["step"]["mode"][v[1]][2] = "CURRENT"
 			hash_recipe["step"][v[1]]["substep"].each{|substep_id|
