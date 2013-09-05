@@ -3,7 +3,7 @@ require 'sinatra'
 require 'json'
 
 $LOAD_PATH.push(File.dirname(__FILE__))
-require 'lib/default.rb'
+require 'lib/defaultNavigator.rb'
 
 get '/' do
 	'Hello world!'
