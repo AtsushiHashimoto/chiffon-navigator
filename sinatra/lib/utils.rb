@@ -2,20 +2,6 @@
 
 require 'rubygems'
 require 'json'
-require 'rexml/document'
-
-def read_hash(session_id)
-	hash_mode = Hash.new()
-	open("records/#{session_id}/#{session_id}_mode.txt", "r"){|io|
-		hash_mode = JSON.load(io)
-	}
-	hash_recipe = Hash.new()
-	open("records/#{session_id}/#{session_id}_recipe.txt", "r"){|io|
-		hash_recipe = JSON.load(io)
-	}
-	return hash_recipe, hash_mode
-end
-
 
 def search_ElementName(hash_recipe, id)
 	element_name = nil
@@ -168,77 +154,4 @@ def logger()
 end
 
 def errorLOG()
-end
-
-# 再生待ち状態のaudio，video，notificationを中止するCancel命令．
-def cancel(session_id, hash_recipe, hash_mode, *id)
-	begin
-		orders = []
-		# 特に中止させるメディアについて指定が無い場合
-		if id == []
-			# audioとvideoの処理．
-			# Cancelさせるべきものは，STOPになっているはず．
-			media = ["audio", "video"]
-			media.each{|v|
-				if hash_mode.key?(v)
-					hash_mode[v]["mode"].each{|key, value|
-						if value[0] == "STOP"
-							orders.push({"Cancel"=>{"id"=>key}})
-							# STOPからFINISHEDに変更．
-							hash_mode[v]["mode"][key] = ["FINISHED", -1]
-						end
-					}
-				end
-			}
-			# notificationの処理．
-			# Cancelさせるべきものは，STOPのなっているはず．
-			if hash_mode.key?("notification")
-				hash_mode["notification"]["mode"].each{|key, value|
-					if value[0] == "STOP"
-						orders.push({"Cancel"=>{"id"=>key}})
-						# STOPからFINISHEDに変更．
-						hash_mode["notification"]["mode"][key] = ["FINISHED", -1]
-						# audioをもつnotificationの場合，audioもFINISHEDに変更．
-						if hash_recipe["notification"][key].key?("audio")
-							audio_id = hash_recipe["notification"][key]["audio"]
-							hash_mode["audio"]["mode"][audio_id] = ["FINISHED", -1]
-						end
-					end
-				}
-			end
-		else # 中止させるメディアについて指定がある場合．
-			id.each{|v|
-				# 指定されたメディアのelement nameを調査．
-				element_name = search_ElementName(hash_recipe, v)
-				# audioとvideoの場合．
-				if element_name == "audio" || element_name == "video"
-					# 指定されたものが再生待ちかどうかとりあえず調べる，
-					if hash_mode[element_name]["mode"][v][0] == "CURRENT"
-						# CancelしてFINISHEDに．
-						orders.push({"Cancel"=>{"id"=>v}})
-						hash_mode[element_name]["mode"][v] = ["FINISHED", -1]
-					end
-				elsif element_name == "notification" # notificationの場合．
-					# 指定されたnotificationが再生待ちかどうかとりあえず調べる．
-					if hash_mode["notification"]["mode"][v][0] == "KEEP"
-						# CancelしてFINISHEDに．
-						orders.push({"Cancel"=>{"id"=>v}})
-						hash_mode["notification"]["mode"][v][0] = ["FINISHED", -1]
-						# audioを持つnotificationはaudioもFINISHEDに．
-						if hash_recipe["notification"][v].key?("audio")
-							audio_id = hash_recipe["notification"][v]["audio"]
-							hash_mode["audio"]["mode"][audio_id] = ["FINISHED", -1]
-						end
-					end
-				else # 指定されたものがaudio，video，notificationで無い場合．
-					return [], hash_mode, "invalid params"
-				end
-			}
-		end
-	rescue => e
-		p e
-		return [], hash_mode, "internal error"
-	end
-
-	return orders, hash_mode, "success"
 end

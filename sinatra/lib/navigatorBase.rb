@@ -169,7 +169,7 @@ class NavigatorBase
 			### Play：不要
 			### Notify：不要
 			### Cancel：再生待ちコンテンツが存在すればキャンセル
-			body, @hash_mode, status = cancel(jason_input["session_id"], @hash_recipe, @hash_mode)
+			body, @hash_mode, status = cancel(@hash_recipe, @hash_mode)
 			if status == "internal error"
 				# 履歴
 				logger()

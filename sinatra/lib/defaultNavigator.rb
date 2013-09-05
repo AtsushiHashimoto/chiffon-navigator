@@ -5,6 +5,7 @@ require 'json'
 $LOAD_PATH.push(File.dirname(__FILE__))
 require 'lib/navigatorBase.rb'
 require 'lib/ordersmaker.rb'
+require 'lib/modeUpdater.rb'
 require 'lib/utils.rb'
 
 class DefaultNavigator < NavigatorBase
@@ -103,8 +104,6 @@ class DefaultNavigator < NavigatorBase
 				return "invalid params", body
 			end
 
-			maker = OrdersMaker.new(jason_input["session_id"], @hash_recipe, @hash_mode)
-
 			case jason_input["operation_contents"]
 			when "GUIDE"
 				# notificationが再生済みかチェック．
@@ -113,19 +112,19 @@ class DefaultNavigator < NavigatorBase
 				@hash_mode["display"] = jason_input["operation_contents"]
 
 				# DetailDraw：modeUpdateしないので，最近送ったオーダーと同じDetailDrawを送ることになる．
-				parts, @hash_mode = maker.detailDraw()
+				parts = detailDraw(@hash_mode)
 				body.concat(parts)
 				# Play：STARTからoverviewを経てguideに移る場合，メディアの再生が必要かもしれない．
-				parts, @hash_mode = maker.play(jason_input["time"]["sec"])
+				parts, @hash_mode = play(@hash_recipe, @hash_mode, jason_input["time"]["sec"])
 				body.concat(parts)
 				# Notify：STARTからoverviewを経てguideに移る場合，メディアの再生が必要かもしれない．
-				parts, @hash_mode = maker.notify(jason_input["time"]["sec"])
+				parts, @hash_mode = notify(@hash_recipe, @hash_mode, jason_input["time"]["sec"])
 				body.concat(parts)
 				# Cancel：不要．再生待ちコンテンツは存在しない．
 				# ChannelSwitch：GUIDEを指定
 				body.push({"ChannelSwitch"=>{"channel"=>"GUIDE"}})
 				# NaviDraw：直近のナビ画面と同じものを返すことになる．
-				parts, @hash_mode = maker.naviDraw()
+				parts = naviDraw(@hash_recipe, @hash_mode)
 				body.concat(parts)
 			when "MATERIALS", "OVERVIEW"
 				# modeの修正
@@ -146,7 +145,7 @@ class DefaultNavigator < NavigatorBase
 				# Play：不要．再生コンテンツは存在しない
 				# Notify：不要．再生コンテンツは存在しない
 				# Cancel：再生待ちコンテンツがあればキャンセル
-				parts, @hash_mode = maker.cancel()
+				parts, @hash_mode, status = cancel(@hash_recipe, @hash_mode)
 				body.concat(parts)
 				# ChannelSwitch：MATERIALSを指定
 				body.push({"ChannelSwitch"=>{"channel"=>"#{jason_input["operation_contents"]}"}})
