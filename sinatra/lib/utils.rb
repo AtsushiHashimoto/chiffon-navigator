@@ -1,22 +1,5 @@
 #!/usr/bin/ruby
 
-require 'rubygems'
-require 'json'
-
-def search_ElementName(hash_recipe, id)
-	element_name = nil
-	hash_recipe.each{|key, value|
-		if key == "event" || key == "sorted_step"
-			next
-		end
-		if value.key?(id)
-			element_name = key
-			break
-		end
-	}
-	return element_name
-end
-
 def set_ABLEorOTHERS(hash_recipe, hash_mode, current_step, current_substep)
 	# step
 	hash_mode["step"]["mode"].each{|key, value|
@@ -151,7 +134,4 @@ def search_CURRENT(hash_recipe, hash_mode)
 end
 
 def logger()
-end
-
-def errorLOG()
 end
