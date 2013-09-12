@@ -10,17 +10,17 @@ def parse_xml(xmlfile)
 	hash_mode = Hash.new{|h,k| h[k]=Hash.new(&h.default_proc)}
 
 	hash_recipe = get_step(doc, hash_recipe)
-	# directions/substep¤Î½ñ¤­½Ğ¤·
+	# directions/substepã®æ›¸ãå‡ºã—
 	doc.xpath("//directions/substep").each{|node|
 		substep_id = node["id"]
 		hash_recipe = get_substep(doc, hash_recipe, nil, substep_id)
 	}
-	# recipe/notification¤Î½ñ¤­½Ğ¤·
+	# recipe/notificationã®æ›¸ãå‡ºã—
 	doc.xpath("//recipe/notification").each{|node|
 		notification_id = node["id"]
 		hash_recipe = get_notification(doc, hash_recipe, nil, notification_id)
 	}
-	# recipe/event¤Î½ñ¤­½Ğ¤·
+	# recipe/eventã®æ›¸ãå‡ºã—
 	doc.xpath("//recipe/event").each{|node|
 		event_id = node["id"]
 		hash_recipe["event"][event_id] = 1
@@ -29,38 +29,38 @@ def parse_xml(xmlfile)
 end
 
 # step
-# hash_recipe["step"][id] : step¤Îid¤ò¥­¡¼¤È¤¹¤ë¡¥
-# hash_recipe["step"][id]["parent"] = [id1, id2, ...] : step¤Îparent¥ê¥¹¥È
-# hash_recipe["step"][id]["chain"] = id : step¤Îchain
-# hash_recipe["step"][id]["priority"] = number : step¤Îpriority¡¥
-# hash_recipe["step"][id]["trigger"] = [[timing, ref, delay], [...], ...] : step¤Îtrigger¥ê¥¹¥È
-# hash_recipe["step"][id]["substep"] = [id, id, ...] : step¤Îsubstep¥ê¥¹¥È
-# hash_recipe["sorted_step"] = [[priproty, id], [...], ...] : step¤Îpriority½ç¤Ë¥½¡¼¥È¤·¤¿step¤Îid¥ê¥¹¥È
+# hash_recipe["step"][id] : stepã®idã‚’ã‚­ãƒ¼ã¨ã™ã‚‹ï¼
+# hash_recipe["step"][id]["parent"] = [id1, id2, ...] : stepã®parentãƒªã‚¹ãƒˆ
+# hash_recipe["step"][id]["chain"] = id : stepã®chain
+# hash_recipe["step"][id]["priority"] = number : stepã®priorityï¼
+# hash_recipe["step"][id]["trigger"] = [[timing, ref, delay], [...], ...] : stepã®triggerãƒªã‚¹ãƒˆ
+# hash_recipe["step"][id]["substep"] = [id, id, ...] : stepã®substepãƒªã‚¹ãƒˆ
+# hash_recipe["sorted_step"] = [[priproty, id], [...], ...] : stepã®priorityé †ã«ã‚½ãƒ¼ãƒˆã—ãŸstepã®idãƒªã‚¹ãƒˆ
 def get_step(doc, hash_recipe)
 	priority_list = []
 	doc.xpath("//recipe/directions/step").each{|node|
-		##### attribute¤Î¼è¤ê½Ğ¤· #####
-		# id¤Ï»ı¤Ä¤Ï¤º
+		##### attributeã®å–ã‚Šå‡ºã— #####
+		# idã¯æŒã¤ã¯ãš
 		step_id = node["id"]
-		# parent¤ò»ı¤Ä¤Ê¤é¤Ğ
+		# parentã‚’æŒã¤ãªã‚‰ã°
 		unless node["parent"] == nil
 			hash_recipe["step"][step_id]["parent"] = []
 			node["parent"].split(" ").each{|v|
 				hash_recipe["step"][step_id]["parent"].push(v)
 			}
 		end
-		# chain¤ò»ı¤Ä¤Ê¤é¤Ğ
+		# chainã‚’æŒã¤ãªã‚‰ã°
 		unless node["chain"] == nil
 			hash_recipe["step"][step_id]["chain"] = node["chain"]
 		end
-		# priority¤Ï³ä¤ÈÌÌÅİ
-		# ´ğËÜÅª¤Ëelement¤Îµ­½Ò½ç½ø¤É¤ª¤ê¤Ëpriority_list¤ËÂåÆş¤·¤Æ¤¤¤¯
-		# priority¤¬»ØÄê¤µ¤ì¤Æ¤¤¤ë¤È¤­¤Î¤ß¡¤¤½¤ì¤Ë¹ç¤ï¤»¤¿°ÌÃÖ¤ËÂåÆş¤¹¤ë¡¥
-		# °ìÈÖ½é¤á¤Ëpriority¤ò»ØÄê¤µ¤ì¤¿step¤Î°ÌÃÖ¤¬´ğ½à¤È¤Ê¤Ã¤Æ¿§¡¹¤ä¤ë¤³¤È¤Ë¤Ê¤ë¤Î¤Ç¡¤ºÇÅ¬¤Ê½ç½ø¤ÇÊÂ¤Ù¤é¤ì¤Æ¤¤¤ë¤ï¤±¤Ç¤Ï¤Ê¤¤¡¥
-		# chain¤Î¤Ä¤Ê¤¬¤ê¤â´Ş¤á¤Æpriority¤Î½çÈÖ¤ò·è¤á¤ë¤Ù¤­¤À¤¬¡¤Æñ¤·¤¤¤Î¤Ç¤ä¤é¤Ê¤¤¡¥
+		# priorityã¯å‰²ã¨é¢å€’
+		# åŸºæœ¬çš„ã«elementã®è¨˜è¿°é †åºã©ãŠã‚Šã«priority_listã«ä»£å…¥ã—ã¦ã„ã
+		# priorityãŒæŒ‡å®šã•ã‚Œã¦ã„ã‚‹ã¨ãã®ã¿ï¼Œãã‚Œã«åˆã‚ã›ãŸä½ç½®ã«ä»£å…¥ã™ã‚‹ï¼
+		# ä¸€ç•ªåˆã‚ã«priorityã‚’æŒ‡å®šã•ã‚ŒãŸstepã®ä½ç½®ãŒåŸºæº–ã¨ãªã£ã¦è‰²ã€…ã‚„ã‚‹ã“ã¨ã«ãªã‚‹ã®ã§ï¼Œæœ€é©ãªé †åºã§ä¸¦ã¹ã‚‰ã‚Œã¦ã„ã‚‹ã‚ã‘ã§ã¯ãªã„ï¼
+		# chainã®ã¤ãªãŒã‚Šã‚‚å«ã‚ã¦priorityã®é †ç•ªã‚’æ±ºã‚ã‚‹ã¹ãã ãŒï¼Œé›£ã—ã„ã®ã§ã‚„ã‚‰ãªã„ï¼
 		unless node["priority"] == nil
-			# priority¤ò»ı¤Ä¤Ê¤é¤Ğ¡¤priority_list¤ÎÃæ¤Ç¼«Ê¬¤è¤ê¾®¤µ¤¤¤â¤Î¤ÎÁ°¤ËÂåÆş¤¹¤ë
-			# priority_list¤¬Á´¤Ænil¤Ê¤é¤Ğ¡¤°ìÈÖ¸å¤í¤ËÂåÆş¤¹¤ë
+			# priorityã‚’æŒã¤ãªã‚‰ã°ï¼Œpriority_listã®ä¸­ã§è‡ªåˆ†ã‚ˆã‚Šå°ã•ã„ã‚‚ã®ã®å‰ã«ä»£å…¥ã™ã‚‹
+			# priority_listãŒå…¨ã¦nilãªã‚‰ã°ï¼Œä¸€ç•ªå¾Œã‚ã«ä»£å…¥ã™ã‚‹
 			priority_num = node["priority"].to_i
 			if priority_list.size == 0
 				priority_list.push([step_id, priority_num])
@@ -76,15 +76,15 @@ def get_step(doc, hash_recipe)
 				end
 			end
 		else
-			# priority¤ò»ı¤¿¤Ê¤¤¤Ê¤é¤Ğ¡¤nil¤È¤·¤Æpriority_list¤Î°ìÈÖ¸å¤í¤ËÂåÆş¤¹¤ë
+			# priorityã‚’æŒãŸãªã„ãªã‚‰ã°ï¼Œnilã¨ã—ã¦priority_listã®ä¸€ç•ªå¾Œã‚ã«ä»£å…¥ã™ã‚‹
 			priority_list.push([step_id,nil])
 		end
-		##### element¤Î¼è¤ê½Ğ¤· #####
-		# trigger¤ò»ı¤Ä¤Ê¤é¤Ğ
+		##### elementã®å–ã‚Šå‡ºã— #####
+		# triggerã‚’æŒã¤ãªã‚‰ã°
 		unless doc.xpath("//recipe/directions/step[@id=\"#{step_id}\"]/trigger")[0] == nil
 			hash_recipe["step"][step_id]["trigger"] = []
 			doc.xpath("//recipe/directions/step[@id=\"#{step_id}\"]/trigger").each{|node2|
-				# trigger¤¬timing¤ò»ı¤Ä¤Ê¤é¤Ğ
+				# triggerãŒtimingã‚’æŒã¤ãªã‚‰ã°
 				timing = nil
 				unless node2["timing"] == nil
 					timing = node2["timing"]
@@ -92,12 +92,12 @@ def get_step(doc, hash_recipe)
 				if timing == nil
 					timing = "start"
 				end
-				# trigger¤Ïref¤ò»ı¤Ä¤Ï¤º¡Êref¤ÏÊ£¿ô¸Ä¤Î²ÄÇ½À­¤¢¤ê¡Ë
+				# triggerã¯refã‚’æŒã¤ã¯ãšï¼ˆrefã¯è¤‡æ•°å€‹ã®å¯èƒ½æ€§ã‚ã‚Šï¼‰
 				ref = []
 				node2["ref"].split(" ").each{|v|
 					ref.push(v)
 				}
-				# trigger¤¬delay¤ò»ı¤Ä¤Ê¤é¤Ğ
+				# triggerãŒdelayã‚’æŒã¤ãªã‚‰ã°
 				delay = -1
 				unless node2["delay"] == nil
 					delay = node2["delay"]
@@ -108,20 +108,20 @@ def get_step(doc, hash_recipe)
 				hash_recipe["step"][step_id]["trigger"].push([timing, ref, delay])
 			}
 		end
-		# substep¤Ï°ì¤Ä°Ê¾å»ı¤Ä¤Ï¤º
+		# substepã¯ä¸€ã¤ä»¥ä¸ŠæŒã¤ã¯ãš
 		hash_recipe["step"][step_id]["substep"] = []
 		doc.xpath("//recipe/directions/step[@id=\"#{step_id}\"]/substep").each{|node2|
-			# substep¤Ïid¤ò»ı¤Ä¤Ï¤º
+			# substepã¯idã‚’æŒã¤ã¯ãš
 			substep_id = node2["id"]
 			hash_recipe["step"][step_id]["substep"].push(substep_id)
 			hash_recipe = get_substep(doc, hash_recipe, step_id, substep_id)
 		}
 	}
-	# priority_list¤Ë¹ç¤ï¤»¤Æpriority¤ÎÀßÄê
+	# priority_listã«åˆã‚ã›ã¦priorityã®è¨­å®š
 	for i in 0..(priority_list.size-1)
 		hash_recipe["step"][priority_list[i][0]]["priority"] = 100 - i
 	end
-	# step¤òpriority¤Î½ç¤ËÊÂ¤Ù¤¿hash_recipe[sorted_step]¤òºîÀ®
+	# stepã‚’priorityã®é †ã«ä¸¦ã¹ãŸhash_recipe[sorted_step]ã‚’ä½œæˆ
 	hash_recipe["sorted_step"] = []
 	hash_recipe["step"].each{|key, value|
 		hash_recipe["sorted_step"].push([value["priority"], key])
@@ -134,30 +134,30 @@ def get_step(doc, hash_recipe)
 end
 
 # substep
-# hash_recipe["substep"][id] : substep¤Îid
-# hash_recipe["substep"][id]["parent_step"] = id : parent node¤Êstep¤Îid
-# hash_recipe["substep"][id]["order"] = order_num : substep¤Îorder¤ÎÈÖ¹æ
-# hash_recipe["substep"][id]["trigger"] = [[timing, ref, delay], [...], ...] : substep¤Îtrigger¥ê¥¹¥È
-# hash_recipe["substep"][id]["notification"] = [id, id, ...] : notification¤Îid¥ê¥¹¥È
-# hash_recipe["substep"][id]["audio"] = [id] : audio¤Îid¡¥ÊØµ¹¾åÇÛÎó¤Ë¤·¤Æ¤¤¤ë¡¥
-# hash_recipe["substep"][id]["video"] = [id] : video¤Îid¡¥ÊØµ¹¾åÇÛÎó¤Ë¤·¤Æ¤¤¤ë¡¥
-# hash_recipe["substep"][id]["next_substep"] = id : ¼¡¤Îsubstep¤Îid
+# hash_recipe["substep"][id] : substepã®id
+# hash_recipe["substep"][id]["parent_step"] = id : parent nodeãªstepã®id
+# hash_recipe["substep"][id]["order"] = order_num : substepã®orderã®ç•ªå·
+# hash_recipe["substep"][id]["trigger"] = [[timing, ref, delay], [...], ...] : substepã®triggerãƒªã‚¹ãƒˆ
+# hash_recipe["substep"][id]["notification"] = [id, id, ...] : notificationã®idãƒªã‚¹ãƒˆ
+# hash_recipe["substep"][id]["audio"] = [id] : audioã®idï¼ä¾¿å®œä¸Šé…åˆ—ã«ã—ã¦ã„ã‚‹ï¼
+# hash_recipe["substep"][id]["video"] = [id] : videoã®idï¼ä¾¿å®œä¸Šé…åˆ—ã«ã—ã¦ã„ã‚‹ï¼
+# hash_recipe["substep"][id]["next_substep"] = id : æ¬¡ã®substepã®id
 def get_substep(doc, hash_recipe, step_id, substep_id)
 	unless step_id == nil
-		# directions°Ê²¼¤Îstep°Ê²¼¤Ë½ñ¤«¤ì¤Æ¤¤¤ësubste¤Ïparent_step¤ò»ı¤Ä
+		# directionsä»¥ä¸‹ã®stepä»¥ä¸‹ã«æ›¸ã‹ã‚Œã¦ã„ã‚‹substeã¯parent_stepã‚’æŒã¤
 		hash_recipe["substep"][substep_id]["parent_step"] = step_id
 	end
-	##### attribute¤Î¼è¤ê½Ğ¤· #####
-	# order¤ò»ı¤Ä¤Ê¤é¤Ğ
+	##### attributeã®å–ã‚Šå‡ºã— #####
+	# orderã‚’æŒã¤ãªã‚‰ã°
 	unless doc.xpath("//substep[@id=\"#{substep_id}\"]")[0]["order"] == nil
 		hash_recipe["substep"][substep_id]["order"] = doc.xpath("//substep[@id=\"#{substep_id}\"]")[0]["order"]
 	end
-	##### element¤Î¼è¤ê½Ğ¤· #####
-	# trigger¤ò»ı¤Ä¤Ê¤é¤Ğ
+	##### elementã®å–ã‚Šå‡ºã— #####
+	# triggerã‚’æŒã¤ãªã‚‰ã°
 	unless doc.xpath("//substep[@id=\"#{substep_id}\"]/trigger")[0] == nil
 		hash_recipe["substep"][substep_id]["trigger"] = []
 		doc.xpath("//substep[@id=\"#{substep_id}\"]/trigger").each{|node2|
-			# trigger¤¬timing¤ò»ı¤Ä¤Ê¤é¤Ğ
+			# triggerãŒtimingã‚’æŒã¤ãªã‚‰ã°
 			timing = nil
 			unless node2["timing"] == nil
 				timing = node2["timing"]
@@ -165,12 +165,12 @@ def get_substep(doc, hash_recipe, step_id, substep_id)
 			if timing == nil
 				timing = "start"
 			end
-			# trigger¤Ïref¤ò»ı¤Ä¤Ï¤º¡Êref¤ÏÊ£¿ô¸Ä¤Î²ÄÇ½À­¤¢¤ê¡Ë
+			# triggerã¯refã‚’æŒã¤ã¯ãšï¼ˆrefã¯è¤‡æ•°å€‹ã®å¯èƒ½æ€§ã‚ã‚Šï¼‰
 			ref = []
 			node2["ref"].split(" ").each{|v|
 				ref.push(v)
 			}
-			# trigger¤¬delay¤ò»ı¤Ä¤Ê¤é¤Ğ
+			# triggerãŒdelayã‚’æŒã¤ãªã‚‰ã°
 			delay = -1
 			unless node2["delay"] == nil
 				delay = node2["delay"]
@@ -181,7 +181,7 @@ def get_substep(doc, hash_recipe, step_id, substep_id)
 			hash_recipe["substep"][substep_id]["trigger"].push([timing, ref, delay])
 		}
 	end
-	# notification¤ò»ı¤Ä¤Ê¤é¤Ğ
+	# notificationã‚’æŒã¤ãªã‚‰ã°
 	unless doc.xpath("//substep[@id=\"#{substep_id}\"]/notification")[0] == nil
 		hash_recipe["substep"][substep_id]["notification"] = []
 		doc.xpath("//substep[@id=\"#{substep_id}\"]/notification").each{|node|
@@ -190,19 +190,19 @@ def get_substep(doc, hash_recipe, step_id, substep_id)
 			hash_recipe = get_notification(doc, hash_recipe, substep_id, notification_id)
 		}
 	end
-	# audio¤ò»ı¤Ä¤Ê¤é¤Ğ
+	# audioã‚’æŒã¤ãªã‚‰ã°
 	unless doc.xpath("//substep[@id=\"#{substep_id}\"]/audio")[0] == nil
 		audio_id = doc.xpath("//substep[@id=\"#{substep_id}\"]/audio")[0]["id"]
 		hash_recipe["substep"][substep_id]["audio"] = [audio_id]
 		hash_recipe = get_audio(doc, hash_recipe, substep_id, nil, audio_id)
 	end
-	# video¤ò»ı¤Ä¤Ê¤é¤Ğ
+	# videoã‚’æŒã¤ãªã‚‰ã°
 	unless doc.xpath("//substep[@id=\"#{substep_id}\"]/video")[0] == nil
 		video_id = doc.xpath("//substep[@id=\"#{substep_id}\"]/video")[0]["id"]
 		hash_recipe["substep"][substep_id]["video"] = [video_id]
 		hash_recipe = get_video(doc, hash_recipe, substep_id, video_id)
 	end
-	# ¼¡¤Îsubstep¤ò»ı¤Ä¤Ê¤é¤Ğ
+	# æ¬¡ã®substepã‚’æŒã¤ãªã‚‰ã°
 	unless doc.xpath("//substep[@id=\"#{substep_id}\"]")[0].next_sibling == nil
 		next_node = doc.xpath("//substep[@id=\"#{substep_id}\"]")[0].next_sibling
 		if doc.xpath("//substep[@id=\"#{substep_id}\"]")[0].next_sibling.name == "substep"
@@ -214,20 +214,20 @@ def get_substep(doc, hash_recipe, step_id, substep_id)
 end
 
 # notification
-# hash_recipe["notification"][id] : notification¤Îid
-# hash_recipe["notification"][id]["parent_substep"] = id : parent node¤Êsubstep¤Îid
-# hash_recipe["notification"][id]["trigger"] = [[timing, ref, delay], [...], ...] : notification¤Îtrigger¥ê¥¹¥È
-# hash_recipe["notification"][id]["audio"] = id : notification¤Îaudio¡¥
+# hash_recipe["notification"][id] : notificationã®id
+# hash_recipe["notification"][id]["parent_substep"] = id : parent nodeãªsubstepã®id
+# hash_recipe["notification"][id]["trigger"] = [[timing, ref, delay], [...], ...] : notificationã®triggerãƒªã‚¹ãƒˆ
+# hash_recipe["notification"][id]["audio"] = id : notificationã®audioï¼
 def get_notification(doc, hash_recipe, substep_id, notification_id)
 	unless substep_id == nil
 		hash_recipe["notification"][notification_id]["parent_substep"] = substep_id
 	end
-	##### element¤Î¼è¤ê½Ğ¤· #####
-	# trigger¤ò»ı¤Ä¤Ê¤é¤Ğ
+	##### elementã®å–ã‚Šå‡ºã— #####
+	# triggerã‚’æŒã¤ãªã‚‰ã°
 	unless doc.xpath("//notification[@id=\"#{notification_id}\"]/trigger")[0] == nil
 		hash_recipe["notification"][notification_id]["trigger"] = []
 		doc.xpath("//notification[@id=\"#{notification_id}\"]/trigger").each{|node2|
-			# trigger¤¬timing¤ò»ı¤Ä¤Ê¤é¤Ğ
+			# triggerãŒtimingã‚’æŒã¤ãªã‚‰ã°
 			timing = nil
 			unless node2["timing"] == nil
 				timing = node2["timing"]
@@ -235,12 +235,12 @@ def get_notification(doc, hash_recipe, substep_id, notification_id)
 			if timing == nil
 				timing = "start"
 			end
-			# trigger¤Ïref¤ò»ı¤Ä¤Ï¤º¡Êref¤ÏÊ£¿ô¸Ä¤Î²ÄÇ½À­¤¢¤ê¡Ë
+			# triggerã¯refã‚’æŒã¤ã¯ãšï¼ˆrefã¯è¤‡æ•°å€‹ã®å¯èƒ½æ€§ã‚ã‚Šï¼‰
 			ref = []
 			node2["ref"].split(" ").each{|v|
 				ref.push(v)
 			}
-			# trigger¤¬delay¤ò»ı¤Ä¤Ê¤é¤Ğ
+			# triggerãŒdelayã‚’æŒã¤ãªã‚‰ã°
 			delay = -1
 			unless node2["delay"] == nil
 				delay = node2["delay"]
@@ -251,7 +251,7 @@ def get_notification(doc, hash_recipe, substep_id, notification_id)
 			hash_recipe["notification"][notification_id]["trigger"].push([timing, ref, delay])
 		}
 	end
-	# audio¤ò»ı¤Ä¤Ê¤é¤Ğ
+	# audioã‚’æŒã¤ãªã‚‰ã°
 	unless doc.xpath("//notification[@id=\"#{notification_id}\"]/audio")[0] == nil
 		audio_id = doc.xpath("//notification[@id=\"#{notification_id}\"]/audio")[0]["id"]
 		hash_recipe["notification"][notification_id]["audio"] = audio_id
@@ -261,10 +261,10 @@ def get_notification(doc, hash_recipe, substep_id, notification_id)
 end
 
 # audio
-# hash_recipe["audio"][id] : audio¤Îid
-# hash_recipe["audio"][id]["parent_substep"] = id : parent node¤Êsubstep¤Îid
-# hash_recipe["audio"][id]["parent_notification"] = id : parent node¤Ênotification¤Îid
-# hash_recipe["audio"][id]["trigger"] = [[timing, ref, delay], [...], ...] : notification¤Îtrigger¥ê¥¹¥È
+# hash_recipe["audio"][id] : audioã®id
+# hash_recipe["audio"][id]["parent_substep"] = id : parent nodeãªsubstepã®id
+# hash_recipe["audio"][id]["parent_notification"] = id : parent nodeãªnotificationã®id
+# hash_recipe["audio"][id]["trigger"] = [[timing, ref, delay], [...], ...] : notificationã®triggerãƒªã‚¹ãƒˆ
 def get_audio(doc, hash_recipe, substep_id, notification_id, audio_id)
 	unless substep_id == nil
 		hash_recipe["audio"][audio_id]["parent_substep"] = substep_id
@@ -272,12 +272,12 @@ def get_audio(doc, hash_recipe, substep_id, notification_id, audio_id)
 	unless notification_id == nil
 		hash_recipe["audio"][audio_id]["parent_notification"] = notification_id
 	end
-	##### element¤Î¼è¤ê½Ğ¤· #####
-	# trigger¤ò»ı¤Ä¤Ê¤é¤Ğ
+	##### elementã®å–ã‚Šå‡ºã— #####
+	# triggerã‚’æŒã¤ãªã‚‰ã°
 	unless doc.xpath("//audio[@id=\"#{audio_id}\"]/trigger")[0] == nil
 		hash_recipe["audio"][audio_id]["trigger"] = []
 		doc.xpath("//audio[@id=\"#{audio_id}\"]/trigger").each{|node2|
-			# trigger¤¬timing¤ò»ı¤Ä¤Ê¤é¤Ğ
+			# triggerãŒtimingã‚’æŒã¤ãªã‚‰ã°
 			timing = nil
 			unless node2["timing"] == nil
 				timing = node2["timing"]
@@ -285,12 +285,12 @@ def get_audio(doc, hash_recipe, substep_id, notification_id, audio_id)
 			if timing == nil
 				timing = "start"
 			end
-			# trigger¤Ïref¤ò»ı¤Ä¤Ï¤º¡Êref¤ÏÊ£¿ô¸Ä¤Î²ÄÇ½À­¤¢¤ê¡Ë
+			# triggerã¯refã‚’æŒã¤ã¯ãšï¼ˆrefã¯è¤‡æ•°å€‹ã®å¯èƒ½æ€§ã‚ã‚Šï¼‰
 			ref = []
 			node2["ref"].split(" ").each{|v|
 				ref.push(v)
 			}
-			# trigger¤¬delay¤ò»ı¤Ä¤Ê¤é¤Ğ
+			# triggerãŒdelayã‚’æŒã¤ãªã‚‰ã°
 			delay = -1
 			unless node2["delay"] == nil
 				delay = node2["delay"]
@@ -305,17 +305,17 @@ def get_audio(doc, hash_recipe, substep_id, notification_id, audio_id)
 end
 
 # video
-# hash_recipe["video"][id] : video¤Îid
-# hash_recipe["video"][id]["parent_substep"] = id : parent node¤Êsubstep¤Îid
-# hash_recipe["video"][id]["trigger"] = [[timing, ref, delay], [...], ...] : notification¤Îtrigger¥ê¥¹¥È
+# hash_recipe["video"][id] : videoã®id
+# hash_recipe["video"][id]["parent_substep"] = id : parent nodeãªsubstepã®id
+# hash_recipe["video"][id]["trigger"] = [[timing, ref, delay], [...], ...] : notificationã®triggerãƒªã‚¹ãƒˆ
 def get_video(doc, hash_recipe, substep_id, video_id)
 	hash_recipe["video"][video_id]["parent_substep"] = substep_id
-	##### element¤Î¼è¤ê½Ğ¤· #####
-	# trigger¤ò»ı¤Ä¤Ê¤é¤Ğ
+	##### elementã®å–ã‚Šå‡ºã— #####
+	# triggerã‚’æŒã¤ãªã‚‰ã°
 	unless doc.xpath("//substep[@id=\"#{substep_id}\"]/video[@id=\"#{video_id}\"]/trigger")[0] == nil
 		hash_recipe["video"][video_id]["trigger"] = []
 		doc.xpath("//substep[@id=\"#{substep_id}\"]/video[@id=\"#{video_id}\"]/trigger").each{|node2|
-			# trigger¤¬timing¤ò»ı¤Ä¤Ê¤é¤Ğ
+			# triggerãŒtimingã‚’æŒã¤ãªã‚‰ã°
 			timing = nil
 			unless node2["timing"] == nil
 				timing = node2["timing"]
@@ -323,12 +323,12 @@ def get_video(doc, hash_recipe, substep_id, video_id)
 			if timing == nil
 				timing = "start"
 			end
-			# trigger¤Ïref¤ò»ı¤Ä¤Ï¤º¡Êref¤ÏÊ£¿ô¸Ä¤Î²ÄÇ½À­¤¢¤ê¡Ë
+			# triggerã¯refã‚’æŒã¤ã¯ãšï¼ˆrefã¯è¤‡æ•°å€‹ã®å¯èƒ½æ€§ã‚ã‚Šï¼‰
 			ref = []
 			node2["ref"].split(" ").each{|v|
 				ref.push(v)
 			}
-			# trigger¤¬delay¤ò»ı¤Ä¤Ê¤é¤Ğ
+			# triggerãŒdelayã‚’æŒã¤ãªã‚‰ã°
 			delay = -1
 			unless node2["delay"] == nil
 				delay = node2["delay"]
