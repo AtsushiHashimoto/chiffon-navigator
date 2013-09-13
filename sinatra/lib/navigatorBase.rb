@@ -27,7 +27,6 @@ class NavigatorBase
 			when "NAVI_MENU"
 				status, body = navi_menu(jason_input)
 			when "EXTERNAL_INPUT"
-				p "#####test4"
 				status, body = external_input(jason_input)
 			when "CHANNEL"
 				status, body = channel(jason_input)
@@ -48,7 +47,6 @@ class NavigatorBase
 		end
 
 		if status == "internal error"
-			p "#####test11"
 			p body.class
 			p body.message
 			p body.backtrace
