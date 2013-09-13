@@ -20,6 +20,11 @@ def parse_xml(xmlfile)
 		notification_id = node["id"]
 		hash_recipe = get_notification(doc, hash_recipe, nil, notification_id)
 	}
+	# recipe/materials/objectの書き出し
+	doc.xpath("//object").each{|node|
+		object_id = node["id"]
+		hash_recipe["object"][object_id] = 1
+	}
 	# recipe/eventの書き出し
 	doc.xpath("//recipe/event").each{|node|
 		event_id = node["id"]
