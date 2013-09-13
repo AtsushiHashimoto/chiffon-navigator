@@ -18,7 +18,6 @@ class NavigatorBase
 		orders = {}
 
 		if jason_input["situation"] == nil || jason_input["situation"] == ""
-			p "#####test2"
 			p "invalid params : jason_input['situation'] is wrong."
 			logger()
 			status = "invalid params"
@@ -39,7 +38,6 @@ class NavigatorBase
 			when "PLAY_CONTROL"
 				status, body = play_control(jason_input)
 			else
-				p "#####test10"
 				p "invalid params : jason_input['situation'] is wrong."
 				logger()
 				status = "invalid params"
@@ -57,22 +55,18 @@ class NavigatorBase
 			logger()
 			return {"status"=>"internal error"}
 		elsif status == "invalid params"
-			p "#####test12"
 			orders = {"status"=>status}
 		elsif status == "success"
 			logger()
 			orders = {"status"=>status, "body"=>body}
 		else
-			p "#####test14"
 			p "internal error"
 			p "navigatorBase.rb: parameter 'status' is wrong."
 			logger()
 			orders = {"status"=>"internal error"}
 		end
-		p orders
 		return orders
 	rescue => e
-		p "#####test15"
 		p e.class
 		p e.message
 		p e.backtrace
