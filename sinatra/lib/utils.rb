@@ -8,8 +8,7 @@ def set_ABLEorOTHERS(hash_recipe, hash_mode, current_step, current_substep)
 			# parentを持たないstepはいつでもできるので，無条件でABLEにする．
 			unless hash_recipe["step"][key].key?("parent")
 				hash_mode["step"]["mode"][key][0] = "ABLE"
-			# parentを持つstepは，その複数の(単数の場合あり)stepが全てis_finishedならばABLEになる．
-			else
+			else # parentを持つstepは，その複数の(単数の場合あり)stepが全てis_finishedならばABLEにな
 				flag = -1
 				hash_recipe["step"][key]["parent"].each{|v|
 					# parentとして指定されたidがちゃんと存在する．
@@ -34,38 +33,41 @@ def set_ABLEorOTHERS(hash_recipe, hash_mode, current_step, current_substep)
 					end
 				}
 				# parentが全てis_finishedならABLEに設定．
-				if flag == 1 then
+				if flag == 1
 					hash_mode["step"]["mode"][key][0] = "ABLE"
-				# ABLEでないstepは明示的にOTHERSに．
 				else
+					# ABLEでないstepは明示的にOTHERSに
 					hash_mode["step"]["mode"][key][0] = "OTHERS"
 				end
 			end
-		# ABLEでないstepは明示的にOTHERSに．
 		else
+			# ABLEでないstepは明示的にOTHERSに
 			hash_mode["step"]["mode"][key][0] = "OTHERS"
 		end
-	}
-	# substep
-	# とりあえず，全てのsubstepをOTHERSにする．
-	hash_mode["substep"]["mode"].each{|key, value|
-		hash_mode["substep"]["mode"][key][0] = "OTHERS"
-	}
-	# current_substepの親ノードのstepがABLEの場合のみ，子ノードsubstepのいずれかがABLEになれる．
-	if hash_mode["step"]["mode"][current_step][0] == "ABLE"
-		hash_recipe["step"][current_step]["substep"].each{|substep_id|
-			# NOT_YETなsubstepの中で優先度の一番高いもの（一番初めに現れるもの）をABLEにする．
-			if hash_mode["substep"]["mode"][substep_id][1] == "NOT_YET"
-				hash_mode["substep"]["mode"][substep_id][0] = "ABLE"
-				# ABLEなsubstepがCURRENTでかつ，弟ノードなsubstepがあればそれをABLEにする．
-				if substep_id == current_substep && hash_recipe["substep"][substep_id].key?("next_substep")
-					next_substep = hash_recipe["substep"][substep_id]["next_substep"]
-					hash_mode["substep"]["mode"][next_substep][0] = "ABLE"
-				end
-				break
-			end
+
+		# substepの処理
+		# ["step"]["mode"][id][0] == ABLEなstepにおいて，is_finishedでない一番最初のsubstepがABLEになれる．
+		# ["step"]["mode"][id][2] == CURRENTなstepにおいてのみ，CURRENTなsubstepの次のsubstepもABLEになれる．
+
+		# とりあえず，全てのsubstepをOTHERSにする．
+		hash_recipe["step"][key]["substep"].each{|substep_id|
+			hash_mode["substep"]["mode"][substep_id][0] = "OTHERS"
 		}
-	end
+		if value[0] == "ABLE"
+			hash_recipe["step"][key]["substep"].each{|substep_id|
+				if hash_mode["substep"]["mode"][substep_id][1] == "NOT_YET"
+					# 一番初めのsubstepをABLEに
+					hash_mode["substep"]["mode"][substep_id][0] = "ABLE"
+					# step，substep共にCURRENTならば次のsubstepもABLEにする
+					if value[2] == "CURRENT" && hash_mode["substep"]["mode"][substep_id][2] == "CURRENT" && hash_recipe["substep"][substep_id].key?("next_substep")
+						next_substep = hash_recipe["substep"][substep_id]["next_substep"]
+						hash_mode["substep"]["mode"][next_substep][0] = "ABLE"
+					end
+					break
+				end
+			}
+		end
+	}
 	return hash_mode
 end
 

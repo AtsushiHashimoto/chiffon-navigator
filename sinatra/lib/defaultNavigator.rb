@@ -11,8 +11,8 @@ class DefaultNavigator < NavigatorBase
 	private
 
 	########################################################
-	##### situationに合わせて動作する7メソッドの内，   #####
-	##### navigatorの仕様に合わせて変更すべき3メソッド #####
+	##### situation$B$K9g$o$;$FF0:n$9$k(B7$B%a%=%C%I$NFb!$(B   #####
+	##### navigator$B$N;EMM$K9g$o$;$FJQ99$9$Y$-(B3$B%a%=%C%I(B #####
 	########################################################
 
 	def navi_menu(jason_input)
@@ -29,17 +29,17 @@ class DefaultNavigator < NavigatorBase
 			logger()
 			return "invalid params", body
 		end
-		# modeの修正
+		# mode$B$N=$@5(B
 		modeUpdate_navimenu(jason_input["time"]["sec"], id)
 
-		# DetailDraw：入力されたstepをCURRENTとして提示
+		# DetailDraw$B!'F~NO$5$l$?(Bstep$B$r(BCURRENT$B$H$7$FDs<((B
 		body.concat(detailDraw())
-		# Play：不要．クリックされたstepの調理行動を始めれば，EXTERNAL_INPUTで再生される
-		# Notify：不要．クリックされたstepの調理行動を始めれば，EXTERNAL_INPUTで再生される
-		# Cancel：再生待ちコンテンツがあればキャンセル
+		# Play$B!'ITMW!%(B
+		# Notify$B!'ITMW!%(B
+		# Cancel$B!':F@8BT$A%3%s%F%s%D$,$"$l$P%-%c%s%;%k(B
 		body.concat(cancel())
-		# ChannelSwitch：不要
-		# NaviDraw：適切にvisualを書き換えたものを提示
+		# ChannelSwitch$B!'ITMW(B
+		# NaviDraw$B!'E,@Z$K(Bvisual$B$r=q$-49$($?$b$N$rDs<((B
 		body.concat(naviDraw())
 
 		session_id = jason_input["session_id"]
@@ -53,19 +53,19 @@ class DefaultNavigator < NavigatorBase
 
 	def external_input(jason_input)
 		body = []
-		# modeの修正
+		# mode$B$N=$@5(B
 		modeUpdate_externalinput(jason_input["time"]["sec"], jason_input["operation_contents"])
 
-		# DetailDraw：調理者がとったものに合わせたsubstepのidを提示
+		# DetailDraw$B!'D4M}<T$,$H$C$?$b$N$K9g$o$;$?(Bsubstep$B$N(Bid$B$rDs<((B
 		body.concat(detailDraw())
-		# Play：substep内にコンテンツが存在すれば再生命令を送る
+		# Play$B!'(Bsubstep$BFb$K%3%s%F%s%D$,B8:_$9$l$P:F@8L?Na$rAw$k(B
 		body.concat(play(jason_input["time"]["sec"]))
-		# Notify：substep内にコンテンツが存在すれば再生命令を送る
+		# Notify$B!'(Bsubstep$BFb$K%3%s%F%s%D$,B8:_$9$l$P:F@8L?Na$rAw$k(B
 		body.concat(notify(jason_input["time"]["sec"]))
-		# Cancel：再生待ちコンテンツがあればキャンセル
+		# Cancel$B!':F@8BT$A%3%s%F%s%D$,$"$l$P%-%c%s%;%k(B
 		body.concat(cancel())
-		# ChannelSwitch：不要
-		# NaviDraw：適切にvisualを書き換えたものを提示
+		# ChannelSwitch$B!'ITMW(B
+		# NaviDraw$B!'E,@Z$K(Bvisual$B$r=q$-49$($?$b$N$rDs<((B
 		body.concat(naviDraw())
 
 		session_id = jason_input["session_id"]
@@ -78,67 +78,26 @@ class DefaultNavigator < NavigatorBase
 	end
 
 	##########################################################
-	##### modeのupdate処理が複雑な2メソッドのmodeUpdater #####
+	##### mode$B$N(Bupdate$B=hM}$,J#;($J(B2$B%a%=%C%I$N(BmodeUpdater #####
 	##########################################################
 
 	def modeUpdate_navimenu(time, id)
-		# 遷移要求先がstepかsubstepかで場合分け
+		# $B8=>u$G(BCURRENT$B$J(Bstep$B!$(Bsubstep$B$K4X$7$F$O2?$N=hM}$b$7$J$$(B
+		# clicked_with_NAVI_MENU$B$O(BCURRENT$B!$(BNOT_CURRENT$B$HF1$8>l=j$G4IM}$9$k(B
 		if @hash_recipe["step"].key?(id)
-			# まずは，CURRENT，NOT_CURRENTの操作．
-			# 現状でCURRENTなsubstepをNOT_CURRENTにする．
-			@hash_mode["substep"]["mode"].each{|key, value|
-				if value[2] == "CURRENT"
-					@hash_mode["substep"]["mode"][key][2] = "NOT_CURRENT"
-					# substepに含まれるaudio，videoは再生済み・再生中・再生待ち関わらずSTOPに．
-					media = ["audio", "video"]
-					media.each{|v|
-						@hash_mode[v]["mode"].each{|key, value|
-							if value[0] == "CURRENT"
-								@hash_mode[v]["mode"][key][0] = "STOP"
-							end
-						}
-					}
-					break # CURRENTなsubstepは一つだけのはず．
-				end
-			}
-			# 現状でCURRENTだったstepをNOT_CURRENTにする．
-			@hash_mode["step"]["mode"].each{|key, value|
-				if value[2] == "CURRENT"
-					@hash_mode["step"]["mode"][key][2] = "NOT_CURRENT"
-					break # CURRENTなstepは一つだけのはず．
-				end
-			}
-			# クリックされたstepをCURRENTに．
-			@hash_mode["step"]["mode"][id][2] = "CURRENT"
-			# クリックされたstep内でNOT_YETなsubstepの一番目をCURRENTに．
-			# NOT_YETなsubstepが存在しなければ，第一番目のsubstepをCURRENTに．
-			current_substep = nil
-			@hash_recipe["step"][id]["substep"].each{|substep_id|
-				if @hash_mode["substep"]["mode"][substep_id][1] == "NOT_YET"
-					current_substep = substep_id
-					break
-				else
-					next
-				end
-			}
-			if current_substep != nil # NOT_YETなsubstepが存在する．
-				# 一番目にNOT_YETなsubstepをCURRENTに．
-				@hash_mode["substep"]["mode"][current_substep][2] = "CURRENT"
-			else # NOT_YETなsubstepが存在しない．
-				# 一番目の(is_finishedな)substepをCURRENTに．
-				current_substep = @hash_recipe["step"][id]["substep"][0]
-				@hash_mode["substep"]["mode"][current_substep][2] = "CURRENT"
+			# $B%/%j%C%/$5$l$?(Bstep$B$,(Bclicked_with_NAVI_MENU$B$J$i$P(BNOT_CURRENT$B$KLa$9!%(B
+			if @hash_mode["step"]["mode"][id][2] == "clicked_with_NAVI_MENU"
+				@hash_mode["step"]["mode"][id][2] = "NOT_CURRENT"
+			else # $B%/%j%C%/$5$l$?(Bstep$B$,(BNOT_CURRENT$B$J$i$P(Bclicked_with_NAVI_MENU$B$K$9$k(B
+				@hash_mode["step"]["mode"][id][2] = "clicked_with_NAVI_MENU"
 			end
-			# クリックされた先のメディアは再生させない．
-			# stepとsubstepを適切にABLEにする．
-			@hash_mode = set_ABLEorOTHERS(@hash_recipe, @hash_mode, id, current_substep)
 		elsif @hash_recipe["substep"].key?(id)
-			# まずは，CURRENT，NOT_CURRENTの操作．
-			# 現状でCURRENTなsubstepをNOT_CURRENTに．
+			# $B%/%j%C%/$5$l$?(Bsubstep$B$r(Bclicked_with_NAVI_MENU$B$K$9$k(B
+			@hash_mode["substep"]["mode"][id][2] = "clicked_with_NAVI_MENU"
+			# substep$B$,%/%j%C%/$5$l$?>l9g$N$_!$(BdetailDraw$B$,JQ2=$9$k$N$G!$F02h$H2;@<$rDd;_$9$k!%(B
 			@hash_mode["substep"]["mode"].each{|key, value|
 				if value[2] == "CURRENT"
-					@hash_mode["substep"]["mode"][key][2] = "NOT_CURRENT"
-					# substepに含まれるaudio，videoは再生済み・再生中・再生待ち関わらずSTOPに．
+					# substep$B$K4^$^$l$k(Baudio$B!$(Bvideo$B$O:F@8:Q$_!&:F@8Cf!&:F@8BT$A4X$o$i$:(BSTOP$B$K!%(B
 					media = ["audio", "video"]
 					media.each{|v|
 						@hash_mode[v]["mode"].each{|key, value|
@@ -150,23 +109,16 @@ class DefaultNavigator < NavigatorBase
 					break
 				end
 			}
-			# クリックされたsubstepをCURRENTに．
-			@hash_mode["substep"]["mode"][id][2] = "CURRENT"
-			# CURRENTなstepの探索．
-			current_step = @hash_recipe["substep"][id]["parent_step"]
-			# stepとsubstepを適切にABLEにする．
-			@hash_mode = set_ABLEorOTHERS(@hash_recipe, @hash_mode, current_step, id)
 		end
-		# notificationが再生済みかどうかは，隙あらば調べましょう．
 	end
 
-	# EXTERNAL_INPUTリクエストの場合のmodeアップデート
+	# EXTERNAL_INPUT$B%j%/%(%9%H$N>l9g$N(Bmode$B%"%C%W%G!<%H(B
 	def modeUpdate_externalinput(time, id)
-		# 優先度順に，入力されたオブジェクトをトリガーとするsubstepを探索．
+		# $BM%@hEY=g$K!$F~NO$5$l$?%*%V%8%'%/%H$r%H%j%,!<$H$9$k(Bsubstep$B$rC5:w!%(B
 		current_substep = nil
 		@hash_recipe["sorted_step"].each{|v|
 			flag = -1
-			# ABLEなstepの中のNOT_YETなsubstepから探索．（現状でCURRENTなsubstepも探索対象．一旦オブジェクトを置いてまたやり始めただけかもしれない．）
+			# ABLE$B$J(Bstep$B$NCf$N(BNOT_YET$B$J(Bsubstep$B$+$iC5:w!%!J8=>u$G(BCURRENT$B$J(Bsubstep$B$bC5:wBP>]!%0lC6%*%V%8%'%/%H$rCV$$$F$^$?$d$j;O$a$?$@$1$+$b$7$l$J$$!%!K(B
 			if @hash_mode["step"]["mode"][v[1]][0] == "ABLE"
 				@hash_recipe["step"][v[1]]["substep"].each{|substep_id|
 					if @hash_mode["substep"]["mode"][substep_id][1] == "NOT_YET"
@@ -175,16 +127,16 @@ class DefaultNavigator < NavigatorBase
 								if v[1] == id
 									current_substep = node2.parent.attributes.get_attribute("id").value
 									flag = 1
-									break # trigger探索からのbreak
+									break # trigger$BC5:w$+$i$N(Bbreak
 								end
 							}
 						end
 					end
 					if flag == 1
-						break # substep探索からのbreak
+						break # substep$BC5:w$+$i$N(Bbreak
 					end
 				}
-			elsif @hash_mode["step"]["mode"][v[1]][1] == "NOT_YET" && @hash_mode["step"]["mode"][v[1]][2] == "CURRENT" # ABLEでなくても，navi_menu等でCURRENTなstepも探索対象
+			elsif @hash_mode["step"]["mode"][v[1]][1] == "NOT_YET" && @hash_mode["step"]["mode"][v[1]][2] == "CURRENT" # ABLE$B$G$J$/$F$b!$(Bnavi_menu$BEy$G(BCURRENT$B$J(Bstep$B$bC5:wBP>](B
 				@hash_recipe["step"][v[1]]["substep"].each{|substep_id|
 					if @hash_mode["substep"]["mode"][substep_id][1] == "NOT_YET"
 						if @hash_recipe["substep"][substep_id].key?("trigger")
@@ -203,7 +155,7 @@ class DefaultNavigator < NavigatorBase
 				}
 			end
 			if flag == 1
-				break # step探索からのbreak
+				break # step$BC5:w$+$i$N(Bbreak
 			end
 		}
 		previous_substep = nil
@@ -248,7 +200,7 @@ class DefaultNavigator < NavigatorBase
 		if current_substep == nil
 			previous_substep = nil
 			parent_step = nil
-			# 全てのsubstepが終了下と考えられる．
+			# $BA4$F$N(Bsubstep$B$,=*N;2<$H9M$($i$l$k!%(B
 			@hash_mode["substep"]["mode"].each{|key, value|
 				if value[2] == "CURRENT"
 					previous_substep = key
@@ -271,7 +223,7 @@ class DefaultNavigator < NavigatorBase
 			@hash_mode = set_ABLEorOTHERS(@hash_recipe, @hash_mode, parent_step, previous_substep)
 
 		else
-			# 現状でCURRENTなsubstepをNOT_CURRENTかつis_finishedに．
+			# $B8=>u$G(BCURRENT$B$J(Bsubstep$B$r(BNOT_CURRENT$B$+$D(Bis_finished$B$K!%(B
 			previous_substep = nil
 			@hash_mode["substep"]["mode"].each{|key, value|
 				if value[2] == "CURRENT"
@@ -279,8 +231,8 @@ class DefaultNavigator < NavigatorBase
 					if previous_substep != current_substep
 						@hash_mode["substep"]["mode"][previous_substep][2] = "NOT_CURRENT"
 						@hash_mode["substep"]["mode"][previous_substep][1] = "is_finished"
-						# 子の時点ではメディアはSTOPしない．
-						# 親ノードもNOT_CURRENTにする．かつ，上記のsubstepがstep内で最後のsubstepであれば，stepをis_finishedにする．
+						# $B;R$N;~E@$G$O%a%G%#%"$O(BSTOP$B$7$J$$!%(B
+						# $B?F%N!<%I$b(BNOT_CURRENT$B$K$9$k!%$+$D!$>e5-$N(Bsubstep$B$,(Bstep$BFb$G:G8e$N(Bsubstep$B$G$"$l$P!$(Bstep$B$r(Bis_finished$B$K$9$k!%(B
 						parent_step = @hash_recipe["substep"][previous_substep]["parent_step"]
 						@hash_mode["step"]["mode"][parent_step][2] = "NOT_CURRENT"
 						unless @hash_recipe["substep"][previous_substep].key?("next_substep")
@@ -290,11 +242,11 @@ class DefaultNavigator < NavigatorBase
 					break
 				end
 			}
-			# 次にCURRENTとなるsubstepをCURRENTに．
+			# $B<!$K(BCURRENT$B$H$J$k(Bsubstep$B$r(BCURRENT$B$K!%(B
 			@hash_mode["substep"]["mode"][current_substep][2] = "CURRENT"
 			current_step = @hash_recipe["substep"][current_substep]["parent_step"]
 			@hash_mode["step"]["mode"][current_step][2] = "CURRENT"
-			# 現状でCURRENTなsubstepと次にCURRENTなsubstepが異なる場合は，メディアを再生させる．
+			# $B8=>u$G(BCURRENT$B$J(Bsubstep$B$H<!$K(BCURRENT$B$J(Bsubstep$B$,0[$J$k>l9g$O!$%a%G%#%"$r:F@8$5$;$k!%(B
 			if current_substep != previous_substep
 				media = ["audio", "video", "notification"]
 				media.each{|v|
@@ -306,7 +258,7 @@ class DefaultNavigator < NavigatorBase
 						}
 					end
 				}
-				# previous_substepのメディアはSTOPする．
+				# previous_substep$B$N%a%G%#%"$O(BSTOP$B$9$k!%(B
 				media = ["audio", "video"]
 				media.each{|v|
 					if @hash_recipe["substep"][previous_substep].key?(v)
@@ -316,12 +268,88 @@ class DefaultNavigator < NavigatorBase
 					end
 				}
 			end
-			# stepとsubstepを適切にABLEに．
+			# step$B$H(Bsubstep$B$rE,@Z$K(BABLE$B$K!%(B
 			p current_step
 			p current_substep
 			@hash_mode = set_ABLEorOTHERS(@hash_recipe, @hash_mode, current_step, current_substep)
-			# notificationが再生済みかどうかは，隙あらば調べましょう
+			# notification$B$,:F@8:Q$_$+$I$&$+$O!$7d$"$i$PD4$Y$^$7$g$&(B
 			@hash_mode = check_notification_FINISHED(@hash_recipe, @hash_mode, time)
 		end
 	end
+
+	#################################################################
+	##### NAVI_MENU$BMQ$NFCJL$J(BdetailDraw$B5Z$S(BnaviDraw$B$r:FDj5A$9$k(B #####
+	#################################################################
+
+	# clicked_with_NAVI_MENU$B$^$?$O(BCURRENT$B$J(Bsubstep$B$N(Bhtml_contents$B$rI=<($5$;$k(BDetailDraw$BL?Na!%(B
+	# clicked_with_NAVI_MENU$B$NJ}$,M%@hEY$O9b$$(B
+	# clicked_with_NAVI_MENU$B$O0lEY=hM}$9$k$H(BNOT_CURRENT$B$KLa$k(B
+	def detailDraw
+		orders = []
+		@hash_mode["substep"]["mode"].each{|key, value|
+			if value[2] == "CURRENT"
+				orders = [{"DetailDraw"=>{"id"=>key}}]
+			end
+			if value[2] == "clicked_with_NAVI_MENU"
+				orders = [{"DetailDraw"=>{"id"=>key}}]
+				@hash_mode["substep"]["mode"][key][2] = "NOT_CURRENT"
+				break
+			end
+		}
+		return orders
+	end
+
+		# $B%J%S2hLL$NI=<($r7hDj$9$k(BNaviDraw$BL?Na!%(B
+	def naviDraw
+		# sorted_step$B$N=g$KI=<($5$;$k!%(B
+		orders = []
+		orders.push({"NaviDraw"=>{"steps"=>[]}})
+		@hash_recipe["sorted_step"].each{|v|
+			id = v[1]
+			visual_step = nil
+			if @hash_mode["step"]["mode"][id][2] == "CURRENT"
+				visual_step = "CURRENT"
+			else
+				visual_step = @hash_mode["step"]["mode"][id][0]
+			end
+			if @hash_mode["step"]["mode"][id][1] == "is_finished"
+				orders[0]["NaviDraw"]["steps"].push({"id"=>id, "visual"=>visual_step, "is_finished"=>1})
+			elsif @hash_mode["step"]["mode"][id][1] == "NOT_YET"
+				orders[0]["NaviDraw"]["steps"].push({"id"=>id, "visual"=>visual_step, "is_finished"=>0})
+			end
+			# CURRENT$B$J(Bstep$B$N>l9g!$(Bsubstep$B$bI=<($5$;$k!%(B
+			if @hash_mode["step"]["mode"][id][2] == "CURRENT"
+				@hash_recipe["step"][id]["substep"].each{|id|
+					visual_substep = nil
+					if @hash_mode["substep"]["mode"][id][2] == "CURRENT"
+						visual_substep = "CURRENT"
+					else
+						visual_substep = @hash_mode["substep"]["mode"][id][0]
+					end
+					if @hash_mode["substep"]["mode"][id][1] == "is_finished"
+						orders[0]["NaviDraw"]["steps"].push({"id"=>id, "visual"=>visual_substep, "is_finished"=>1})
+					else
+						orders[0]["NaviDraw"]["steps"].push({"id"=>id, "visual"=>visual_substep, "is_finished"=>0})
+					end
+				}
+			elsif @hash_mode["step"]["mode"][id][2] == "clicked_with_NAVI_MENU"
+				# NAVI_MENU$B$GA*Br$5$l$?$b$N$b!$(Bsubstep$B$rI=<($5$;$k!%(B
+				@hash_recipe["step"][id]["substep"].each{|id|
+					visual_substep = nil
+					if @hash_mode["substep"]["mode"][id][2] == "CURRENT"
+						visual_substep = "CURRENT"
+					else
+						visual_substep = @hash_mode["substep"]["mode"][id][0]
+					end
+					if @hash_mode["substep"]["mode"][id][1] == "is_finished"
+						orders[0]["NaviDraw"]["steps"].push({"id"=>id, "visual"=>visual_substep, "is_finished"=>1})
+					else
+						orders[0]["NaviDraw"]["steps"].push({"id"=>id, "visual"=>visual_substep, "is_finished"=>0})
+					end
+				}
+			end
+		}
+		return orders
+	end
+
 end
