@@ -18,8 +18,8 @@ def set_ABLEorOTHERS(hash_recipe, hash_mode, current_step, current_substep)
 							flag = 1
 						# parentがis_finishedでない場合，
 						else
-							# parentがCURRENTなstepでありかつABLEであれば，ABLEになる可能性あり．（その他のparentに期待）
-							if v == current_step && hash_mode["step"]["mode"][current_step][0] == "ABLE"
+							# parentがCURRENTなstepでありかつ，そのCURRENTなsubstepがstep内の最後尾であれば，ABLEになる可能性あり．（その他のparentに期待）
+							if v == current_step && !hash_recipe["substep"][current_substep].key?("next_substep")
 								flag = 1
 							# 上記以外はABLEになれないので直ちにbreak．
 							else
