@@ -69,6 +69,7 @@ class NavigatorBase
 			logger()
 			orders = {"status"=>"internal error"}
 		end
+		p orders
 		return orders
 	rescue => e
 		p "#####test15"

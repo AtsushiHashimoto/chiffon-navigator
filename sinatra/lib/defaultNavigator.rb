@@ -88,27 +88,29 @@ class DefaultNavigator < NavigatorBase
 			# クリックされたstepがclicked_with_NAVI_MENUならばNOT_CURRENTに戻す．
 			if @hash_mode["step"]["mode"][id][2] == "clicked_with_NAVI_MENU"
 				@hash_mode["step"]["mode"][id][2] = "NOT_CURRENT"
-			else # クリックされたstepがNOT_CURRENTならばclicked_with_NAVI_MENUにする
+			elsif @hash_mode["step"]["mode"][id][2] == "NOT_CURRENT" # クリックされたstepがNOT_CURRENTならばclicked_with_NAVI_MENUにする
 				@hash_mode["step"]["mode"][id][2] = "clicked_with_NAVI_MENU"
 			end
 		elsif @hash_recipe["substep"].key?(id)
 			# クリックされたsubstepをclicked_with_NAVI_MENUにする
-			@hash_mode["substep"]["mode"][id][2] = "clicked_with_NAVI_MENU"
-			# substepがクリックされた場合のみ，detailDrawが変化するので，動画と音声を停止する．
-			@hash_mode["substep"]["mode"].each{|key, value|
-				if value[2] == "CURRENT"
-					# substepに含まれるaudio，videoは再生済み・再生中・再生待ち関わらずSTOPに．
-					media = ["audio", "video"]
-					media.each{|v|
-						@hash_mode[v]["mode"].each{|key, value|
-							if value[0] == "CURRENT"
-								@hash_mode[v]["mode"][key][0] = "STOP"
-							end
+			if @hash_mode["substep"]["mode"][id][2] == "NOT_CURRENT"
+				@hash_mode["substep"]["mode"][id][2] = "clicked_with_NAVI_MENU"
+				# substepがクリックされた場合のみ，detailDrawが変化するので，動画と音声を停止する．
+				@hash_mode["substep"]["mode"].each{|key, value|
+					if value[2] == "CURRENT"
+						# substepに含まれるaudio，videoは再生済み・再生中・再生待ち関わらずSTOPに．
+						media = ["audio", "video"]
+						media.each{|v|
+							@hash_mode[v]["mode"].each{|key, value|
+								if value[0] == "CURRENT"
+									@hash_mode[v]["mode"][key][0] = "STOP"
+								end
+							}
 						}
-					}
-					break
-				end
-			}
+						break
+					end
+				}
+			end
 		end
 	end
 
