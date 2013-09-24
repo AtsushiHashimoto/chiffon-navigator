@@ -309,15 +309,21 @@ class DefaultNavigator < NavigatorBase
 		@hash_recipe["sorted_step"].each{|v|
 			id = v[1]
 			visual_step = nil
+			is_open = -1
 			if @hash_mode["step"]["mode"][id][2] == "CURRENT"
 				visual_step = "CURRENT"
+				is_open = 1
+			elsif @hash_mode["step"]["mode"][id][2] == "clicked_with_NAVI_MENU"
+				visual_step = @hash_mode["step"]["mode"][id][0]
+				is_open = 1
 			else
 				visual_step = @hash_mode["step"]["mode"][id][0]
+				is_open = 0
 			end
 			if @hash_mode["step"]["mode"][id][1] == "is_finished"
-				orders[0]["NaviDraw"]["steps"].push({"id"=>id, "visual"=>visual_step, "is_finished"=>1})
+				orders[0]["NaviDraw"]["steps"].push({"id"=>id, "visual"=>visual_step, "is_finished"=>1, "is_open"=>is_open})
 			elsif @hash_mode["step"]["mode"][id][1] == "NOT_YET"
-				orders[0]["NaviDraw"]["steps"].push({"id"=>id, "visual"=>visual_step, "is_finished"=>0})
+				orders[0]["NaviDraw"]["steps"].push({"id"=>id, "visual"=>visual_step, "is_finished"=>0, "is_open"=>is_open})
 			end
 			# CURRENTなstepの場合，substepも表示させる．
 			if @hash_mode["step"]["mode"][id][2] == "CURRENT"
