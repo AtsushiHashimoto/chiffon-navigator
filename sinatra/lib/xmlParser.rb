@@ -7,7 +7,6 @@ require 'nokogiri'
 def parse_xml(xmlfile)
 	doc = Nokogiri::XML(open(xmlfile))
 	hash_recipe = Hash.new{|h,k| h[k]=Hash.new(&h.default_proc)}
-	hash_mode = Hash.new{|h,k| h[k]=Hash.new(&h.default_proc)}
 
 	hash_recipe = get_step(doc, hash_recipe)
 	# directions/substepの書き出し
@@ -47,23 +46,24 @@ def get_step(doc, hash_recipe)
 		##### attributeの取り出し #####
 		# idは持つはず
 		step_id = node["id"]
+		hash_recipe["step"][step_id]["parent"] = []
 		# parentを持つならば
 		unless node["parent"] == nil
-			hash_recipe["step"][step_id]["parent"] = []
 			node["parent"].split(" ").each{|v|
 				hash_recipe["step"][step_id]["parent"].push(v)
 			}
 		end
 		# chainを持つならば
+		hash_recipe["step"][step_id]["chain"] = []
 		unless node["chain"] == nil
-			hash_recipe["step"][step_id]["chain"] = node["chain"]
+			hash_recipe["step"][step_id]["chain"].push(node["chain"])
 		end
 		# priorityは割と面倒
 		# 基本的にelementの記述順序どおりにpriority_listに代入していく
 		# priorityが指定されているときのみ，それに合わせた位置に代入する．
 		# 一番初めにpriorityを指定されたstepの位置が基準となって色々やることになるので，最適な順序で並べられているわけではない．
 		# chainのつながりも含めてpriorityの順番を決めるべきだが，難しいのでやらない．
-		unless node["priority"] == nil
+		if node["priority"] != nil
 			# priorityを持つならば，priority_listの中で自分より小さいものの前に代入する
 			# priority_listが全てnilならば，一番後ろに代入する
 			priority_num = node["priority"].to_i
@@ -86,8 +86,8 @@ def get_step(doc, hash_recipe)
 		end
 		##### elementの取り出し #####
 		# triggerを持つならば
+		hash_recipe["step"][step_id]["trigger"] = []
 		unless doc.xpath("//recipe/directions/step[@id=\"#{step_id}\"]/trigger")[0] == nil
-			hash_recipe["step"][step_id]["trigger"] = []
 			doc.xpath("//recipe/directions/step[@id=\"#{step_id}\"]/trigger").each{|node2|
 				# triggerがtimingを持つならば
 				timing = nil
@@ -148,19 +148,21 @@ end
 # hash_recipe["substep"][id]["video"] = [id] : videoのid．便宜上配列にしている．
 # hash_recipe["substep"][id]["next_substep"] = id : 次のsubstepのid
 def get_substep(doc, hash_recipe, step_id, substep_id)
+	hash_recipe["substep"][substep_id]["parent_step"] = nil
 	unless step_id == nil
 		# directions以下のstep以下に書かれているsubsteはparent_stepを持つ
 		hash_recipe["substep"][substep_id]["parent_step"] = step_id
 	end
 	##### attributeの取り出し #####
 	# orderを持つならば
+	hash_recipe["substep"][substep_id]["order"] = nil
 	unless doc.xpath("//substep[@id=\"#{substep_id}\"]")[0]["order"] == nil
 		hash_recipe["substep"][substep_id]["order"] = doc.xpath("//substep[@id=\"#{substep_id}\"]")[0]["order"]
 	end
 	##### elementの取り出し #####
 	# triggerを持つならば
+	hash_recipe["substep"][substep_id]["trigger"] = []
 	unless doc.xpath("//substep[@id=\"#{substep_id}\"]/trigger")[0] == nil
-		hash_recipe["substep"][substep_id]["trigger"] = []
 		doc.xpath("//substep[@id=\"#{substep_id}\"]/trigger").each{|node2|
 			# triggerがtimingを持つならば
 			timing = nil
@@ -187,8 +189,8 @@ def get_substep(doc, hash_recipe, step_id, substep_id)
 		}
 	end
 	# notificationを持つならば
+	hash_recipe["substep"][substep_id]["notification"] = []
 	unless doc.xpath("//substep[@id=\"#{substep_id}\"]/notification")[0] == nil
-		hash_recipe["substep"][substep_id]["notification"] = []
 		doc.xpath("//substep[@id=\"#{substep_id}\"]/notification").each{|node|
 			notification_id = node["id"]
 			hash_recipe["substep"][substep_id]["notification"].push(notification_id)
@@ -196,20 +198,22 @@ def get_substep(doc, hash_recipe, step_id, substep_id)
 		}
 	end
 	# audioを持つならば
+	hash_recipe["substep"][substep_id]["audio"] = []
 	unless doc.xpath("//substep[@id=\"#{substep_id}\"]/audio")[0] == nil
 		audio_id = doc.xpath("//substep[@id=\"#{substep_id}\"]/audio")[0]["id"]
-		hash_recipe["substep"][substep_id]["audio"] = [audio_id]
+		hash_recipe["substep"][substep_id]["audio"].push(audio_id)
 		hash_recipe = get_audio(doc, hash_recipe, substep_id, nil, audio_id)
 	end
 	# videoを持つならば
+	hash_recipe["substep"][substep_id]["video"] = []
 	unless doc.xpath("//substep[@id=\"#{substep_id}\"]/video")[0] == nil
 		video_id = doc.xpath("//substep[@id=\"#{substep_id}\"]/video")[0]["id"]
-		hash_recipe["substep"][substep_id]["video"] = [video_id]
+		hash_recipe["substep"][substep_id]["video"].push(video_id)
 		hash_recipe = get_video(doc, hash_recipe, substep_id, video_id)
 	end
 	# 次のsubstepを持つならば
+	hash_recipe["substep"][substep_id]["next_substep"] = nil
 	unless doc.xpath("//substep[@id=\"#{substep_id}\"]")[0].next_sibling == nil
-		next_node = doc.xpath("//substep[@id=\"#{substep_id}\"]")[0].next_sibling
 		if doc.xpath("//substep[@id=\"#{substep_id}\"]")[0].next_sibling.name == "substep"
 			next_substep = doc.xpath("//substep[@id=\"#{substep_id}\"]")[0].next_sibling["id"]
 			hash_recipe["substep"][substep_id]["next_substep"] = next_substep
@@ -222,15 +226,16 @@ end
 # hash_recipe["notification"][id] : notificationのid
 # hash_recipe["notification"][id]["parent_substep"] = id : parent nodeなsubstepのid
 # hash_recipe["notification"][id]["trigger"] = [[timing, ref, delay], [...], ...] : notificationのtriggerリスト
-# hash_recipe["notification"][id]["audio"] = id : notificationのaudio．
+# hash_recipe["notification"][id]["audio"] = [id] : notificationのaudio．便宜上配列にしている．
 def get_notification(doc, hash_recipe, substep_id, notification_id)
+	hash_recipe["notification"][notification_id]["parent_substep"] = nil
 	unless substep_id == nil
 		hash_recipe["notification"][notification_id]["parent_substep"] = substep_id
 	end
 	##### elementの取り出し #####
 	# triggerを持つならば
+	hash_recipe["notification"][notification_id]["trigger"] = []
 	unless doc.xpath("//notification[@id=\"#{notification_id}\"]/trigger")[0] == nil
-		hash_recipe["notification"][notification_id]["trigger"] = []
 		doc.xpath("//notification[@id=\"#{notification_id}\"]/trigger").each{|node2|
 			# triggerがtimingを持つならば
 			timing = nil
@@ -257,9 +262,10 @@ def get_notification(doc, hash_recipe, substep_id, notification_id)
 		}
 	end
 	# audioを持つならば
+	hash_recipe["notification"][notification_id]["audio"] = []
 	unless doc.xpath("//notification[@id=\"#{notification_id}\"]/audio")[0] == nil
 		audio_id = doc.xpath("//notification[@id=\"#{notification_id}\"]/audio")[0]["id"]
-		hash_recipe["notification"][notification_id]["audio"] = audio_id
+		hash_recipe["notification"][notification_id]["audio"].push(audio_id)
 		hash_recipe = get_audio(doc, hash_recipe, nil, notification_id, audio_id)
 	end
 	return hash_recipe
@@ -271,16 +277,18 @@ end
 # hash_recipe["audio"][id]["parent_notification"] = id : parent nodeなnotificationのid
 # hash_recipe["audio"][id]["trigger"] = [[timing, ref, delay], [...], ...] : notificationのtriggerリスト
 def get_audio(doc, hash_recipe, substep_id, notification_id, audio_id)
+	hash_recipe["audio"][audio_id]["parent_substep"] = nil
 	unless substep_id == nil
 		hash_recipe["audio"][audio_id]["parent_substep"] = substep_id
 	end
+	hash_recipe["audio"][audio_id]["parent_notification"] = nil
 	unless notification_id == nil
 		hash_recipe["audio"][audio_id]["parent_notification"] = notification_id
 	end
 	##### elementの取り出し #####
 	# triggerを持つならば
+	hash_recipe["audio"][audio_id]["trigger"] = []
 	unless doc.xpath("//audio[@id=\"#{audio_id}\"]/trigger")[0] == nil
-		hash_recipe["audio"][audio_id]["trigger"] = []
 		doc.xpath("//audio[@id=\"#{audio_id}\"]/trigger").each{|node2|
 			# triggerがtimingを持つならば
 			timing = nil
@@ -317,8 +325,8 @@ def get_video(doc, hash_recipe, substep_id, video_id)
 	hash_recipe["video"][video_id]["parent_substep"] = substep_id
 	##### elementの取り出し #####
 	# triggerを持つならば
+	hash_recipe["video"][video_id]["trigger"] = []
 	unless doc.xpath("//substep[@id=\"#{substep_id}\"]/video[@id=\"#{video_id}\"]/trigger")[0] == nil
-		hash_recipe["video"][video_id]["trigger"] = []
 		doc.xpath("//substep[@id=\"#{substep_id}\"]/video[@id=\"#{video_id}\"]/trigger").each{|node2|
 			# triggerがtimingを持つならば
 			timing = nil

@@ -4,6 +4,7 @@ require 'rubygems'
 require 'json'
 $LOAD_PATH.push(File.dirname(__FILE__))
 require 'lib/xmlParser.rb'
+require 'lib/modeInitializer.rb'
 require 'lib/utils.rb'
 
 class NavigatorBase
@@ -44,6 +45,11 @@ class NavigatorBase
 			end
 		end
 
+		session_id = jason_input["session_id"]
+		open("records/#{session_id}/#{session_id}_mode.txt", "w"){|io|
+			io.puts(JSON.pretty_generate(@hash_mode))
+		}
+
 		if status == "internal error"
 			p body.class
 			p body.message
@@ -59,6 +65,7 @@ class NavigatorBase
 		elsif status == "success"
 			logger()
 			orders = {"status"=>status, "body"=>body}
+			p orders
 		else
 			p "internal error"
 			p "navigatorBase.rb: parameter 'status' is wrong."
@@ -114,10 +121,10 @@ class NavigatorBase
 		when "MATERIALS", "OVERVIEW"
 			# modeの修正
 			media = ["audio", "video"]
-			media.each{|v|
-				@hash_mode[v]["mode"].each{|key, value|
-					if value[0] == "CURRENT"
-						@hash_mode[v]["mode"][key][0] = "STOP"
+			media.each{|media_name|
+				@hash_mode[media_name].each{|media_id, value|
+					if value["PLAY_MODE"] == "PLAY"
+						@hash_mode[media_name][media_id]["PLAY_MODE"] = "STOP"
 					end
 				}
 			}
@@ -155,9 +162,65 @@ class NavigatorBase
 
 		id = jason_input["operation_contents"]
 		# element_nameの確認
-		if @hash_recipe["step"].key?(id) || @hash_recipe["substep"].key?(id)
+		if @hash_recipe["step"].key?(id)
 			# modeの修正
-			modeUpdate_check(jason_input["time"]["sec"], id)
+			if @hash_mode["step"][id]["is_finished?"]
+				@hash_mode = uncheck_isFinished(@hash_recipe, @hash_mode, id)
+			else
+				@hash_mode = check_isFinished(@hash_recipe, @hash_mode, id)
+			end
+			current_step, current_substep = search_CURRENT(@hash_recipe, @hash_mode)
+			@hash_mode = set_ABLEorOTHERS(@hash_recipe, @hash_mode, current_step, current_substep)
+			@hash_recipe["step"].each{|step_id, value|
+				unless @hash_mode["step"][step_id]["is_finished?"]
+					@hash_mode["step"][current_step]["CURRENT?"] = false
+					@hash_mode["step"][current_step]["open?"] = false
+					@hash_mode["substep"][current_substep]["CURRENT?"] = false
+					@hash_mode["substep"].each{|substep_id, value|
+						if value["is_shown?"]
+							@hash_mode["substep"][substep_id]["is_shown?"] = false
+						end
+					}
+					@hash_mode, next_step, next_substep = go2next(@hash_recipe, @hash_mode)
+					@hash_mode = set_ABLEorOTHERS(@hash_recipe, @hash_mode, next_step, next_substep)
+					break
+				end
+			}
+			# DetailDraw：別のsubstepに遷移するかもしれないので必要．
+			body.concat(detailDraw())
+			# Play：別のsubstepに遷移するかもしれないので必要．
+			body.concat(play(jason_input["time"]["sec"]))
+			# Notify：別のsubstepに遷移するかもしれないので必要．
+			body.concat(notify(jason_input["time"]["sec"]))
+			# Cancel：別のsubstepに遷移するかもしれないので必要．
+			body.concat(cancel())
+			# ChannelSwitch：不要．
+			# NaviDraw：チェックされたものをis_fisnishedに書き替え，visualを適切に書き換えたものを提示
+			body.concat(naviDraw())
+		elsif @hash_recipe["substep"].key?(id)
+			# modeの修正
+			if @hash_mode["substep"][id]["is_finished?"]
+				@hash_mode = uncheck_isFinished(@hash_recipe, @hash_mode, id)
+			else
+				@hash_mode = check_isFinished(@hash_recipe, @hash_mode, id)
+			end
+			current_step, current_substep = search_CURRENT(@hash_recipe, @hash_mode)
+			@hash_mode = set_ABLEorOTHERS(@hash_recipe, @hash_mode, current_step, current_substep)
+			@hash_recipe["step"].each{|step_id, value|
+				unless @hash_mode["step"][step_id]["is_finished?"]
+					@hash_mode["step"][current_step]["CURRENT?"] = false
+					@hash_mode["step"][current_step]["open?"] = false
+					@hash_mode["substep"][current_substep]["CURRENT?"] = false
+					@hash_mode["substep"].each{|substep_id, value|
+						if value["is_shown?"]
+							@hash_mode["substep"][substep_id]["is_shown?"] = false
+						end
+					}
+					@hash_mode, next_step, next_substep = go2next(@hash_recipe, @hash_mode)
+					@hash_mode = set_ABLEorOTHERS(@hash_recipe, @hash_mode, next_step, next_substep)
+					break
+				end
+			}
 			# DetailDraw：別のsubstepに遷移するかもしれないので必要．
 			body.concat(detailDraw())
 			# Play：別のsubstepに遷移するかもしれないので必要．
@@ -206,55 +269,8 @@ class NavigatorBase
 		# recipe.xmlをパースし，hash_recipeに格納する
 		@hash_recipe = parse_xml("records/#{session_id}/#{session_id}_recipe.xml")
 
-		# stepやmediaの管理をするhahs_modeの作成
-		if @hash_recipe.key?("step")
-			@hash_recipe["step"].each{|key, value|
-				@hash_mode["step"]["mode"][key] = ["OTHERS","NOT_YET","NOT_CURRENT"]
-			}
-		end
-		if @hash_recipe.key?("substep")
-			@hash_recipe["substep"].each{|key, value|
-				@hash_mode["substep"]["mode"][key] = ["OTHERS","NOT_YET","NOT_CURRENT"]
-			}
-		end
-		if @hash_recipe.key?("audio")
-			@hash_recipe["audio"].each{|key, value|
-				@hash_mode["audio"]["mode"][key] = ["NOT_YET", -1]
-			}
-		end
-		if @hash_recipe.key?("video")
-			@hash_recipe["video"].each{|key, value|
-				@hash_mode["video"]["mode"][key] = ["NOT_YET", -1]
-			}
-		end
-		if @hash_recipe.key?("notification")
-			@hash_recipe["notification"].each{|key, value|
-				@hash_mode["notification"]["mode"][key] = ["NOT_YET", -1]
-			}
-		end
-		# 表示されている画面の管理のために（START時はOVERVIEW）
-		@hash_mode["display"] = "OVERVIEW"
-
-		# hahs_modeにおける各要素の初期設定
-		# 優先度の最も高いstepをCURRENTとし，その一番目のsubstepもCURRENTにする．
-		current_step = @hash_recipe["sorted_step"][0][1]
-		current_substep = @hash_recipe["step"][current_step]["substep"][0]
-		@hash_mode["step"]["mode"][current_step][2] = "CURRENT"
-		@hash_mode["substep"]["mode"][current_substep][2] = "CURRENT"
-		# stepとsubstepを適切にABLEにする．
-		@hash_mode = set_ABLEorOTHERS(@hash_recipe, @hash_mode, current_step, current_substep)
-		# STARTなので，is_finishedなものはない．
-		# CURRENTとなったsubstepがABLEならばメディアの再生準備としてCURRENTにする．
-		if @hash_mode["substep"]["mode"][current_substep][0] == "ABLE"
-			media = ["audio", "video", "notification"]
-			media.each{|v|
-				if @hash_recipe["substep"][current_substep].key?(v)
-					@hash_recipe["substep"][current_substep][v].each{|media_id|
-						@hash_mode[v]["mode"][media_id][0] = "CURRENT"
-					}
-				end
-			}
-		end
+		# stepやmediaの管理をするhahs_modeの作成及び初期設定
+		@hash_mode = initialize_mode(@hash_recipe)
 
 		### DetailDraw：不要
 		### Play：不要
@@ -264,9 +280,6 @@ class NavigatorBase
 		body.push({"ChannelSwitch"=>{"channel"=>"OVERVIEW"}})
 		### NaviDraw：不要
 
-		open("records/#{session_id}/#{session_id}_mode.txt", "w"){|io|
-			io.puts(JSON.pretty_generate(@hash_mode))
-		}
 		open("records/#{session_id}/#{session_id}_recipe.txt", "w"){|io|
 			io.puts(JSON.pretty_generate(@hash_recipe))
 		}
@@ -280,10 +293,10 @@ class NavigatorBase
 		# mediaをSTOPにする．
 		session_id = jason_input["session_id"]
 		media = ["audio", "video", "notification"]
-		media.each{|v|
-			@hash_mode[v]["mode"].each{|key, value|
-				if value[0] == "CURRENT"
-					@hash_mode[v]["mode"][key][0] = "STOP"
+		media.each{|media_name|
+			@hash_mode[media_name].each{|media_id, value|
+				if value["PLAY_MODE"] == "PLAY"
+					@hash_mode[media_name][media_id]["PLAY_MODE"] = "STOP"
 				end
 			}
 		}
@@ -296,9 +309,6 @@ class NavigatorBase
 		### ChannelSwitch：不要
 		### NaviDraw：不要
 
-		open("records/#{session_id}/#{session_id}_mode.txt", "w"){|io|
-			io.puts(JSON.pretty_generate(@hash_mode))
-		}
 		return "success", body
 	rescue => e
 		return "internal error", e
@@ -334,10 +344,6 @@ class NavigatorBase
 		### ChannelSwitch：不要
 		### NaviDraw：不要
 
-#		session_id = jason_input["session_id"]
-#		open("records/#{session_id}/#{session_id}_mode.txt", "w"){|io|
-#			io.puts(JSON.pretty_generate(@hash_mode))
-#		}
 		return "success", body
 	rescue => e
 		return "internal error", e
@@ -350,9 +356,9 @@ class NavigatorBase
 	# CURRENTなsubstepのhtml_contentsを表示させるDetailDraw命令．
 	def detailDraw
 		orders = []
-		@hash_mode["substep"]["mode"].each{|key, value|
-			if value[2] == "CURRENT"
-				orders.push({"DetailDraw"=>{"id"=>key}})
+		@hash_mode["substep"].each{|substep_id, value|
+			if value["is_shown?"]
+				orders.push({"DetailDraw"=>{"id"=>substep_id}})
 				break
 			end
 		}
@@ -363,19 +369,17 @@ class NavigatorBase
 	def play(time)
 		orders = []
 		media = ["audio", "video"]
-		media.each{|v|
-			@hash_mode[v]["mode"].each{|key, value|
-				if value[0] == "CURRENT"
-					# triggerの数が1個以上のとき．
-					if @hash_recipe[v][key].key?("trigger")
-						# triggerが複数個の場合，どうするのか考えていない．
-						orders.push({"Play"=>{"id"=>key, "delay"=>@hash_recipe[v][key]["trigger"][0][2].to_i}})
-						finish_time = time + @hash_recipe[v][key]["trigger"][0][2].to_i * 1000
-						@hash_mode[v]["mode"][key][1] = finish_time
-					else # triggerが0個のとき．
-						# triggerが無い場合は再生命令は出さないが，hash_modeはどう変更するのか考えていない．
-						# @hash_mode[v]["mode"][key][1] = ?
+		media.each{|media_name|
+			@hash_mode[media_name].each{|media_id, value|
+				if value["PLAY_MODE"] == "START"
+					if @hash_recipe[media_name][media_id]["trigger"].empty?
+						@hash_mode[media_name][media_id]["PLAY_MODE"] = "---"
 						return []
+					else
+						orders.push({"Play"=>{"id"=>media_id, "delay"=>@hash_recipe[media_name][media_id]["trigger"][0][2].to_i}})
+						finish_time = time + @hash_recipe[media_name][media_id]["trigger"][0][2].to_i * 1000
+						@hash_mode[media_name][media_id]["time"] = finish_time
+						@hash_mode[media_name][media_id]["PLAY_MODE"] = "PLAY"
 					end
 				end
 			}
@@ -386,78 +390,43 @@ class NavigatorBase
 	# CURRENTなnotificationを再生させるNotify命令．
 	def notify(time)
 		orders = []
-		@hash_mode["notification"]["mode"].each{|key, value|
-			if value[0] == "CURRENT"
-				# notificationはtriggerが必ずある．
-				# triggerが複数個の場合，どうするのか考えていない．
-				orders.push({"Notify"=>{"id"=>key, "delay"=>@hash_recipe["notification"][key]["trigger"][0][2].to_i}})
-				finish_time = time + @hash_recipe["notification"][key]["trigger"][0][2].to_i * 1000
-				# notificationは特殊なので，特別にKEEPに変更する．
-				@hash_mode["notification"]["mode"][key] = ["KEEP", finish_time]
+		@hash_mode["notification"].each{|id, value|
+			if value["PLAY_MODE"] == "START"
+				orders.push({"Notify"=>{"id"=>id, "delay"=>@hash_recipe["notification"][id]["trigger"][0][2].to_i}})
+				finish_time = time + @hash_recipe["notification"][id]["trigger"][0][2].to_i * 1000
+				@hash_mode["notification"][id]["time"] = finish_time
+				@hash_mode["notification"][id]["PLAY_MODE"] = "PLAY"
+				@hash_recipe["notification"][id]["audio"].each{|audio_id|
+					@hash_mode["audio"][audio_id]["time"] = finish_time
+				}
 			end
 		}
 		return orders
 	end
 
 	# 再生待ち状態のaudio，video，notificationを中止するCancel命令．
-	def cancel(*id)
+	def cancel
 		orders = []
-		# 特に中止させるメディアについて指定が無い場合
-		if id == []
-			# audioとvideoの処理．
-			# Cancelさせるべきものは，STOPになっているはず．
-			media = ["audio", "video"]
-			media.each{|v|
-				if @hash_mode.key?(v)
-					@hash_mode[v]["mode"].each{|key, value|
-						if value[0] == "STOP"
-							orders.push({"Cancel"=>{"id"=>key}})
-							# STOPからFINISHEDに変更．
-							@hash_mode[v]["mode"][key] = ["FINISHED", -1]
-						end
-					}
+		media = ["audio", "video"]
+		media.each{|media_name|
+			@hash_mode[media_name].each{|media_id, value|
+				if value["PLAY_MODE"] == "STOP"
+					orders.push({"Cancel"=>{"id"=>media_id}})
+					@hash_mode[media_name][media_id]["PLAY_MODE"] = "---"
+					@hash_mode[media_name][media_id]["time"] = -1
 				end
 			}
-			# notificationの処理．
-			# Cancelさせるべきものは，STOPのなっているはず．
-			if @hash_mode.key?("notification")
-				@hash_mode["notification"]["mode"].each{|key, value|
-					if value[0] == "STOP"
-						orders.push({"Cancel"=>{"id"=>key}})
-						# STOPからFINISHEDに変更．
-						@hash_mode["notification"]["mode"][key] = ["FINISHED", -1]
-						# audioをもつnotificationの場合，audioもFINISHEDに変更．
-						if @hash_recipe["notification"][key].key?("audio")
-							audio_id = @hash_recipe["notification"][key]["audio"]
-							@hash_mode["audio"]["mode"][audio_id] = ["FINISHED", -1]
-						end
-					end
-				}
-			end
-		else # 中止させるメディアについて指定がある場合．
-			id.each{|v|
-				# 指定されたメディアのelement nameを調査．
-				element_name = search_ElementName(@hash_recipe, v)
-				# audioとvideoの場合．
-				if @hash_recipe["audio"].key?(v) || @hash_recipe["video"].key?(v)
-					# 指定されたものが再生待ちかどうかとりあえず調べる，
-					if @hash_mode[element_name]["mode"][v][0] == "CURRENT"
-						# CancelしてFINISHEDに．
-						orders.push({"Cancel"=>{"id"=>v}})
-						@hash_mode[element_name]["mode"][v] = ["FINISHED", -1]
-					end
-				elsif @hash_recipe["notification"].key?(v) # notificationの場合．
-					# 指定されたnotificationが再生待ちかどうかとりあえず調べる．
-					if @hash_mode["notification"]["mode"][v][0] == "KEEP"
-						# CancelしてFINISHEDに．
-						orders.push({"Cancel"=>{"id"=>v}})
-						@hash_mode["notification"]["mode"][v][0] = ["FINISHED", -1]
-						# audioを持つnotificationはaudioもFINISHEDに．
-						if @hash_recipe["notification"][v].key?("audio")
-							audio_id = @hash_recipe["notification"][v]["audio"]
-							@hash_mode["audio"]["mode"][audio_id] = ["FINISHED", -1]
-						end
-					end
+		}
+		if @hash_mode.key?("notification")
+			@hash_mode["notification"].each{|id, value|
+				if value["PLAY_MODE"] == "STOP"
+					orders.push({"Cancel"=>{"id"=>id}})
+					@hash_mode["notification"][id]["PLAY_MODE"] = "---"
+					@hash_mode["notification"][id]["time"] = -1
+					@hash_recipe["notification"][id]["audio"].each{|audio_id|
+						@hash_mode["audio"][audio_id]["PLAY_MODE"] == "---"
+						@hash_mode["audio"][audio_id]["time"] = -1
+					}
 				end
 			}
 		end
@@ -466,175 +435,41 @@ class NavigatorBase
 
 	# ナビ画面の表示を決定するNaviDraw命令．
 	def naviDraw
-		# sorted_stepの順に表示させる．
 		orders = []
 		orders.push({"NaviDraw"=>{"steps"=>[]}})
 		@hash_recipe["sorted_step"].each{|v|
-			id = v[1]
+			step_id = v[1]
 			visual = nil
-			if @hash_mode["step"]["mode"][id][2] == "CURRENT"
+			if @hash_mode["step"][step_id]["CURRENT?"]
 				visual = "CURRENT"
+			elsif @hash_mode["step"][step_id]["ABLE?"]
+				visual = "ABLE"
 			else
-				visual = @hash_mode["step"]["mode"][id][0]
+				visual = "OTHERS"
 			end
-			if @hash_mode["step"]["mode"][id][1] == "is_finished"
-				orders[0]["NaviDraw"]["steps"].push({"id"=>id, "visual"=>visual, "is_finished"=>1})
-			elsif @hash_mode["step"]["mode"][id][1] == "NOT_YET"
-				orders[0]["NaviDraw"]["steps"].push({"id"=>id, "visual"=>visual, "is_finished"=>0})
+			if @hash_mode["step"][step_id]["is_finished?"]
+				orders[0]["NaviDraw"]["steps"].push({"id"=>step_id, "visual"=>visual, "is_finished"=>1})
+			else
+				orders[0]["NaviDraw"]["steps"].push({"id"=>step_id, "visual"=>visual, "is_finished"=>0})
 			end
-			# CURRENTなstepの場合，substepも表示させる．
-			if visual == "CURRENT"
-				@hash_recipe["step"][id]["substep"].each{|id|
+			if @hash_mode["step"][step_id]["open?"]
+				@hash_recipe["step"][step_id]["substep"].each{|substep_id|
 					visual = nil
-					if @hash_mode["substep"]["mode"][id][2] == "CURRENT"
+					if @hash_mode["substep"][substep_id]["CURRENT?"]
 						visual = "CURRENT"
+					elsif @hash_mode["substep"][substep_id]["ABLE?"]
+						visual = "ABLE"
 					else
-						visual = @hash_mode["substep"]["mode"][id][0]
+						visual = "OTHERS"
 					end
-					if @hash_mode["substep"]["mode"][id][1] == "is_finished"
-						orders[0]["NaviDraw"]["steps"].push({"id"=>id, "visual"=>visual, "is_finished"=>1})
+					if @hash_mode["substep"][substep_id]["is_finished?"]
+						orders[0]["NaviDraw"]["steps"].push({"id"=>substep_id, "visual"=>visual, "is_finished"=>1})
 					else
-						orders[0]["NaviDraw"]["steps"].push({"id"=>id, "visual"=>visual, "is_finished"=>0})
+						orders[0]["NaviDraw"]["steps"].push({"id"=>substep_id, "visual"=>visual, "is_finished"=>0})
 					end
 				}
 			end
 		}
 		return orders
-	end
-
-	##############################################################
-	##### modeのupdate処理が複雑なCHECKメソッドのmodeUpdater #####
-	##############################################################
-
-	def modeUpdate_check(time, id)
-		# チェックされたものによって場合分け．
-		# 上位メソッドで判定しているので，idとしてstepまたはsubstep以外が入力されることはない．
-		if @hash_recipe["step"].key?(id)
-			# is_finishedまたはNOT_YETの操作．
-			if @hash_mode["step"]["mode"][id][1] == "NOT_YET" # NOT_YETならis_finishedに．
-				# チェックされたstepをis_finishedに．
-				@hash_mode["step"]["mode"][id][1] = "is_finished"
-				# チェックされたstepに含まれるsubstepを全てis_finishedに．
-				@hash_recipe["step"][id]["substep"].each{|substep_id|
-					@hash_mode["substep"]["mode"][substep_id][1] = "is_finished"
-					# substepに含まれるメディアをFINISHEDにする．
-					# もしも現状でCURRENTまたはKEEPだったら，再生待ちまたは再生中なのでSTOPにする．
-					media = ["audio", "video", "notification"]
-					media.each{|v|
-						if @hash_recipe["substep"][substep_id].key?(v)
-							@hash_recipe["substep"][substep_id][v].each{|media_id|
-								if @hash_mode[v]["mode"][media_id][0] == "NOT_YET"
-									@hash_mode[v]["mode"][media_id][0] = "FINISHED"
-								elsif @hash_mode[v]["mode"][media_id][0] == "CURRENT" || @hash_mode[v]["mode"][media_id][0] == "KEEP"
-									@hash_mode[v]["mode"][media_id][0] = "STOP"
-								end
-							}
-						end
-					}
-				}
-				#
-				# 本当は，チェックされたstepがparentに持つstepもis_finishedにしなければならない．
-				#
-			else # is_finishedならNOT_YETに．
-				# チェックされたstepをNOT_YETに．
-				@hash_mode["step"]["mode"][id][1] = "NOT_YET"
-				# チェックされたstepに含まれるsubstepを全てNOT_YETに．
-				@hash_recipe["step"][id]["substep"].each{|substep_id|
-					@hash_mode["substep"]["mode"][substep_id][1] = "NOT_YET"
-					# substepに含まれるメディアをNOT_YETにする．
-					media = ["audio", "video", "notification"]
-					media.each{|v|
-						if @hash_recipe["substep"][substep_id].key?(v)
-							@hash_recipe["substep"][substep_id][v].each{|media_id|
-								@hash_mode[v]["mode"][media_id][0] = "NOT_YET"
-							}
-						end
-					}
-				}
-				#
-				# 本当は，チェックされたstepをparentに持つstepもNOT_YETにしなければならない．
-				#
-			end
-		elsif @hash_recipe["substep"].key?(id)
-			# is_finishedまたはNOT_YETの操作．
-			if @hash_mode["substep"]["mode"][id][1] == "NOT_YET" # NOT_YETならばis_finishedに．
-				parent_step = @hash_recipe["substep"][id]["parent_step"]
-				media = ["audio", "video", "notification"]
-				# チェックされたsubstepを含めそれ以前のsubstep全てをis_finishedに．
-				@hash_recipe["step"][parent_step]["substep"].each{|child_substep|
-					@hash_mode["substep"]["mode"][child_substep][1] = "is_finished"
-					# そのsubstepに含まれるメディアをFINISHEDに．
-					# もしも現状でCURRENTまたはKEEPならば，再生中または再生待ちなのでSTOPに．
-					media.each{|v|
-						if @hash_recipe["substep"][child_substep].key?(v)
-							@hash_recipe["substep"][child_substep][v].each{|media_id|
-								if @hash_mode[v]["mode"][media_id][0] == "NOT_YET"
-									@hash_mode[v]["mode"][media_id][0] = "FINISHED"
-								elsif @hash_mode[v]["mode"][media_id][0] == "CURRENT" || @hash_mode[v]["mode"][media_id][0] == "KEEP"
-									@hash_mode[v]["mode"][media_id][0] = "STOP"
-								end
-							}
-						end
-					}
-					# チェックされたsubstepをis_finishedにしたらループ終了．
-					if child_substep == id
-						# チェックされたsubstepがstep内の最終substepならば，親ノードもis_finishedにする．
-						if @hash_recipe["step"][parent_step]["substep"].last == id
-							@hash_mode["step"]["mode"][parent_step][1] = "is_finished"
-						end
-						break
-					end
-				}
-				#
-				# かつ，is_finishedとなったstepがparentにもつstepもis_finishedにしなければならない
-				#
-			else # is_finishedならばNOT_YETに．
-				parent_step = @hash_recipe["substep"][id]["parent_step"]
-				media = ["audio", "video", "notification"]
-				# チェックされたsubstepを含むそれ以降の（同一step内の）substepをNOT_YETに．
-				flag = -1
-				@hash_recipe["step"][parent_step]["substep"].each{|child_substep|
-					if flag == 1 || child_substep == id
-						flag = 1
-						@hash_mode["substep"]["mode"][child_substep][1] = "NOT_YET"
-						# そのsubstepに含まれるメディアをNOT_YETに．
-						media.each{|v|
-							if @hash_recipe["substep"][child_substep].key?(v)
-								@hash_recipe["substep"][child_substep][v].each{|media_id|
-									@hash_mode[v]["mode"][media_id][0] = "NOT_YET"
-								}
-							end
-						}
-					end
-				}
-				# 親ノードのstepを明示的にNOT_YETにする．
-				@hash_mode["step"]["mode"][parent_step][1] = "NOT_YET"
-				#
-				# かつ，NOT_YETとなったstepをparentにもつstepもNOT_YETにしなければならない
-				#
-			end
-		end
-		# ABLEまたはOTHERSの操作のために，CURRENTなstepとsubstepのidを調べる．
-		current_step, current_substep = search_CURRENT(@hash_recipe, @hash_mode)
-		# ABLEまたはOTHERSの操作．
-		@hash_mode = set_ABLEorOTHERS(@hash_recipe, @hash_mode, current_step, current_substep)
-		# 全てis_finishedならばCURRENT探索はしない
-		flag = -1
-		@hash_mode["step"]["mode"].each{|key, value|
-			if value[1] == "NOT_YET"
-				flag = 1
-				break
-			end
-		}
-		if flag == 1 # NOT_YETなstepが存在する場合のみ，CURRENTの移動を行う
-			# 可能なsubstepに遷移する
-			@hash_mode = go2current(@hash_recipe, @hash_mode, current_step, current_substep)
-			# 再度ABLEの判定を行う
-			current_step, current_substep = search_CURRENT(@hash_recipe, @hash_mode)
-			# ABLEまたはOTHERSの操作．
-			@hash_mode = set_ABLEorOTHERS(@hash_recipe, @hash_mode, current_step, current_substep)
-		end
-		# notificationが再生済みかどうかは，隙あらば調べましょう．
-		@hash_mode = check_notification_FINISHED(@hash_recipe, @hash_mode, time)
 	end
 end

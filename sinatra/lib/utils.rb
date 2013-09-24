@@ -1,67 +1,42 @@
 #!/usr/bin/ruby
 
 def set_ABLEorOTHERS(hash_recipe, hash_mode, current_step, current_substep)
-	# step
-	hash_mode["step"]["mode"].each{|key, value|
-		# NOT_YETなstepのみがABLEになれる．
-		if value[1] == "NOT_YET"
-			# parentを持たないstepはいつでもできるので，無条件でABLEにする．
-			unless hash_recipe["step"][key].key?("parent")
-				hash_mode["step"]["mode"][key][0] = "ABLE"
-			else # parentを持つstepは，その複数の(単数の場合あり)stepが全てis_finishedならばABLEにな
+	hash_mode["step"].each{|step_id, value|
+		if !value["is_finished?"]
+			if hash_recipe["step"][step_id]["parent"].empty?
+				hash_mode["step"][step_id]["ABLE?"] = true
+			else
 				flag = -1
-				hash_recipe["step"][key]["parent"].each{|v|
-					# parentとして指定されたidがちゃんと存在する．
-					if hash_mode["step"]["mode"].key?(v)
-						# parentがis_finishedならばABLEになる可能性あり．（その他のparentに期待）
-						if hash_mode["step"]["mode"][v][1] == "is_finished"
-							flag = 1
-						# parentがis_finishedでない場合，
-						else
-							# parentがCURRENTなstepでありかつ，そのCURRENTなsubstepがstep内の最後尾であれば，ABLEになる可能性あり．（その他のparentに期待）
-							if v == current_step && !hash_recipe["substep"][current_substep].key?("next_substep")
-								flag = 1
-							# 上記以外はABLEになれないので直ちにbreak．
-							else
-								flag = -1
-								break
-							end
-						end
-					# parentとして指定されたidが存在しない場合，recipe.xmlの記述がおかしい．（エラーとして出す？）
-					else
+				hash_recipe["step"][step_id]["parent"].each{|parent_id|
+					if hash_mode["step"][parent_id]["is_finished?"]
 						flag = 1
+					elsif parent_id == current_step && hash_recipe["substep"][current_substep]["next_substep"] == nil
+						flag = 1
+					else
+						flag = -1
+						break
 					end
 				}
-				# parentが全てis_finishedならABLEに設定．
 				if flag == 1
-					hash_mode["step"]["mode"][key][0] = "ABLE"
+					hash_mode["step"][step_id]["ABLE?"] = true
 				else
-					# ABLEでないstepは明示的にOTHERSに
-					hash_mode["step"]["mode"][key][0] = "OTHERS"
+					hash_mode["step"][step_id]["ABLE?"] = false
 				end
 			end
 		else
-			# ABLEでないstepは明示的にOTHERSに
-			hash_mode["step"]["mode"][key][0] = "OTHERS"
+			hash_mode["step"][step_id]["ABLE?"] = false
 		end
 
-		# substepの処理
-		# ["step"]["mode"][id][0] == ABLEなstepにおいて，is_finishedでない一番最初のsubstepがABLEになれる．
-		# ["step"]["mode"][id][2] == CURRENTなstepにおいてのみ，CURRENTなsubstepの次のsubstepもABLEになれる．
-
-		# とりあえず，全てのsubstepをOTHERSにする．
-		hash_recipe["step"][key]["substep"].each{|substep_id|
-			hash_mode["substep"]["mode"][substep_id][0] = "OTHERS"
+		hash_recipe["step"][step_id]["substep"].each{|substep_id|
+			hash_mode["substep"][substep_id]["ABLE?"] = false
 		}
-		if value[0] == "ABLE"
-			hash_recipe["step"][key]["substep"].each{|substep_id|
-				if hash_mode["substep"]["mode"][substep_id][1] == "NOT_YET"
-					# 一番初めのsubstepをABLEに
-					hash_mode["substep"]["mode"][substep_id][0] = "ABLE"
-					# step，substep共にCURRENTならば次のsubstepもABLEにする
-					if value[2] == "CURRENT" && hash_mode["substep"]["mode"][substep_id][2] == "CURRENT" && hash_recipe["substep"][substep_id].key?("next_substep")
+		if hash_mode["step"][step_id]["ABLE?"]
+			hash_recipe["step"][step_id]["substep"].each{|substep_id|
+				unless hash_mode["substep"][substep_id]["is_finished?"]
+					hash_mode["substep"][substep_id]["ABLE?"] = true
+					if step_id == current_step && substep_id == current_substep && hash_recipe["substep"][substep_id]["next_substep"] != nil
 						next_substep = hash_recipe["substep"][substep_id]["next_substep"]
-						hash_mode["substep"]["mode"][next_substep][0] = "ABLE"
+						hash_mode["substep"][next_substep]["ABLE?"] = true
 					end
 					break
 				end
@@ -71,26 +46,24 @@ def set_ABLEorOTHERS(hash_recipe, hash_mode, current_step, current_substep)
 	return hash_mode
 end
 
-def go2current(hash_recipe, hash_mode, current_step, current_substep)
-	# 現状でCURRENTなstepとsubstepをNOT_CURRENTにする．
-	hash_mode["step"]["mode"][current_step][2] = "NOT_CURRENT"
-	hash_mode["substep"]["mode"][current_substep][2] = "NOT_CURRENT"
-
+def go2next(hash_recipe, hash_mode)
+	next_step = nil
+	next_substep = nil
 	hash_recipe["sorted_step"].each{|v|
-		if hash_mode["step"]["mode"][v[1]][0] == "ABLE"
-			hash_mode["step"]["mode"][v[1]][2] = "CURRENT"
+		if hash_mode["step"][v[1]]["ABLE?"]
+			hash_mode["step"][v[1]]["CURRENT?"] = true
+			hash_mode["step"][v[1]]["open?"] = true
+			next_step = v[1]
 			hash_recipe["step"][v[1]]["substep"].each{|substep_id|
-				if hash_mode["substep"]["mode"][substep_id][1] == "NOT_YET"
-					hash_mode["substep"]["mode"][substep_id][2] = "CURRENT"
+				unless hash_mode["substep"][substep_id]["is_finished?"]
+					hash_mode["substep"][substep_id]["CURRENT?"] = true
+					hash_mode["substep"][substep_id]["is_shown?"] = true
+					next_substep = substep_id
 					media = ["audio", "video", "notification"]
-					media.each{|v|
-						if hash_recipe["substep"][substep_id].key?(v)
-							hash_recipe["substep"][substep_id][v].each{|media_id|
-								if hash_mode[v]["mode"][media_id][0] == "NOT_YET"
-									hash_mode[v]["mode"][media_id][0] = "CURRENT"
-								end
-							}
-						end
+					media.each{|media_name|
+						hash_recipe["substep"][substep_id][media_name].each{|media_id|
+							hash_mode[media_name][media_id]["PLAY_MODE"] = "START"
+						}
 					}
 					break
 				end
@@ -98,19 +71,19 @@ def go2current(hash_recipe, hash_mode, current_step, current_substep)
 			break
 		end
 	}
-	return hash_mode
+	return hash_mode, next_step, next_substep
 end
 
 def check_notification_FINISHED(hash_recipe, hash_mode, time)
-	hash_mode["notification"]["mode"].each{|key, value|
-		if value[0]  == "KEEP"
-			if time > value[1]
-				hash_mode["notification"]["mode"][key] = ["FINISHED", -1]
-				# notificationがaudioをもっていれば，それもFINISHEDにする．
-				if hash_recipe["notification"][key].key?("audio")
-					audio_id = hash_recipe["notification"][key]["audio"]
-					hash_mode["audio"]["mode"][audio_id] = ["FINISHED", -1]
-				end
+	hash_mode["notification"].each{|key, value|
+		if value["PLAY_MODE"]  == "PLAY"
+			if time > value["time"]
+				hash_mode["notification"][key]["PLAY_MODE"] = "---"
+				hash_mode["notification"][key]["time"] = -1
+				hash_recipe["notification"][key]["audio"].empty{|audio_id|
+					hash_mode["audio"][audio_id]["PLAY_MODE"] = "---"
+					hash_mode["audio"][audio_id]["time"] = -1
+				}
 			end
 		end
 	}
@@ -120,11 +93,11 @@ end
 def search_CURRENT(hash_recipe, hash_mode)
 	current_step = nil
 	current_substep = nil
-	hash_mode["step"]["mode"].each{|key, value|
-		if hash_mode["step"]["mode"][key][2] == "CURRENT"
+	hash_mode["step"].each{|key, value|
+		if hash_mode["step"][key]["CURRENT?"]
 			current_step = key
 			hash_recipe["step"][key]["substep"].each{|substep_id|
-				if hash_mode["substep"]["mode"][substep_id][2] == "CURRENT"
+				if hash_mode["substep"][substep_id]["CURRENT?"]
 					current_substep = substep_id
 					break
 				end
@@ -133,6 +106,104 @@ def search_CURRENT(hash_recipe, hash_mode)
 		end
 	}
 	return current_step, current_substep
+end
+
+def check_isFinished(hash_recipe, hash_mode, id)
+	media = ["audio", "video", "notification"]
+	if hash_recipe["step"].key?(id)
+		unless hash_mode["step"][id]["is_finished?"]
+			hash_mode["step"][id]["is_finished?"] = true
+			hash_recipe["step"][id]["substep"].each{|substep_id|
+				hash_mode["substep"][substep_id]["is_finished?"] = true
+				media.each{|media_name|
+					hash_recipe["substep"][substep_id][media_name].each{|media_id|
+						if hash_mode[media_name][media_id]["PLAY_MODE"] == "PLAY"
+							hash_mode[media_name][media_id]["PLAY_MODE"] = "STOP"
+						end
+					}
+				}
+			}
+			hash_recipe["step"][id]["parent"].each{|parent_id|
+				hash_mode = check_isFinished(hash_recipe, hash_mode, parent_id)
+			}
+		end
+	elsif hash_recipe["substep"].key?(id)
+		unless hash_mode["substep"][id]["is_finished?"]
+			parent_step = hash_recipe["substep"][id]["parent_step"]
+			hash_recipe["step"][parent_step]["substep"].each{|substep_id|
+				hash_mode["substep"][substep_id]["is_finished?"] = true
+				media.each{|media_name|
+					hash_recipe["substep"][substep_id][media_name].each{|media_id|
+						if hash_mode[media_name][media_id]["PLAY_MODE"] == "PLAY"
+							hash_mode[media_name][media_id]["PLAY_MODE"] = "STOP"
+						end
+					}
+				}
+				if substep_id == id
+					break
+				end
+			}
+			if hash_recipe["substep"][id]["next_substep"] == nil
+				hash_mode["step"][parent_step]["is_finished?"] = true
+				hash_recipe["step"][parent_step]["parent"].each{|parent_id|
+					hash_mode = check_isFinished(hash_recipe, hash_mode, parent_id)
+				}
+			end
+		end
+	end
+	return hash_mode
+end
+
+def uncheck_isFinished(hash_recipe, hash_mode, id)
+	media = ["audio", "video", "notification"]
+	if hash_recipe["step"].key?(id)
+		if hash_mode["step"][id]["is_finished?"]
+			hash_mode["step"][id]["is_finished?"] = false
+			hash_recipe["step"][id]["substep"].each{|substep_id|
+				hash_mode["substep"][substep_id]["is_finished?"] = false
+				media.each{|media_name|
+					hash_recipe["substep"][substep_id][media_name].each{|media_id|
+						hash_mode[media_name][media_id]["PLAY_MODE"] = "---"
+						hash_mode[media_name][media_id]["time"] = -1
+					}
+				}
+			}
+			hash_recipe["step"].each{|step_id, value|
+				hash_recipe["step"][step_id]["parent"].each{|parent_id|
+					if parent_id == id && hash_mode["step"][step_id]["is_finished?"]
+						hash_mode = uncheck_isFinished(hash_recipe, hash_mode, step_id)
+					end
+				}
+			}
+		end
+	elsif hash_recipe["substep"].key?(id)
+		if hash_mode["substep"][id]["is_finished?"]
+			parent_step = hash_recipe["substep"][id]["parent_step"]
+			hash_recipe["step"][parent_step]["substep"].reverse_each{|substep_id|
+				hash_mode["substep"][substep_id]["is_finished?"] = false
+				media.each{|media_name|
+					hash_recipe["substep"][substep_id][media_name].each{|media_id|
+						hash_mode[media_name][media_id]["PLAY_MODE"] = "---"
+						hash_mode[media_name][media_id]["time"] = -1
+					}
+				}
+				if substep_id == id
+					break
+				end
+			}
+			if hash_recipe["substep"][id]["next_substep"] == nil
+				hash_mode["step"][parent_step]["is_finished?"] = false
+				hash_recipe["step"].each{|step_id, value|
+					hash_recipe["step"][step_id]["parent"].each{|parent_id|
+						if parent_id == id && hash_mode["step"][step_id]["is_finished?"]
+							hash_mode = uncheck_isFinished(hash_recipe, hash_mode, step_id)
+						end
+					}
+				}
+			end
+		end
+	end
+	return hash_mode
 end
 
 def logger()
