@@ -78,11 +78,13 @@ class DefaultNavigator < NavigatorBase
 		# 現状でCURRENTなstep，substepに関しては何の処理もしない
 		# clicked_with_NAVI_MENUはCURRENT，NOT_CURRENTと同じ場所で管理する
 		if @hash_recipe["step"].key?(id)
-			# クリックされたstepがclicked_with_NAVI_MENUならばNOT_CURRENTに戻す．
-			if @hash_mode["step"][id]["open?"]
-				@hash_mode["step"][id]["open?"] = false
-			else
-				@hash_mode["step"][id]["open?"] = true
+			unless @hash_mode["step"][id]["CURRENT?"]
+				# クリックされたstepがclicked_with_NAVI_MENUならばNOT_CURRENTに戻す．
+				if @hash_mode["step"][id]["open?"]
+					@hash_mode["step"][id]["open?"] = false
+				else
+					@hash_mode["step"][id]["open?"] = true
+				end
 			end
 		elsif @hash_recipe["substep"].key?(id)
 			# substepがクリックされた場合のみ，detailDrawが変化するので，動画と音声を停止する．
