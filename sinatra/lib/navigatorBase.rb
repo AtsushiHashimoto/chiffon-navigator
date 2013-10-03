@@ -65,13 +65,13 @@ class NavigatorBase
 		elsif status == "success"
 			logger()
 			orders = {"status"=>status, "body"=>body}
-			p orders
 		else
 			p "internal error"
 			p "navigatorBase.rb: parameter 'status' is wrong."
 			logger()
 			orders = {"status"=>"internal error"}
 		end
+		p orders
 		return orders
 	rescue => e
 		p e.class
@@ -174,7 +174,6 @@ class NavigatorBase
 			@hash_recipe["step"].each{|step_id, value|
 				unless @hash_mode["step"][step_id]["is_finished?"]
 					@hash_mode["step"][current_step]["CURRENT?"] = false
-					@hash_mode["step"][current_step]["open?"] = false
 					@hash_mode["substep"][current_substep]["CURRENT?"] = false
 					@hash_mode["substep"].each{|substep_id, value|
 						if value["is_shown?"]
@@ -209,14 +208,13 @@ class NavigatorBase
 			@hash_recipe["step"].each{|step_id, value|
 				unless @hash_mode["step"][step_id]["is_finished?"]
 					@hash_mode["step"][current_step]["CURRENT?"] = false
-					@hash_mode["step"][current_step]["open?"] = false
 					@hash_mode["substep"][current_substep]["CURRENT?"] = false
 					@hash_mode["substep"].each{|substep_id, value|
 						if value["is_shown?"]
 							@hash_mode["substep"][substep_id]["is_shown?"] = false
 						end
 					}
-					@hash_mode, next_step, next_substep = go2next(@hash_recipe, @hash_mode)
+					@hash_mode, next_step, next_substep = go2next(@hash_recipe, @hash_mode, current_step)
 					@hash_mode = set_ABLEorOTHERS(@hash_recipe, @hash_mode, next_step, next_substep)
 					break
 				end

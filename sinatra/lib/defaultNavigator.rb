@@ -48,10 +48,28 @@ class DefaultNavigator < NavigatorBase
 	end
 
 	def external_input(jason_input)
-		p jason_input["operation_contents"]
 		body = []
+		# EXTERNALINPUTのチェック
+		e_input = nil
+		p jason_input["operation_contents"]
+		begin
+			e_input = JSON.load(jason_input["operation_contents"])
+		rescue
+			p "EXTERNAL_INPUT is wrong."
+			p "EXTERNAL_INPUT must be {\"navigator\":hoge,\"mode\":\"hogehoge\",...}"
+			logger()
+			return "invalid params", body
+		end
+		# inputのチェック
+		result, message = inputChecker_externalinput(@hash_recipe, @hash_mode, e_input)
+		unless result
+			p "EXTERNAL_INPUT is wrong."
+			p message
+			logger()
+			return "invalid params", body
+		end
 		# modeの修正
-		modeUpdate_externalinput(jason_input["time"]["sec"], jason_input["operation_contents"])
+		modeUpdate_externalinput(jason_input["time"]["sec"], e_input)
 
 		# DetailDraw：調理者がとったものに合わせたsubstepのidを提示
 		body.concat(detailDraw())
@@ -70,16 +88,56 @@ class DefaultNavigator < NavigatorBase
 		return "internal error", e
 	end
 
+	###########################################
+	##### EXTERNAL_INPUT時の入力のchecker #####
+	###########################################
+
+	def inputChecker_externalinput(hash_recipe, hash_mode, e_input)
+	unless e_input.key?("navigator") && e_input.key?("mode")
+		message =  "EXTERNAL_INPUT must have keys, 'navigator' and 'mode'."
+		return false, message
+	end
+	case e_input["mode"]
+	when "debug"
+		unless e_input.key?("action")
+			message = "When 'mode' is 'debug', EXTERNAL_INPUT must have key, 'action'."
+			return false, message
+		end
+		unless e_input["action"] == "next" || e_input["action"] = "jump"
+			message = "When 'mode' is 'debug', 'action' must have be 'next' or 'jump'."
+			return false, message
+		end
+		if e_input["action"] == "jump"
+			unless e_input.key?("destination")
+				message = "When 'action' is 'jump', EXTERNAL_INPUT must have key, 'destination'."
+				return false, message
+			end
+			substep_id = e_input["destination"]
+			unless hash_recipe["substep"].key?(substep_id)
+				message = "#{substep_id} : No such substep in recipe.xml"
+				return false, message
+			end
+			unless hash_mode["substep"][substep_id]["ABLE?"]
+				message = "Can not jump to #{substep_id}, because #{substep_id} is not ABLE."
+				return false, message
+			end
+		end
+	when "recognizer"
+		unless e_input.key?("tool") && e_input.key?("action")
+			message = "When 'mode' is 'recognizer', EXTERNAL_INPUT must have keys, 'tool' and 'action'."
+			return false, message
+		end
+	end
+	return true, ""
+end
+
 	##########################################################
 	##### modeのupdate処理が複雑な2メソッドのmodeUpdater #####
 	##########################################################
 
 	def modeUpdate_navimenu(time, id)
-		# 現状でCURRENTなstep，substepに関しては何の処理もしない
-		# clicked_with_NAVI_MENUはCURRENT，NOT_CURRENTと同じ場所で管理する
 		if @hash_recipe["step"].key?(id)
 			unless @hash_mode["step"][id]["CURRENT?"]
-				# クリックされたstepがclicked_with_NAVI_MENUならばNOT_CURRENTに戻す．
 				if @hash_mode["step"][id]["open?"]
 					@hash_mode["step"][id]["open?"] = false
 				else
@@ -109,169 +167,45 @@ class DefaultNavigator < NavigatorBase
 	end
 
 	# EXTERNAL_INPUTリクエストの場合のmodeアップデート
-	def modeUpdate_externalinput(time, id)
-		# 優先度順に，入力されたオブジェクトをトリガーとするsubstepを探索．
-		current_substep = nil
-		@hash_recipe["sorted_step"].each{|v|
-			flag = -1
-			# ABLEなstepの中のNOT_YETなsubstepから探索．（現状でCURRENTなsubstepも探索対象．一旦オブジェクトを置いてまたやり始めただけかもしれない．）
-			if @hash_mode["step"][v[1]]["ABLE?"]
-				@hash_recipe["step"][v[1]]["substep"].each{|substep_id|
-					unless @hash_mode["substep"][substep_id]["is_finished?"]
-						if @hash_recipe["substep"][substep_id].key?("trigger")
-							@hash_recipe["substep"][substep_id]["trigger"].each{|v|
-								if v[1] == id
-									current_substep = substep_id
-									flag = 1
-									break # trigger探索からのbreak
-								end
-							}
-						end
-					end
-					if flag == 1
-						break # substep探索からのbreak
-					end
-				}
-			elsif !@hash_mode["step"][v[1]]["is_finished?"] && @hash_mode["step"][v[1]]["CURRENT?"] # ABLEでなくても，navi_menu等でCURRENTなstepも探索対象
-				@hash_recipe["step"][v[1]]["substep"].each{|substep_id|
-					unless @hash_mode["substep"][substep_id]["is_finished?"]
-						if @hash_recipe["substep"][substep_id].key?("trigger")
-							@hash_recipe["substep"][substep_id]["trigger"].each{|v|
-								if v[1] == id
-									current_substep = substep_id
-									flag = 1
-									break
-								end
-							}
-						end
-					end
-					if flag == 1
-						break
-					end
-				}
-			end
-			if flag == 1
-				break # step探索からのbreak
-			end
-		}
-		previous_substep = nil
-		if current_substep == nil
-			@hash_mode["substep"].each{|key, value|
-				if value["CURRENT?"]
-					previous_substep = key
-					break
+	def modeUpdate_externalinput(time, e_input)
+		next_step = nil
+		next_substep = nil
+		case e_input["mode"]
+		when "debug"
+			current_step, current_substep = search_CURRENT(@hash_recipe, @hash_mode)
+			@hash_mode["substep"][current_substep]["CURRENT?"] = false
+			@hash_mode["substep"][current_substep]["is_finished?"] = true
+			@hash_mode["substep"].each{|substep_id, value|
+				if value["is_shown?"]
+					@hash_mode["substep"][substep_id]["is_shown?"] = false
 				end
 			}
-			if @hash_mode["substep"][previous_substep]["ABLE?"]
-				unless @hash_recipe["substep"][previous_substep]["next_substep"] == nil
-					current_substep = @hash_recipe["substep"][previous_substep]["next_substep"]
-				else
-					parent_id = @hash_recipe["substep"][previous_substep]["parent_step"]
-					@hash_recipe["sorted_step"].each{|v|
-						if v[1] != parent_id && @hash_mode["step"][v[1]]["ABLE?"]
-							@hash_recipe["step"][v[1]]["substep"].each{|substep_id|
-								unless @hash_mode["substep"][substep_id]["is_finished?"]
-									current_substep = substep_id
-									break
-								end
-							}
-							break
-						end
-					}
-				end
-			else
-				@hash_recipe["sorted_step"].each{|v|
-					if @hash_mode["step"][v[1]]["ABLE?"]
-						@hash_recipe["step"][v[1]]["substep"].each{|substep_id|
-							unless @hash_mode["substep"][substep_id]["is_finished?"]
-								current_substep = substep_id
-								break
-							end
-						}
-						break
-					end
-				}
+			@hash_mode["step"][current_step]["CURRENT?"] = false
+			@hash_mode["step"][current_step]["open?"] = false
+			if @hash_recipe["substep"][current_substep]["next_substep"] == nil
+				@hash_mode["step"][current_step]["is_finished?"] = true
 			end
+			# e_input[action] = NEXTならば，CURRENTなsubstepをis_finishedにして，あれば次のsubstepをCURRENTにする．
+			if e_input["action"] == "next"
+				@hash_mode, next_step, next_substep = go2next(@hash_recipe, @hash_mode, current_step)
+			elsif e_input["action"] == "jump"
+				next_substep = e_input["destination"]
+				next_step = @hash_recipe["substep"][next_substep]["parent_step"]
+				@hash_mode = jump2substep(@hash_recipe, @hash_mode, next_step, next_substep)
+			end
+		when "recognizer"
 		end
-		if current_substep == nil
-			previous_substep = nil
-			parent_step = nil
-			# 全てのsubstepが終了下と考えられる．
-			@hash_mode["substep"].each{|key, value|
-				if value["CURRENT?"]
-					previous_substep = key
-					@hash_mode["substep"][previous_substep]["is_finished?"] = true
-					parent_step = @hash_recipe["substep"][previous_substep]["parent_step"]
-					@hash_mode["step"][parent_step]["is_finished?"] = true
-					break
-				end
-			}
-			media = ["audio", "video", "notification"]
-			media.each{|v|
-				@hash_recipe["substep"][previous_substep][v].each{|media_id|
-					if @hash_mode[v][media_id]["PLAY_MODE"] == "PLAY"
-						@hash_mode[v][media_id]["PLAY_MODE"] = "STOP"
-					end
-				}
-			}
-			@hash_mode = set_ABLEorOTHERS(@hash_recipe, @hash_mode, parent_step, previous_substep)
-
-		else
-			# 現状でCURRENTなsubstepをNOT_CURRENTかつis_finishedに．
-			previous_substep = nil
-			@hash_mode["substep"].each{|key, value|
-				if value["CURRENT?"]
-					previous_substep = key
-					if previous_substep != current_substep
-						@hash_mode["substep"][previous_substep]["CURRENT?"] = false
-						@hash_mode["substep"][previous_substep]["is_finished?"] = true
-						@hash_mode["substep"].each{|substep_id, value|
-							if value["is_shown?"]
-								@hash_mode["substep"][substep_id]["is_shown?"] = false
-							end
-						}
-						# previous_substepのメディアはSTOPする．
-						media = ["audio", "video"]
-						media.each{|v|
-							@hash_recipe["substep"][previous_substep][v].each{|media_id|
-								@hash_mode[v][media_id]["PLAY_MODE"] = "STOP"
-							}
-						}
-						# 親ノードもNOT_CURRENTにする．かつ，上記のsubstepがstep内で最後のsubstepであれば，stepをis_finishedにする．
-						parent_step = @hash_recipe["substep"][previous_substep]["parent_step"]
-						@hash_mode["step"][parent_step]["CURRENT?"] = false
-						@hash_mode["step"][parent_step]["open?"] = false
-						if @hash_recipe["substep"][previous_substep]["next_substep"] == nil
-							@hash_mode["step"][parent_step]["is_finished?"] = true
-						end
-					end
-					break
-				end
-			}
-			# 次にCURRENTとなるsubstepをCURRENTに．
-			@hash_mode["substep"][current_substep]["CURRENT?"] = true
-			@hash_mode["substep"][current_substep]["is_shown?"] = true
-			current_step = @hash_recipe["substep"][current_substep]["parent_step"]
-			@hash_mode["step"][current_step]["CURRENT?"] = true
-			@hash_mode["step"][current_step]["open?"] = true
-			media = ["audio", "video", "notification"]
-			media.each{|v|
-				@hash_recipe["substep"][current_substep][v].each{|media_id|
-					@hash_mode[v][media_id]["PLAY_MODE"] = "START"
-				}
-			}
-			# stepとsubstepを適切にABLEに．
-			@hash_mode = set_ABLEorOTHERS(@hash_recipe, @hash_mode, current_step, current_substep)
-			# notificationが再生済みかどうかは，隙あらば調べましょう
-			@hash_mode = check_notification_FINISHED(@hash_recipe, @hash_mode, time)
-		end
+		p next_step
+		p next_substep
+		@hash_mode = set_ABLEorOTHERS(@hash_recipe, @hash_mode, next_step, next_substep)
+		@hash_mode = check_notification_FINISHED(@hash_recipe, @hash_mode, time)
 	end
 
-	#################################################################
+	###################################################
 	##### NAVI_MENU用の特別なnaviDrawを再定義する #####
-	#################################################################
+	###################################################
 
-	# ナビ画面の表示を決定するNaviDraw命令．
+		# ナビ画面の表示を決定するNaviDraw命令．
 	def naviDraw
 		# sorted_stepの順に表示させる．
 		orders = []
