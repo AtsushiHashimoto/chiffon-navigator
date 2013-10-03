@@ -191,11 +191,11 @@ def uncheck_isFinished(hash_recipe, hash_mode, id)
 					break
 				end
 			}
-			if hash_recipe["substep"][id]["next_substep"] == nil
+			if hash_recipe["step"][parent_step]["is_finished?"]
 				hash_mode["step"][parent_step]["is_finished?"] = false
 				hash_recipe["step"].each{|step_id, value|
 					hash_recipe["step"][step_id]["parent"].each{|parent_id|
-						if parent_id == id && hash_mode["step"][step_id]["is_finished?"]
+						if parent_id == parent_step && hash_mode["step"][step_id]["is_finished?"]
 							hash_mode = uncheck_isFinished(hash_recipe, hash_mode, step_id)
 						end
 					}
