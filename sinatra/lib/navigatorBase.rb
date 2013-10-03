@@ -358,10 +358,18 @@ class NavigatorBase
 		orders = []
 		@hash_mode["substep"].each{|substep_id, value|
 			if value["is_shown?"]
-				orders.push({"DetailDraw"=>{"id"=>substep_id}})
+				@hash_mode["substep"].each{|substep_id_2, value_2|
+					unless value_2["is_finished?"]
+						orders.push({"DetailDraw"=>{"id"=>substep_id}})
+						break
+					end
+				}
 				break
 			end
 		}
+		if orders.empty?
+			orders.push({"DetailDraw"=>{}})
+		end
 		return orders
 	end
 
