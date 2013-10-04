@@ -175,11 +175,6 @@ class NavigatorBase
 				unless @hash_mode["step"][step_id]["is_finished?"]
 					@hash_mode["step"][current_step]["CURRENT?"] = false
 					@hash_mode["substep"][current_substep]["CURRENT?"] = false
-					@hash_mode["substep"].each{|substep_id, value|
-						if value["is_shown?"]
-							@hash_mode["substep"][substep_id]["is_shown?"] = false
-						end
-					}
 					@hash_mode, next_step, next_substep = go2next(@hash_recipe, @hash_mode)
 					@hash_mode = set_ABLEorOTHERS(@hash_recipe, @hash_mode, next_step, next_substep)
 					break
@@ -209,11 +204,6 @@ class NavigatorBase
 				unless @hash_mode["step"][step_id]["is_finished?"]
 					@hash_mode["step"][current_step]["CURRENT?"] = false
 					@hash_mode["substep"][current_substep]["CURRENT?"] = false
-					@hash_mode["substep"].each{|substep_id, value|
-						if value["is_shown?"]
-							@hash_mode["substep"][substep_id]["is_shown?"] = false
-						end
-					}
 					@hash_mode, next_step, next_substep = go2next(@hash_recipe, @hash_mode, current_step)
 					@hash_mode = set_ABLEorOTHERS(@hash_recipe, @hash_mode, next_step, next_substep)
 					break
@@ -354,14 +344,10 @@ class NavigatorBase
 	# CURRENTなsubstepのhtml_contentsを表示させるDetailDraw命令．
 	def detailDraw
 		orders = []
+		shown_substep = @hash_mode["shown"]
 		@hash_mode["substep"].each{|substep_id, value|
-			if value["is_shown?"]
-				@hash_mode["substep"].each{|substep_id_2, value_2|
-					unless value_2["is_finished?"]
-						orders.push({"DetailDraw"=>{"id"=>substep_id}})
-						break
-					end
-				}
+			unless value["is_finished?"]
+				orders.push({"DetailDraw"=>{"id"=>shown_substep}})
 				break
 			end
 		}

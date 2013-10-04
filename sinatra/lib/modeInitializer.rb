@@ -16,7 +16,6 @@ def initialize_mode(hash_recipe)
 			hash_mode["substep"][substep_id]["ABLE?"] = false
 			hash_mode["substep"][substep_id]["is_finished?"] = false
 			hash_mode["substep"][substep_id]["CURRENT?"] = false
-			hash_mode["substep"][substep_id]["is_shown?"] = false
 		}
 	end
 	if hash_recipe.key?("audio")
@@ -39,8 +38,10 @@ def initialize_mode(hash_recipe)
 	end
 	# 表示されている画面の管理のために（START時はOVERVIEW）
 	hash_mode["display"] = "OVERVIEW"
+	# DetailDrawで指定されるsubstepの管理
+	hash_mode["shown"] = nil
 	# EXTERNAL_INPUTで入力された，Takenされている物体リスト（サイズは最大２）
-	hash_mode["Taken"] = []
+	hash_mode["taken"] = []
 
 	# hahs_modeにおける各要素の初期設定
 	# 優先度の最も高いstepをCURRENTとし，その一番目のsubstepもCURRENTにする．
@@ -49,7 +50,7 @@ def initialize_mode(hash_recipe)
 	hash_mode["step"][current_step]["CURRENT?"] = true
 	hash_mode["step"][current_step]["open?"] = true
 	hash_mode["substep"][current_substep]["CURRENT?"] = true
-	hash_mode["substep"][current_substep]["is_shown?"] = true
+	hash_mode["shown"] = current_substep
 	# stepとsubstepを適切にABLEにする．
 	hash_mode = set_ABLEorOTHERS(hash_recipe, hash_mode, current_step, current_substep)
 	if hash_mode["substep"][current_substep]["ABLE?"]

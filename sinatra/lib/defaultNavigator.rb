@@ -104,7 +104,7 @@ class DefaultNavigator < NavigatorBase
 			return false, message
 		end
 		unless e_input["action"] == "next" || e_input["action"] = "jump"
-			message = "When 'mode' is 'debug', 'action' must have be 'next' or 'jump'."
+			message = "When 'mode' is 'debug', 'action' must be 'next' or 'jump'."
 			return false, message
 		end
 		if e_input["action"] == "jump"
@@ -127,9 +127,52 @@ class DefaultNavigator < NavigatorBase
 			message = "When 'mode' is 'recognizer', EXTERNAL_INPUT must have keys, 'tool' and 'action'."
 			return false, message
 		end
+		unless e_input["action"] == "taken" || e_input["action"] == "put"
+			message = "When 'mode' is 'recognizer', 'action' must be 'taken' or 'put'."
+			return false, message
+		end
+		if e_input["action"] == "taken" && hash_mode["taken"].size > 1
+			message = "System user may not be able to take more than 2 tool."
+			return false, message
+		end
+		if e_input["action"] == "taken" && (hash_recipe["object"].value?(e_input["tool"]) || hash_recipe["event"].value?(e_input["tool"]))
+			message = "#{e_input["tool"]} : No such tool in recipe."
+			return false, message
+		end
+		if e_input["action"] == "put" && !hash_mode["taken"].include?(e_input["tool"])
+			message = "#{e_input["tool"]} : System user does not take such tool."
+			return false, message
+		end
 	end
 	return true, ""
 end
+
+	#####################################################
+	##### EXTERNAL_INPUT時の，次のsubstepを探索する #####
+	#####################################################
+
+	def searchNextSubstep(hash_recipe, hash_mode)
+		hash_recipe["substep"].each{|substep_id, value|
+			if hash_mode["substep"][substep_id]["ABLE?"]
+				value["trigger"].each{|value2|
+					flag = -1
+					array_trigger = value2[1]
+					array_trigger.each{|ref|
+						if hash_mode["taken"].include?(ref)
+							flag = 1
+						else
+							flag = 0
+							break
+						end
+					}
+					if flag == 1
+						return substep_id
+					end
+				}
+			end
+		}
+		return nil
+	end
 
 	##########################################################
 	##### modeのupdate処理が複雑な2メソッドのmodeUpdater #####
@@ -146,23 +189,18 @@ end
 			end
 		elsif @hash_recipe["substep"].key?(id)
 			# substepがクリックされた場合のみ，detailDrawが変化するので，動画と音声を停止する．
-			@hash_mode["substep"].each{|substep_id, value|
-				if value["is_shown?"]
-					# substepに含まれるaudio，videoは再生済み・再生中・再生待ち関わらずSTOPに．
-					media = ["audio", "video"]
-					media.each{|media_name|
-						@hash_recipe["substep"][substep_id][media_name].each{|media_id|
-							if @hash_mode[media_name][media_id]["PLAY_MODE"] == "PLAY"
-								@hash_mode[media_name][media_id]["PLAY_MODE"] = "STOP"
-							end
-						}
-					}
-					@hash_mode["substep"][substep_id]["is_shown?"] = false
-					break
-				end
+			shown_substep = @hash_mode["shown"]
+			# substepに含まれるaudio，videoは再生済み・再生中・再生待ち関わらずSTOPに．
+			media = ["audio", "video"]
+			media.each{|media_name|
+				@hash_recipe["substep"][shown_substep][media_name].each{|media_id|
+					if @hash_mode[media_name][media_id]["PLAY_MODE"] == "PLAY"
+						@hash_mode[media_name][media_id]["PLAY_MODE"] = "STOP"
+					end
+				}
 			}
-			# クリックされたsubstepをclicked_with_NAVI_MENUにする
-			@hash_mode["substep"][id]["is_shown?"] = true
+			# クリックされたsubstepをshownにする
+			@hash_mode["shown"] = id
 		end
 	end
 
@@ -174,18 +212,8 @@ end
 		when "debug"
 			current_step, current_substep = search_CURRENT(@hash_recipe, @hash_mode)
 			@hash_mode["substep"][current_substep]["CURRENT?"] = false
-			@hash_mode["substep"][current_substep]["is_finished?"] = true
-			@hash_mode["substep"].each{|substep_id, value|
-				if value["is_shown?"]
-					@hash_mode["substep"][substep_id]["is_shown?"] = false
-				end
-			}
 			@hash_mode["step"][current_step]["CURRENT?"] = false
-			@hash_mode["step"][current_step]["open?"] = false
-			if @hash_recipe["substep"][current_substep]["next_substep"] == nil
-				@hash_mode["step"][current_step]["is_finished?"] = true
-			end
-			# e_input[action] = NEXTならば，CURRENTなsubstepをis_finishedにして，あれば次のsubstepをCURRENTにする．
+			@hash_mode = check_isFinished(@hash_recipe, @hash_mode, current_substep)
 			if e_input["action"] == "next"
 				@hash_mode, next_step, next_substep = go2next(@hash_recipe, @hash_mode, current_step)
 			elsif e_input["action"] == "jump"
@@ -194,10 +222,30 @@ end
 				@hash_mode = jump2substep(@hash_recipe, @hash_mode, next_step, next_substep)
 			end
 		when "recognizer"
+			if e_input["action"] == "put"
+				@hash_mode["taken"].delete_if{|x| x == e_input["tool"]}
+			elsif e_input["action"] == "taken"
+				@hash_mode["taken"].push(e_input["tool"])
+			end
+
+			next_substep = searchNextSubstep(@hash_recipe, @hash_mode)
+			current_step, current_substep = search_CURRENT(@hash_recipe, @hash_mode)
+			if current_substep == next_substep
+				next_substep = nil
+			end
+			unless next_substep == nil
+				next_step = @hash_recipe["substep"][next_substep]["parent_step"]
+				@hash_mode["step"][current_step]["CURRENT?"] = false
+				@hash_mode["substep"][current_substep]["CURRENT?"] = false
+				@hash_mode = check_isFinished(@hash_recipe, @hash_mode, current_substep)
+				@hash_mode = jump2substep(@hash_recipe, @hash_mode, next_step, next_substep)
+			end
 		end
 		p next_step
 		p next_substep
-		@hash_mode = set_ABLEorOTHERS(@hash_recipe, @hash_mode, next_step, next_substep)
+		if next_step != nil && next_substep != nil
+			@hash_mode = set_ABLEorOTHERS(@hash_recipe, @hash_mode, next_step, next_substep)
+		end
 		@hash_mode = check_notification_FINISHED(@hash_recipe, @hash_mode, time)
 	end
 
