@@ -30,7 +30,7 @@ class DefaultNavigator < NavigatorBase
 			return "invalid params", body
 		end
 		# modeの修正
-		modeUpdate_navimenu(jason_input["time"]["sec"], id)
+		modeUpdate_navimenu(jason_input["time"]["sec"], id, session_id)
 
 		@hash_body[session_id].each{|key, value|
 			if key == "DetailDraw" || key == "Cancel" || key == "NaviDraw"
@@ -68,7 +68,7 @@ class DefaultNavigator < NavigatorBase
 			return "invalid params", body
 		end
 		# modeの修正
-		modeUpdate_externalinput(jason_input["time"]["sec"], e_input)
+		modeUpdate_externalinput(jason_input["time"]["sec"], e_input, session_id)
 
 		@hash_body[session_id].each{|key, value|
 			if key == "ChannelSwitch"
@@ -89,26 +89,24 @@ class DefaultNavigator < NavigatorBase
 	###########################################
 
 	def inputChecker_externalinput(hash_recipe, hash_mode, e_input)
-	unless e_input.key?("navigator") && e_input.key?("mode")
-		message =  "EXTERNAL_INPUT must have keys, 'navigator' and 'mode'."
+	unless e_input.key?("navigator") && e_input.key?("mode") && e_input.key?("action")
+		message =  "EXTERNAL_INPUT must have keys, 'navigator', 'mode' and 'action'."
+		return false, message
+	end
+	unless e_input["action"].key?("name")
+		message = "EXTERNAL_INPUT must have keys, 'action':{'name':...}."
 		return false, message
 	end
 	case e_input["mode"]
-	when "debug"
-		unless e_input.key?("action")
-			message = "When 'mode' is 'debug', EXTERNAL_INPUT must have key, 'action'."
-			return false, message
-		end
-		unless e_input["action"] == "next" || e_input["action"] = "jump"
-			message = "When 'mode' is 'debug', 'action' must be 'next' or 'jump'."
-			return false, message
-		end
-		if e_input["action"] == "jump"
-			unless e_input.key?("destination")
-				message = "When 'action' is 'jump', EXTERNAL_INPUT must have key, 'destination'."
+	when "order"
+		case e_input["action"]["name"]
+		when "next"
+		when "jump"
+			unless e_input["action"].key?("destination")
+				message = "When 'action':'name' is 'jump', EXTERNAL_INPUT must have key, 'destination'."
 				return false, message
 			end
-			substep_id = e_input["destination"]
+			substep_id = e_input["action"]["destination"]
 			unless hash_recipe["substep"].key?(substep_id)
 				message = "#{substep_id} : No such substep in recipe.xml"
 				return false, message
@@ -117,28 +115,41 @@ class DefaultNavigator < NavigatorBase
 				message = "Can not jump to #{substep_id}, because #{substep_id} is not ABLE."
 				return false, message
 			end
+		else
+			message = "#{e_input["action"]["name"]}: no such 'action' in 'mode' 'order'."
+			return false, message
 		end
 	when "recognizer"
-		unless e_input.key?("tool") && e_input.key?("action")
-			message = "When 'mode' is 'recognizer', EXTERNAL_INPUT must have keys, 'tool' and 'action'."
+		case e_input["action"]["name"]
+		when "put"
+			unless e_input["action"].key?("tool")
+				message = "When 'mode' is 'recognizer', EXTERNAL_INPUT must have keys, 'tool'."
+				return false, message
+			end
+			unless hash_mode["taken"].include?(e_input["action"]["tool"])
+				message = "#{e_input["action"]["tool"]} : System user does not take such tool."
+				return false, message
+			end
+		when "taken"
+			unless e_input["action"].key?("tool")
+				message = "When 'mode' is 'recognizer', EXTERNAL_INPUT must have keys, 'tool'."
+				return false, message
+			end
+			if hash_mode["taken"].size > 1
+				message = "System user may not be able to take more than 2 tool."
+				return false, message
+			end
+			unless hash_recipe["object"].key?(e_input["action"]["tool"]) || hash_recipe["event"].key?(e_input["action"]["tool"])
+				message = "#{e_input["action"]["tool"]} : No such tool in recipe."
+				return false, message
+			end
+		else
+			message = "#{e_input["action"]["name"]}: no such 'action' in 'mode' 'recognizer'"
 			return false, message
 		end
-		unless e_input["action"] == "taken" || e_input["action"] == "put"
-			message = "When 'mode' is 'recognizer', 'action' must be 'taken' or 'put'."
-			return false, message
-		end
-		if e_input["action"] == "taken" && hash_mode["taken"].size > 1
-			message = "System user may not be able to take more than 2 tool."
-			return false, message
-		end
-		if e_input["action"] == "taken" && (hash_recipe["object"].value?(e_input["tool"]) || hash_recipe["event"].value?(e_input["tool"]))
-			message = "#{e_input["tool"]} : No such tool in recipe."
-			return false, message
-		end
-		if e_input["action"] == "put" && !hash_mode["taken"].include?(e_input["tool"])
-			message = "#{e_input["tool"]} : System user does not take such tool."
-			return false, message
-		end
+	else
+		message = "#{e_input["mode"]}: no such 'mode'"
+		return false, message
 	end
 	return true, ""
 end
@@ -174,7 +185,7 @@ end
 	##### modeのupdate処理が複雑な2メソッドのmodeUpdater #####
 	##########################################################
 
-	def modeUpdate_navimenu(time, id)
+	def modeUpdate_navimenu(time, id, session_id)
 		if @hash_recipe[session_id]["step"].key?(id)
 			unless @hash_mode[session_id]["step"][id]["CURRENT?"]
 				if @hash_mode[session_id]["step"][id]["open?"]
@@ -201,27 +212,27 @@ end
 	end
 
 	# EXTERNAL_INPUTリクエストの場合のmodeアップデート
-	def modeUpdate_externalinput(time, e_input)
+	def modeUpdate_externalinput(time, e_input, session_id)
 		next_step = nil
 		next_substep = nil
 		case e_input["mode"]
-		when "debug"
+		when "order"
 			current_step, current_substep = search_CURRENT(@hash_recipe[session_id], @hash_mode[session_id])
 			@hash_mode[session_id]["substep"][current_substep]["CURRENT?"] = false
 			@hash_mode[session_id]["step"][current_step]["CURRENT?"] = false
 			@hash_mode[session_id] = check_isFinished(@hash_recipe[session_id], @hash_mode[session_id], current_substep)
-			if e_input["action"] == "next"
+			if e_input["action"]["name"] == "next"
 				@hash_mode[session_id], next_step, next_substep = go2next(@hash_recipe[session_id], @hash_mode[session_id], current_step)
-			elsif e_input["action"] == "jump"
-				next_substep = e_input["destination"]
+			elsif e_input["action"]["name"] == "jump"
+				next_substep = e_input["action"]["destination"]
 				next_step = @hash_recipe[session_id]["substep"][next_substep]["parent_step"]
 				@hash_mode[session_id] = jump2substep(@hash_recipe[session_id], @hash_mode[session_id], next_step, next_substep)
 			end
 		when "recognizer"
-			if e_input["action"] == "put"
-				@hash_mode[session_id]["taken"].delete_if{|x| x == e_input["tool"]}
-			elsif e_input["action"] == "taken"
-				@hash_mode[session_id]["taken"].push(e_input["tool"])
+			if e_input["action"]["name"] == "put"
+				@hash_mode[session_id]["taken"].delete_if{|x| x == e_input["action"]["tool"]}
+			elsif e_input["action"]["name"] == "taken"
+				@hash_mode[session_id]["taken"].push(e_input["action"]["tool"])
 			end
 
 			next_substep = searchNextSubstep(@hash_recipe[session_id], @hash_mode[session_id])
@@ -237,8 +248,6 @@ end
 				@hash_mode[session_id] = jump2substep(@hash_recipe[session_id], @hash_mode[session_id], next_step, next_substep)
 			end
 		end
-		p next_step
-		p next_substep
 		if next_step != nil && next_substep != nil
 			@hash_mode[session_id] = set_ABLEorOTHERS(@hash_recipe[session_id], @hash_mode[session_id], next_step, next_substep)
 		end
