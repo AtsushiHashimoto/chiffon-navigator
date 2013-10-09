@@ -260,14 +260,14 @@ def unlock(fo)
 end
 
 def inputHashMode(session_id)
-	open("records/#{session_id}/#{session_id}_mode.txt", "r"){|io|
+	open("records/#{session_id}/mode.txt", "r"){|io|
 		hash_mode = JSON.load(io)
 	}
 	return hash_mode
 end
 
 def outputHashMode(session_id, hash_mode)
-	open("records/#{session_id}/#{session_id}_mode.txt", "w"){|io|
+	open("records/#{session_id}/mode.txt", "w"){|io|
 		io.puts(JSON.pretty_generate(hash_mode))
 	}
 end

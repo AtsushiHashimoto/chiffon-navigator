@@ -219,16 +219,16 @@ class NavigatorBase
 			return "internal error in 'system'", body
 		end
 		fo = lock(session_id)
-		unless system("touch records/#{session_id}/#{session_id}.log")
+		unless system("touch records/#{session_id}/log.txt")
 			return "internal error in 'system'", body, fo
 		end
-		unless system("touch records/#{session_id}/#{session_id}_recipe.xml")
+		unless system("touch records/#{session_id}/recipe.xml")
 			return "internal error in 'system'", body, fo
 		end
 		open("records/#{session_id}/temp.xml", "w"){|io|
 			io.puts(jason_input["operation_contents"])
 		}
-		unless system("cat records/#{session_id}/temp.xml | tr -d '\r' | tr -d '\n'  | tr -d '\t' > records/#{session_id}/#{session_id}_recipe.xml")
+		unless system("cat records/#{session_id}/temp.xml | tr -d '\r' | tr -d '\n'  | tr -d '\t' > records/#{session_id}/recipe.xml")
 			return "internal error in 'system'", body, fo
 		end
 		unless system("rm records/#{session_id}/temp.xml")
@@ -236,7 +236,7 @@ class NavigatorBase
 		end
 
 		# recipe.xmlをパースし，hash_recipeに格納する
-		@hash_recipe[session_id] = parse_xml("records/#{session_id}/#{session_id}_recipe.xml")
+		@hash_recipe[session_id] = parse_xml("records/#{session_id}/recipe.xml")
 
 		# stepやmediaの管理をするhahs_modeの作成及び初期設定
 		@hash_mode[session_id] = initialize_mode(@hash_recipe[session_id])
@@ -252,7 +252,7 @@ class NavigatorBase
 		}
 		body = bodyMaker(@hash_mode[session_id], @hash_body[session_id], jason_input["time"]["sec"], session_id)
 
-		open("records/#{session_id}/#{session_id}_recipe.txt", "w"){|io|
+		open("records/#{session_id}/recipe.txt", "w"){|io|
 			io.puts(JSON.pretty_generate(@hash_recipe[session_id]))
 		}
 		return "success", body, fo
