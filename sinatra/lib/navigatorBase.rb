@@ -11,12 +11,16 @@ class NavigatorBase
 	def initialize
 		@hash_recipe = Hash.new{|h,k| h[k]=Hash.new(&h.default_proc)}
 		@hash_mode = Hash.new{|h,k| h[k]=Hash.new(&h.default_proc)}
+		@hash_body = Hash.new{|h,k| h[k]=Hash.new(&h.default_proc)}
+		@body_parts = {"DetailDraw"=>false,"Play"=>false,"Notify"=>false,"Cancel"=>false,"ChannelSwitch"=>false,"NaviDraw"=>false}
 	end
 
 	def counsel(jason_input)
 		status = nil
 		body = []
 		orders = {}
+		session_id = jason_input["session_id"]
+		fo = nil
 
 		if jason_input["situation"] == nil || jason_input["situation"] == ""
 			p "invalid params : jason_input['situation'] is wrong."
@@ -25,19 +29,25 @@ class NavigatorBase
 		else
 			case jason_input["situation"]
 			when "NAVI_MENU"
-				status, body = navi_menu(jason_input)
+				fo = lock(session_id)
+				status, body = navi_menu(jason_input, session_id)
 			when "EXTERNAL_INPUT"
-				status, body = external_input(jason_input)
+				fo = lock(session_id)
+				status, body = external_input(jason_input, session_id)
 			when "CHANNEL"
-				status, body = channel(jason_input)
+				fo = lock(session_id)
+				status, body = channel(jason_input, session_id)
 			when "CHECK"
-				status, body = check(jason_input)
+				fo = lock(session_id)
+				status, body = check(jason_input, session_id)
 			when "START"
-				status, body = start(jason_input)
+				status, body, fo = start(jason_input, session_id)
 			when "END"
-				status, body = finish(jason_input)
+				fo = lock(session_id)
+				status, body = finish(jason_input, session_id)
 			when "PLAY_CONTROL"
-				status, body = play_control(jason_input)
+				fo = lock(session_id)
+				status, body = play_control(jason_input, session_id)
 			else
 				p "invalid params : jason_input['situation'] is wrong."
 				logger()
@@ -45,10 +55,7 @@ class NavigatorBase
 			end
 		end
 
-		session_id = jason_input["session_id"]
-		open("records/#{session_id}/#{session_id}_mode.txt", "w"){|io|
-			io.puts(JSON.pretty_generate(@hash_mode))
-		}
+		outputHashMode(session_id, @hash_mode[session_id])
 
 		if status == "internal error"
 			p body.class
@@ -59,7 +66,7 @@ class NavigatorBase
 		elsif status == "internal error in 'system'"
 			p "Cannot make some directory and files"
 			logger()
-			return {"status"=>"internal error"}
+			orders = {"status"=>"internal error"}
 		elsif status == "invalid params"
 			orders = {"status"=>status}
 		elsif status == "success"
@@ -71,13 +78,14 @@ class NavigatorBase
 			logger()
 			orders = {"status"=>"internal error"}
 		end
-		p orders
+		unlock(fo)
 		return orders
 	rescue => e
 		p e.class
 		p e.message
 		p e.backtrace
 		logger()
+		unlock(fo)
 		return {"status"=>"internal error"}
 	end
 
@@ -88,10 +96,10 @@ class NavigatorBase
 	##### 動作が決まっている5メソッド                #####
 	######################################################
 
-	def channel(jason_input)
+	def channel(jason_input, session_id)
 		body = []
-		if @hash_mode["display"] == jason_input["operation_contents"]
-			p "invalid params : #{@hash_mode["display"]} is displayed now. You try to display same one."
+		if @hash_mode[session_id]["display"] == jason_input["operation_contents"]
+			p "invalid params : #{@hash_mode[session_id]["display"]} is displayed now. You try to display same one."
 			logger()
 			return "invalid params", body
 		end
@@ -99,213 +107,193 @@ class NavigatorBase
 		case jason_input["operation_contents"]
 		when "GUIDE"
 			# notificationが再生済みかチェック．
-			@hash_mode = check_notification_FINISHED(@hash_recipe, @hash_mode, jason_input["time"]["sec"])
+			@hash_mode[session_id] = check_notification_FINISHED(@hash_recipe[session_id], @hash_mode[session_id], jason_input["time"]["sec"])
 			# チャンネルの切り替え
-			@hash_mode["display"] = jason_input["operation_contents"]
-
-			# DetailDraw：modeUpdateしないので，最近送ったオーダーと同じDetailDrawを送ることになる．
-			parts = detailDraw
-			body.concat(parts)
-			# Play：STARTからoverviewを経てguideに移る場合，メディアの再生が必要かもしれない．
-			parts = play(jason_input["time"]["sec"])
-			body.concat(parts)
-			# Notify：STARTからoverviewを経てguideに移る場合，メディアの再生が必要かもしれない．
-			parts = notify(jason_input["time"]["sec"])
-			body.concat(parts)
-			# Cancel：不要．再生待ちコンテンツは存在しない．
-			# ChannelSwitch：GUIDEを指定
-			body.push({"ChannelSwitch"=>{"channel"=>"GUIDE"}})
-			# NaviDraw：直近のナビ画面と同じものを返すことになる．
-			parts = naviDraw
-			body.concat(parts)
+			@hash_mode[session_id]["display"] = jason_input["operation_contents"]
+			@hash_body[session_id].each{|key,value|
+				@hash_body[session_id][key] = true
+			}
 		when "MATERIALS", "OVERVIEW"
 			# modeの修正
 			media = ["audio", "video"]
 			media.each{|media_name|
-				@hash_mode[media_name].each{|media_id, value|
+				@hash_mode[session_id][media_name].each{|media_id, value|
 					if value["PLAY_MODE"] == "PLAY"
-						@hash_mode[media_name][media_id]["PLAY_MODE"] = "STOP"
+						@hash_mode[session_id][media_name][media_id]["PLAY_MODE"] = "STOP"
 					end
 				}
 			}
 			# notificationが再生済みかどうかは，隙あらば調べましょう．
-			@hash_mode = check_notification_FINISHED(@hash_recipe, @hash_mode, jason_input["time"]["sec"])
+			@hash_mode[session_id] = check_notification_FINISHED(@hash_recipe[session_id], @hash_mode[session_id], jason_input["time"]["sec"])
 			# チャンネルの切り替え
-			@hash_mode["display"] = jason_input["operation_contents"]
-
-			# DetailDraw：不要．Detailは描画されない
-			# Play：不要．再生コンテンツは存在しない
-			# Notify：不要．再生コンテンツは存在しない
-			# Cancel：再生待ちコンテンツがあればキャンセル
-			parts = cancel()
-			body.concat(parts)
-			# ChannelSwitch：MATERIALSを指定
-			body.push({"ChannelSwitch"=>{"channel"=>"#{jason_input["operation_contents"]}"}})
-			# NaviDraw：不要．Naviは描画されない
+			@hash_mode[session_id]["display"] = jason_input["operation_contents"]
+			@hash_body[session_id].each{|key,value|
+				if key == "Cancel" || key == "ChannelSwitch"
+					@hash_body[session_id][key] = true
+				else
+					@hash_body[session_id][key] = false
+				end
+			}
 		else
 			p "invalid params : jason_input['operation_contents'] is wrong when situation is CHANNEL."
 			return "invalid params", body
 		end
+
+		body = bodyMaker(@hash_mode[session_id], @hash_body[session_id], jason_input["time"]["sec"], session_id)
 
 		return "success", body
 	rescue => e
 		return "internal error", e
 	end
 
-	def check(jason_input)
+	def check(jason_input, session_id)
 		body = []
-		unless @hash_mode["display"] == "GUIDE"
-			p "invalid params : #{@hash_mode["display"]} is displayed now."
+		unless @hash_mode[session_id]["display"] == "GUIDE"
+			p "invalid params : #{@hash_mode[session_id]["display"]} is displayed now."
 			logger()
 			return "invalid params", body
 		end
 
 		id = jason_input["operation_contents"]
 		# element_nameの確認
-		if @hash_recipe["step"].key?(id)
+		if @hash_recipe[session_id]["step"].key?(id)
 			# modeの修正
-			if @hash_mode["step"][id]["is_finished?"]
-				@hash_mode = uncheck_isFinished(@hash_recipe, @hash_mode, id)
+			if @hash_mode[session_id]["step"][id]["is_finished?"]
+				@hash_mode[session_id] = uncheck_isFinished(@hash_recipe[session_id], @hash_mode[session_id], id)
 			else
-				@hash_mode = check_isFinished(@hash_recipe, @hash_mode, id)
+				@hash_mode[session_id] = check_isFinished(@hash_recipe[session_id], @hash_mode[session_id], id)
 			end
-			current_step, current_substep = search_CURRENT(@hash_recipe, @hash_mode)
-			@hash_mode = set_ABLEorOTHERS(@hash_recipe, @hash_mode, current_step, current_substep)
-			@hash_recipe["step"].each{|step_id, value|
-				unless @hash_mode["step"][step_id]["is_finished?"]
-					@hash_mode["step"][current_step]["CURRENT?"] = false
-					@hash_mode["substep"][current_substep]["CURRENT?"] = false
-					@hash_mode, next_step, next_substep = go2next(@hash_recipe, @hash_mode)
-					@hash_mode = set_ABLEorOTHERS(@hash_recipe, @hash_mode, next_step, next_substep)
+			current_step, current_substep = search_CURRENT(@hash_recipe[session_id], @hash_mode[session_id])
+			@hash_mode[session_id] = set_ABLEorOTHERS(@hash_recipe[session_id], @hash_mode[session_id], current_step, current_substep)
+			@hash_recipe[session_id]["step"].each{|step_id, value|
+				unless @hash_mode[session_id]["step"][step_id]["is_finished?"]
+					@hash_mode[session_id]["step"][current_step]["CURRENT?"] = false
+					@hash_mode[session_id]["substep"][current_substep]["CURRENT?"] = false
+					@hash_mode[session_id], next_step, next_substep = go2next(@hash_recipe[session_id], @hash_mode[session_id])
+					@hash_mode[session_id] = set_ABLEorOTHERS(@hash_recipe[session_id], @hash_mode[session_id], next_step, next_substep)
 					break
 				end
 			}
-			# DetailDraw：別のsubstepに遷移するかもしれないので必要．
-			body.concat(detailDraw())
-			# Play：別のsubstepに遷移するかもしれないので必要．
-			body.concat(play(jason_input["time"]["sec"]))
-			# Notify：別のsubstepに遷移するかもしれないので必要．
-			body.concat(notify(jason_input["time"]["sec"]))
-			# Cancel：別のsubstepに遷移するかもしれないので必要．
-			body.concat(cancel())
-			# ChannelSwitch：不要．
-			# NaviDraw：チェックされたものをis_fisnishedに書き替え，visualを適切に書き換えたものを提示
-			body.concat(naviDraw())
-		elsif @hash_recipe["substep"].key?(id)
+		elsif @hash_recipe[session_id]["substep"].key?(id)
 			# modeの修正
-			if @hash_mode["substep"][id]["is_finished?"]
-				@hash_mode = uncheck_isFinished(@hash_recipe, @hash_mode, id)
+			if @hash_mode[session_id]["substep"][id]["is_finished?"]
+				@hash_mode[session_id] = uncheck_isFinished(@hash_recipe[session_id], @hash_mode[session_id], id)
 			else
-				@hash_mode = check_isFinished(@hash_recipe, @hash_mode, id)
+				@hash_mode[session_id] = check_isFinished(@hash_recipe[session_id], @hash_mode[session_id], id)
 			end
-			current_step, current_substep = search_CURRENT(@hash_recipe, @hash_mode)
-			@hash_mode = set_ABLEorOTHERS(@hash_recipe, @hash_mode, current_step, current_substep)
-			@hash_recipe["step"].each{|step_id, value|
-				unless @hash_mode["step"][step_id]["is_finished?"]
-					@hash_mode["step"][current_step]["CURRENT?"] = false
-					@hash_mode["substep"][current_substep]["CURRENT?"] = false
-					@hash_mode, next_step, next_substep = go2next(@hash_recipe, @hash_mode, current_step)
-					@hash_mode = set_ABLEorOTHERS(@hash_recipe, @hash_mode, next_step, next_substep)
+			current_step, current_substep = search_CURRENT(@hash_recipe[session_id], @hash_mode[session_id])
+			@hash_mode[session_id] = set_ABLEorOTHERS(@hash_recipe[session_id], @hash_mode[session_id], current_step, current_substep)
+			@hash_recipe[session_id]["step"].each{|step_id, value|
+				unless @hash_mode[session_id]["step"][step_id]["is_finished?"]
+					@hash_mode[session_id]["step"][current_step]["CURRENT?"] = false
+					@hash_mode[session_id]["substep"][current_substep]["CURRENT?"] = false
+					@hash_mode[session_id], next_step, next_substep = go2next(@hash_recipe[session_id], @hash_mode[session_id], current_step)
+					@hash_mode[session_id] = set_ABLEorOTHERS(@hash_recipe[session_id], @hash_mode[session_id], next_step, next_substep)
 					break
 				end
 			}
-			# DetailDraw：別のsubstepに遷移するかもしれないので必要．
-			body.concat(detailDraw())
-			# Play：別のsubstepに遷移するかもしれないので必要．
-			body.concat(play(jason_input["time"]["sec"]))
-			# Notify：別のsubstepに遷移するかもしれないので必要．
-			body.concat(notify(jason_input["time"]["sec"]))
-			# Cancel：別のsubstepに遷移するかもしれないので必要．
-			body.concat(cancel())
-			# ChannelSwitch：不要．
-			# NaviDraw：チェックされたものをis_fisnishedに書き替え，visualを適切に書き換えたものを提示
-			body.concat(naviDraw())
 		else
 			p "invalid params : jason_input['operation_contents'] is wrong when situation is CHECK."
 			logger()
 			return "invalid params", body
 		end
 
+		@hash_body[session_id].each{|key, value|
+			if key == "ChannelSwitch"
+				@hash_body[session_id][key] = false
+			else
+				@hash_body[session_id][key] = true
+			end
+		}
+		body = bodyMaker(@hash_mode[session_id], @hash_body[session_id], jason_input["time"]["sec"], session_id)
+
 		return "success", body
 	rescue => e
 		return "internal error", e
 	end
 
-	def start(jason_input)
+	def start(jason_input, session_id)
 		body = []
-		session_id = jason_input["session_id"]
 		# Navigationに必要なファイルを作成
 		unless system("mkdir -p records/#{session_id}")
 			return "internal error in 'system'", body
 		end
+		fo = lock(session_id)
 		unless system("touch records/#{session_id}/#{session_id}.log")
-			return "internal error in 'system'", body
+			return "internal error in 'system'", body, fo
 		end
 		unless system("touch records/#{session_id}/#{session_id}_recipe.xml")
-			return "internal error in 'system'", body
+			return "internal error in 'system'", body, fo
 		end
 		open("records/#{session_id}/temp.xml", "w"){|io|
 			io.puts(jason_input["operation_contents"])
 		}
 		unless system("cat records/#{session_id}/temp.xml | tr -d '\r' | tr -d '\n'  | tr -d '\t' > records/#{session_id}/#{session_id}_recipe.xml")
-			return "internal error in 'system'", body
+			return "internal error in 'system'", body, fo
 		end
 		unless system("rm records/#{session_id}/temp.xml")
-			return "internal error in 'system'", body
+			return "internal error in 'system'", body, fo
 		end
 
 		# recipe.xmlをパースし，hash_recipeに格納する
-		@hash_recipe = parse_xml("records/#{session_id}/#{session_id}_recipe.xml")
+		@hash_recipe[session_id] = parse_xml("records/#{session_id}/#{session_id}_recipe.xml")
 
 		# stepやmediaの管理をするhahs_modeの作成及び初期設定
-		@hash_mode = initialize_mode(@hash_recipe)
+		@hash_mode[session_id] = initialize_mode(@hash_recipe[session_id])
 
-		### DetailDraw：不要
-		### Play：不要
-		### Notify：不要
-		### Cancel：不要
-		### ChannelSwitch：OVERVIEWを指定
-		body.push({"ChannelSwitch"=>{"channel"=>"OVERVIEW"}})
-		### NaviDraw：不要
+		@hash_body[session_id] = @body_parts
+
+		@hash_body[session_id].each{|key, value|
+			if key == "ChannelSwitch"
+				@hash_body[session_id][key] = true
+			else
+				@hash_body[session_id][key] = false
+			end
+		}
+		body = bodyMaker(@hash_mode[session_id], @hash_body[session_id], jason_input["time"]["sec"], session_id)
 
 		open("records/#{session_id}/#{session_id}_recipe.txt", "w"){|io|
-			io.puts(JSON.pretty_generate(@hash_recipe))
+			io.puts(JSON.pretty_generate(@hash_recipe[session_id]))
 		}
-		return "success", body
+		return "success", body, fo
 	rescue => e
-		return "internal error", e
+		return "internal error", e, fo
 	end
 
-	def finish(jason_input)
+	def finish(jason_input, session_id)
 		body = []
 		# mediaをSTOPにする．
 		session_id = jason_input["session_id"]
 		media = ["audio", "video", "notification"]
 		media.each{|media_name|
-			@hash_mode[media_name].each{|media_id, value|
+			@hash_mode[session_id][media_name].each{|media_id, value|
 				if value["PLAY_MODE"] == "PLAY"
-					@hash_mode[media_name][media_id]["PLAY_MODE"] = "STOP"
+					@hash_mode[session_id][media_name][media_id]["PLAY_MODE"] = "STOP"
 				end
 			}
 		}
 
-		### DetailDraw：不要
-		### Play：不要
-		### Notify：不要
-		### Cancel：再生待ちコンテンツが存在すればキャンセル
-		body = cancel
-		### ChannelSwitch：不要
-		### NaviDraw：不要
+		@hash_body[session_id].each{|key, value|
+			if key == "Cancel"
+				@hash_body[session_id][key] = true
+			else
+				@hash_body[session_id][key] = false
+			end
+		}
+		body = bodyMaker(@hash_mode[session_id], @hash_body[session_id], jason_input["time"]["sec"], session_id)
+		@hash_recipe.delete(session_id)
+		@hash_mode.delete(session_id)
+		@hash_body.delete(session_id)
 
 		return "success", body
 	rescue => e
 		return "internal error", e
 	end
 
-	def play_control(jason_input)
+	def play_control(jason_input, session_id)
 		body = []
 		id = jason_input["operation_contents"]["id"]
-		if @hash_recipe["audio"].key?(id) || @hash_recipe["video"].key?(id)
+		if @hash_recipe[session_id]["audio"].key?(id) || @hash_recipe[session_id]["video"].key?(id)
 			case jason_input["operation_contents"]["operation"]
 			when "PLAY"
 			when "PAUSE"
@@ -325,12 +313,10 @@ class NavigatorBase
 			return "invalid params", body
 		end
 
-		### DetailDraw：不要
-		### Play：不要
-		### Notify：不要
-		### Cancel：不要
-		### ChannelSwitch：不要
-		### NaviDraw：不要
+		@hash_body[session_id].each{|key, value|
+			@hash_body[session_id][key] = false
+		}
+		body = bodyMaker(@hash_mode[session_id], @hash_body[session_id], jason_input["time"]["sec"], session_id)
 
 		return "success", body
 	rescue => e
@@ -342,10 +328,10 @@ class NavigatorBase
 	#####################################
 
 	# CURRENTなsubstepのhtml_contentsを表示させるDetailDraw命令．
-	def detailDraw
+	def detailDraw(session_id)
 		orders = []
-		shown_substep = @hash_mode["shown"]
-		@hash_mode["substep"].each{|substep_id, value|
+		shown_substep = @hash_mode[session_id]["shown"]
+		@hash_mode[session_id]["substep"].each{|substep_id, value|
 			unless value["is_finished?"]
 				orders.push({"DetailDraw"=>{"id"=>shown_substep}})
 				break
@@ -358,20 +344,20 @@ class NavigatorBase
 	end
 
 	# CURRENTなaudioとvideoを再生させるPlay命令．
-	def play(time)
+	def play(time, session_id)
 		orders = []
 		media = ["audio", "video"]
 		media.each{|media_name|
-			@hash_mode[media_name].each{|media_id, value|
+			@hash_mode[session_id][media_name].each{|media_id, value|
 				if value["PLAY_MODE"] == "START"
-					if @hash_recipe[media_name][media_id]["trigger"].empty?
-						@hash_mode[media_name][media_id]["PLAY_MODE"] = "---"
+					if @hash_recipe[session_id][media_name][media_id]["trigger"].empty?
+						@hash_mode[session_id][media_name][media_id]["PLAY_MODE"] = "---"
 						return []
 					else
-						orders.push({"Play"=>{"id"=>media_id, "delay"=>@hash_recipe[media_name][media_id]["trigger"][0][2].to_i}})
-						finish_time = time + @hash_recipe[media_name][media_id]["trigger"][0][2].to_i * 1000
-						@hash_mode[media_name][media_id]["time"] = finish_time
-						@hash_mode[media_name][media_id]["PLAY_MODE"] = "PLAY"
+						orders.push({"Play"=>{"id"=>media_id, "delay"=>@hash_recipe[session_id][media_name][media_id]["trigger"][0][2].to_i}})
+						finish_time = time + @hash_recipe[session_id][media_name][media_id]["trigger"][0][2].to_i * 1000
+						@hash_mode[session_id][media_name][media_id]["time"] = finish_time
+						@hash_mode[session_id][media_name][media_id]["PLAY_MODE"] = "PLAY"
 					end
 				end
 			}
@@ -380,16 +366,16 @@ class NavigatorBase
 	end
 
 	# CURRENTなnotificationを再生させるNotify命令．
-	def notify(time)
+	def notify(time, session_id)
 		orders = []
-		@hash_mode["notification"].each{|id, value|
+		@hash_mode[session_id]["notification"].each{|id, value|
 			if value["PLAY_MODE"] == "START"
-				orders.push({"Notify"=>{"id"=>id, "delay"=>@hash_recipe["notification"][id]["trigger"][0][2].to_i}})
-				finish_time = time + @hash_recipe["notification"][id]["trigger"][0][2].to_i * 1000
-				@hash_mode["notification"][id]["time"] = finish_time
-				@hash_mode["notification"][id]["PLAY_MODE"] = "PLAY"
-				@hash_recipe["notification"][id]["audio"].each{|audio_id|
-					@hash_mode["audio"][audio_id]["time"] = finish_time
+				orders.push({"Notify"=>{"id"=>id, "delay"=>@hash_recipe[session_id]["notification"][id]["trigger"][0][2].to_i}})
+				finish_time = time + @hash_recipe[session_id]["notification"][id]["trigger"][0][2].to_i * 1000
+				@hash_mode[session_id]["notification"][id]["time"] = finish_time
+				@hash_mode[session_id]["notification"][id]["PLAY_MODE"] = "PLAY"
+				@hash_recipe[session_id]["notification"][id]["audio"].each{|audio_id|
+					@hash_mode[session_id]["audio"][audio_id]["time"] = finish_time
 				}
 			end
 		}
@@ -397,27 +383,27 @@ class NavigatorBase
 	end
 
 	# 再生待ち状態のaudio，video，notificationを中止するCancel命令．
-	def cancel
+	def cancel(session_id)
 		orders = []
 		media = ["audio", "video"]
 		media.each{|media_name|
-			@hash_mode[media_name].each{|media_id, value|
+			@hash_mode[session_id][media_name].each{|media_id, value|
 				if value["PLAY_MODE"] == "STOP"
 					orders.push({"Cancel"=>{"id"=>media_id}})
-					@hash_mode[media_name][media_id]["PLAY_MODE"] = "---"
-					@hash_mode[media_name][media_id]["time"] = -1
+					@hash_mode[session_id][media_name][media_id]["PLAY_MODE"] = "---"
+					@hash_mode[session_id][media_name][media_id]["time"] = -1
 				end
 			}
 		}
-		if @hash_mode.key?("notification")
-			@hash_mode["notification"].each{|id, value|
+		if @hash_mode[session_id].key?("notification")
+			@hash_mode[session_id]["notification"].each{|id, value|
 				if value["PLAY_MODE"] == "STOP"
 					orders.push({"Cancel"=>{"id"=>id}})
-					@hash_mode["notification"][id]["PLAY_MODE"] = "---"
-					@hash_mode["notification"][id]["time"] = -1
-					@hash_recipe["notification"][id]["audio"].each{|audio_id|
-						@hash_mode["audio"][audio_id]["PLAY_MODE"] == "---"
-						@hash_mode["audio"][audio_id]["time"] = -1
+					@hash_mode[session_id]["notification"][id]["PLAY_MODE"] = "---"
+					@hash_mode[session_id]["notification"][id]["time"] = -1
+					@hash_recipe[session_id]["notification"][id]["audio"].each{|audio_id|
+						@hash_mode[session_id]["audio"][audio_id]["PLAY_MODE"] == "---"
+						@hash_mode[session_id]["audio"][audio_id]["time"] = -1
 					}
 				end
 			}
@@ -426,35 +412,35 @@ class NavigatorBase
 	end
 
 	# ナビ画面の表示を決定するNaviDraw命令．
-	def naviDraw
+	def naviDraw(session_id)
 		orders = []
 		orders.push({"NaviDraw"=>{"steps"=>[]}})
-		@hash_recipe["sorted_step"].each{|v|
+		@hash_recipe[session_id]["sorted_step"].each{|v|
 			step_id = v[1]
 			visual = nil
-			if @hash_mode["step"][step_id]["CURRENT?"]
+			if @hash_mode[session_id]["step"][step_id]["CURRENT?"]
 				visual = "CURRENT"
-			elsif @hash_mode["step"][step_id]["ABLE?"]
+			elsif @hash_mode[session_id]["step"][step_id]["ABLE?"]
 				visual = "ABLE"
 			else
 				visual = "OTHERS"
 			end
-			if @hash_mode["step"][step_id]["is_finished?"]
+			if @hash_mode[session_id]["step"][step_id]["is_finished?"]
 				orders[0]["NaviDraw"]["steps"].push({"id"=>step_id, "visual"=>visual, "is_finished"=>1})
 			else
 				orders[0]["NaviDraw"]["steps"].push({"id"=>step_id, "visual"=>visual, "is_finished"=>0})
 			end
-			if @hash_mode["step"][step_id]["open?"]
-				@hash_recipe["step"][step_id]["substep"].each{|substep_id|
+			if @hash_mode[session_id]["step"][step_id]["open?"]
+				@hash_recipe[session_id]["step"][step_id]["substep"].each{|substep_id|
 					visual = nil
-					if @hash_mode["substep"][substep_id]["CURRENT?"]
+					if @hash_mode[session_id]["substep"][substep_id]["CURRENT?"]
 						visual = "CURRENT"
-					elsif @hash_mode["substep"][substep_id]["ABLE?"]
+					elsif @hash_mode[session_id]["substep"][substep_id]["ABLE?"]
 						visual = "ABLE"
 					else
 						visual = "OTHERS"
 					end
-					if @hash_mode["substep"][substep_id]["is_finished?"]
+					if @hash_mode[session_id]["substep"][substep_id]["is_finished?"]
 						orders[0]["NaviDraw"]["steps"].push({"id"=>substep_id, "visual"=>visual, "is_finished"=>1})
 					else
 						orders[0]["NaviDraw"]["steps"].push({"id"=>substep_id, "visual"=>visual, "is_finished"=>0})

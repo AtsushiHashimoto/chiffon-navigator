@@ -1,5 +1,28 @@
 #!/usr/bin/ruby
 
+def bodyMaker(hash_mode, hash_body, time, session_id)
+	body = []
+	if hash_body["DetailDraw"]
+		body.concat(detailDraw(session_id))
+	end
+	if hash_body["Play"]
+		body.concat(play(time, session_id))
+	end
+	if hash_body["Notify"]
+		body.concat(notify(time, session_id))
+	end
+	if hash_body["Cancel"]
+		body.concat(cancel(session_id))
+	end
+	if hash_body["ChannelSwitch"]
+		body.push({"ChannelSwitch"=>{"channel"=>hash_mode["display"]}})
+	end
+	if hash_body["NaviDraw"]
+		body.concat(naviDraw(session_id))
+	end
+	return body
+end
+
 def set_ABLEorOTHERS(hash_recipe, hash_mode, current_step, current_substep)
 	hash_mode["step"].each{|step_id, value|
 		if !value["is_finished?"]
@@ -220,6 +243,33 @@ def uncheck_isFinished(hash_recipe, hash_mode, id)
 		end
 	end
 	return hash_mode
+end
+
+def lock(session_id)
+	unless File.exist?("records/#{session_id}/lockfile")
+		system("touch records/#{session_id}/lockfile")
+	end
+	fo = open("records/#{session_id}/lockfile", "w")
+	fo.flock(File::LOCK_EX)
+	return fo
+end
+
+def unlock(fo)
+	fo.flock(File::LOCK_UN)
+	fo.close
+end
+
+def inputHashMode(session_id)
+	open("records/#{session_id}/#{session_id}_mode.txt", "r"){|io|
+		hash_mode = JSON.load(io)
+	}
+	return hash_mode
+end
+
+def outputHashMode(session_id, hash_mode)
+	open("records/#{session_id}/#{session_id}_mode.txt", "w"){|io|
+		io.puts(JSON.pretty_generate(hash_mode))
+	}
 end
 
 def logger()

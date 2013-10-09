@@ -15,16 +15,16 @@ class DefaultNavigator < NavigatorBase
 	##### navigatorの仕様に合わせて変更すべき3メソッド #####
 	########################################################
 
-	def navi_menu(jason_input)
+	def navi_menu(jason_input, session_id)
 		body = []
-		unless @hash_mode["display"] == "GUIDE"
-			p "invalid params : #{@hash_mode["display"]} is displayed now."
+		unless @hash_mode[session_id]["display"] == "GUIDE"
+			p "invalid params : #{@hash_mode[session_id]["display"]} is displayed now."
 			logger()
 			return "invalid params", body
 		end
 
 		id = jason_input["operation_contents"]
-		unless @hash_recipe["step"].key?(id) || @hash_recipe["substep"].key?(id)
+		unless @hash_recipe[session_id]["step"].key?(id) || @hash_recipe[session_id]["substep"].key?(id)
 			p "invalid params : jason_input['operation_contents'] is wrong when situation is NAVI_MENU."
 			logger()
 			return "invalid params", body
@@ -32,22 +32,21 @@ class DefaultNavigator < NavigatorBase
 		# modeの修正
 		modeUpdate_navimenu(jason_input["time"]["sec"], id)
 
-		# DetailDraw：入力されたstepをCURRENTとして提示
-		body.concat(detailDraw())
-		# Play：不要．
-		# Notify：不要．
-		# Cancel：再生待ちコンテンツがあればキャンセル
-		body.concat(cancel())
-		# ChannelSwitch：不要
-		# NaviDraw：適切にvisualを書き換えたものを提示
-		body.concat(naviDraw())
+		@hash_body[session_id].each{|key, value|
+			if key == "DetailDraw" || key == "Cancel" || key == "NaviDraw"
+				@hash_body[sessino_id][key] = true
+			else
+				@hash_body[sessino_id][key] = false
+			end
+		}
+		body = bodyMaker(@hash_mode[session_id], @hash_body[session_id], jason_input["time"]["sec"], session_id)
 
 		return "success", body
 	rescue => e
 		return "internal error", e
 	end
 
-	def external_input(jason_input)
+	def external_input(jason_input, session_id)
 		body = []
 		# EXTERNALINPUTのチェック
 		e_input = nil
@@ -61,7 +60,7 @@ class DefaultNavigator < NavigatorBase
 			return "invalid params", body
 		end
 		# inputのチェック
-		result, message = inputChecker_externalinput(@hash_recipe, @hash_mode, e_input)
+		result, message = inputChecker_externalinput(@hash_recipe[session_id], @hash_mode[session_id], e_input)
 		unless result
 			p "EXTERNAL_INPUT is wrong."
 			p message
@@ -71,17 +70,14 @@ class DefaultNavigator < NavigatorBase
 		# modeの修正
 		modeUpdate_externalinput(jason_input["time"]["sec"], e_input)
 
-		# DetailDraw：調理者がとったものに合わせたsubstepのidを提示
-		body.concat(detailDraw())
-		# Play：substep内にコンテンツが存在すれば再生命令を送る
-		body.concat(play(jason_input["time"]["sec"]))
-		# Notify：substep内にコンテンツが存在すれば再生命令を送る
-		body.concat(notify(jason_input["time"]["sec"]))
-		# Cancel：再生待ちコンテンツがあればキャンセル
-		body.concat(cancel())
-		# ChannelSwitch：不要
-		# NaviDraw：適切にvisualを書き換えたものを提示
-		body.concat(naviDraw())
+		@hash_body[session_id].each{|key, value|
+			if key == "ChannelSwitch"
+				@hash_body[session_id][key] = false
+			else
+				@hash_body[session_id][key] = true
+			end
+		}
+		body = bodyMaker(@hash_mode[session_id], @hash_body[session_id], jason_input["time"]["sec"], session_id)
 
 		return "success", body
 	rescue => e
@@ -179,28 +175,28 @@ end
 	##########################################################
 
 	def modeUpdate_navimenu(time, id)
-		if @hash_recipe["step"].key?(id)
-			unless @hash_mode["step"][id]["CURRENT?"]
-				if @hash_mode["step"][id]["open?"]
-					@hash_mode["step"][id]["open?"] = false
+		if @hash_recipe[session_id]["step"].key?(id)
+			unless @hash_mode[session_id]["step"][id]["CURRENT?"]
+				if @hash_mode[session_id]["step"][id]["open?"]
+					@hash_mode[session_id]["step"][id]["open?"] = false
 				else
-					@hash_mode["step"][id]["open?"] = true
+					@hash_mode[session_id]["step"][id]["open?"] = true
 				end
 			end
-		elsif @hash_recipe["substep"].key?(id)
+		elsif @hash_recipe[session_id]["substep"].key?(id)
 			# substepがクリックされた場合のみ，detailDrawが変化するので，動画と音声を停止する．
-			shown_substep = @hash_mode["shown"]
+			shown_substep = @hash_mode[session_id]["shown"]
 			# substepに含まれるaudio，videoは再生済み・再生中・再生待ち関わらずSTOPに．
 			media = ["audio", "video"]
 			media.each{|media_name|
-				@hash_recipe["substep"][shown_substep][media_name].each{|media_id|
-					if @hash_mode[media_name][media_id]["PLAY_MODE"] == "PLAY"
-						@hash_mode[media_name][media_id]["PLAY_MODE"] = "STOP"
+				@hash_recipe[session_id]["substep"][shown_substep][media_name].each{|media_id|
+					if @hash_mode[session_id][media_name][media_id]["PLAY_MODE"] == "PLAY"
+						@hash_mode[session_id][media_name][media_id]["PLAY_MODE"] = "STOP"
 					end
 				}
 			}
 			# クリックされたsubstepをshownにする
-			@hash_mode["shown"] = id
+			@hash_mode[session_id]["shown"] = id
 		end
 	end
 
@@ -210,43 +206,43 @@ end
 		next_substep = nil
 		case e_input["mode"]
 		when "debug"
-			current_step, current_substep = search_CURRENT(@hash_recipe, @hash_mode)
-			@hash_mode["substep"][current_substep]["CURRENT?"] = false
-			@hash_mode["step"][current_step]["CURRENT?"] = false
-			@hash_mode = check_isFinished(@hash_recipe, @hash_mode, current_substep)
+			current_step, current_substep = search_CURRENT(@hash_recipe[session_id], @hash_mode[session_id])
+			@hash_mode[session_id]["substep"][current_substep]["CURRENT?"] = false
+			@hash_mode[session_id]["step"][current_step]["CURRENT?"] = false
+			@hash_mode[session_id] = check_isFinished(@hash_recipe[session_id], @hash_mode[session_id], current_substep)
 			if e_input["action"] == "next"
-				@hash_mode, next_step, next_substep = go2next(@hash_recipe, @hash_mode, current_step)
+				@hash_mode[session_id], next_step, next_substep = go2next(@hash_recipe[session_id], @hash_mode[session_id], current_step)
 			elsif e_input["action"] == "jump"
 				next_substep = e_input["destination"]
-				next_step = @hash_recipe["substep"][next_substep]["parent_step"]
-				@hash_mode = jump2substep(@hash_recipe, @hash_mode, next_step, next_substep)
+				next_step = @hash_recipe[session_id]["substep"][next_substep]["parent_step"]
+				@hash_mode[session_id] = jump2substep(@hash_recipe[session_id], @hash_mode[session_id], next_step, next_substep)
 			end
 		when "recognizer"
 			if e_input["action"] == "put"
-				@hash_mode["taken"].delete_if{|x| x == e_input["tool"]}
+				@hash_mode[session_id]["taken"].delete_if{|x| x == e_input["tool"]}
 			elsif e_input["action"] == "taken"
-				@hash_mode["taken"].push(e_input["tool"])
+				@hash_mode[session_id]["taken"].push(e_input["tool"])
 			end
 
-			next_substep = searchNextSubstep(@hash_recipe, @hash_mode)
-			current_step, current_substep = search_CURRENT(@hash_recipe, @hash_mode)
+			next_substep = searchNextSubstep(@hash_recipe[session_id], @hash_mode[session_id])
+			current_step, current_substep = search_CURRENT(@hash_recipe[session_id], @hash_mode[session_id])
 			if current_substep == next_substep
 				next_substep = nil
 			end
 			unless next_substep == nil
-				next_step = @hash_recipe["substep"][next_substep]["parent_step"]
-				@hash_mode["step"][current_step]["CURRENT?"] = false
-				@hash_mode["substep"][current_substep]["CURRENT?"] = false
-				@hash_mode = check_isFinished(@hash_recipe, @hash_mode, current_substep)
-				@hash_mode = jump2substep(@hash_recipe, @hash_mode, next_step, next_substep)
+				next_step = @hash_recipe[session_id]["substep"][next_substep]["parent_step"]
+				@hash_mode[session_id]["step"][current_step]["CURRENT?"] = false
+				@hash_mode[session_id]["substep"][current_substep]["CURRENT?"] = false
+				@hash_mode[session_id] = check_isFinished(@hash_recipe[session_id], @hash_mode[session_id], current_substep)
+				@hash_mode[session_id] = jump2substep(@hash_recipe[session_id], @hash_mode[session_id], next_step, next_substep)
 			end
 		end
 		p next_step
 		p next_substep
 		if next_step != nil && next_substep != nil
-			@hash_mode = set_ABLEorOTHERS(@hash_recipe, @hash_mode, next_step, next_substep)
+			@hash_mode[session_id] = set_ABLEorOTHERS(@hash_recipe[session_id], @hash_mode[session_id], next_step, next_substep)
 		end
-		@hash_mode = check_notification_FINISHED(@hash_recipe, @hash_mode, time)
+		@hash_mode[session_id] = check_notification_FINISHED(@hash_recipe[session_id], @hash_mode[session_id], time)
 	end
 
 	###################################################
@@ -254,45 +250,45 @@ end
 	###################################################
 
 		# ナビ画面の表示を決定するNaviDraw命令．
-	def naviDraw
+	def naviDraw(session_id)
 		# sorted_stepの順に表示させる．
 		orders = []
 		orders.push({"NaviDraw"=>{"steps"=>[]}})
-		@hash_recipe["sorted_step"].each{|v|
+		@hash_recipe[session_id]["sorted_step"].each{|v|
 			id = v[1]
 			visual_step = nil
 			is_finished = -1
 			is_open = -1
-			if @hash_mode["step"][id]["CURRENT?"]
+			if @hash_mode[session_id]["step"][id]["CURRENT?"]
 				visual_step = "CURRENT"
-			elsif @hash_mode["step"][id]["ABLE?"]
+			elsif @hash_mode[session_id]["step"][id]["ABLE?"]
 				visual_step = "ABLE"
 			else
 				visual_step = "OTHERS"
 			end
-			if @hash_mode["step"][id]["is_finished?"]
+			if @hash_mode[session_id]["step"][id]["is_finished?"]
 				is_finished = 1
 			else
 				is_finished = 0
 			end
-			if @hash_mode["step"][id]["open?"]
+			if @hash_mode[session_id]["step"][id]["open?"]
 				is_open = 1
 			else
 				is_open = 0
 			end
 			orders[0]["NaviDraw"]["steps"].push({"id"=>id, "visual"=>visual_step, "is_finished"=>is_finished, "is_open"=>is_open})
 			# CURRENTなstepの場合，substepも表示させる．
-			if @hash_mode["step"][id]["open?"]
-				@hash_recipe["step"][id]["substep"].each{|id|
+			if @hash_mode[session_id]["step"][id]["open?"]
+				@hash_recipe[session_id]["step"][id]["substep"].each{|id|
 					visual_substep = nil
-					if @hash_mode["substep"][id]["CURRENT?"]
+					if @hash_mode[session_id]["substep"][id]["CURRENT?"]
 						visual_substep = "CURRENT"
-					elsif @hash_mode["substep"][id]["ABLE?"]
+					elsif @hash_mode[session_id]["substep"][id]["ABLE?"]
 						visual_substep = "ABLE"
 					else
 						visual_substep = "OTHERS"
 					end
-					if @hash_mode["substep"][id]["is_finished?"]
+					if @hash_mode[session_id]["substep"][id]["is_finished?"]
 						orders[0]["NaviDraw"]["steps"].push({"id"=>id, "visual"=>visual_substep, "is_finished"=>1})
 					else
 						orders[0]["NaviDraw"]["steps"].push({"id"=>id, "visual"=>visual_substep, "is_finished"=>0})
