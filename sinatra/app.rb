@@ -13,6 +13,7 @@ navigators = {}
 
 configure do
 	# add navigator algorithm class here
+	#navigators['default'] = DefaultNavigator.new()
 	navigators['default'] = DefaultNavigator.new()
 end
 
@@ -32,7 +33,7 @@ post '/navi/:algorithm' do |alg|
 	headers "Access-Control-Allow-Credentials" => "true"
 
 	request.body.rewind
-	json_data = JSON.parse(request.body.read) 
+	json_data = JSON.parse(request.body.read)
 	prescription = {}
 	if !navigators.include?(alg) then
 		# Error!!
@@ -46,3 +47,18 @@ post '/navi/:algorithm' do |alg|
 	return JSON.generate(prescription)
 end
 
+get '/navi/session/:algorithm' do |alg|
+	headers "Access-Control-Allow-Origin" => "*"
+	headers "Access-Control-Allow-Credentials" => "true"
+	session_array = Dir.entries("./records").sort!
+	delete_list = []
+	session_array.each do |value|
+		unless value =~ /^#{alg}-.*$/
+			delete_list.push(value)
+		end
+	end
+	delete_list.each do |value|
+		session_array.delete(value)
+	end
+	"#{session_array.last}"
+end
