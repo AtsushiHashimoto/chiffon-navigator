@@ -166,11 +166,11 @@ def check_isFinished(hash_recipe, hash_mode, id)
 					break
 				end
 			}
+			hash_recipe["step"][parent_step]["parent"].each{|parent_id|
+				hash_mode = check_isFinished(hash_recipe, hash_mode, parent_id)
+			}
 			if hash_recipe["substep"][id]["next_substep"] == nil
 				hash_mode["step"][parent_step]["is_finished?"] = true
-				hash_recipe["step"][parent_step]["parent"].each{|parent_id|
-					hash_mode = check_isFinished(hash_recipe, hash_mode, parent_id)
-				}
 			end
 		end
 	end
@@ -180,7 +180,7 @@ end
 def uncheck_isFinished(hash_recipe, hash_mode, id)
 	media = ["audio", "video", "notification"]
 	if hash_recipe["step"].key?(id)
-		if hash_mode["step"][id]["is_finished?"]
+		if hash_mode["step"][id]["is_finished?"] || hash_mode["substep"][hash_recipe["step"][id]["substep"][0]]["is_finished?"]
 			hash_mode["step"][id]["is_finished?"] = false
 			hash_recipe["step"][id]["substep"].each{|substep_id|
 				hash_mode["substep"][substep_id]["is_finished?"] = false
@@ -193,7 +193,7 @@ def uncheck_isFinished(hash_recipe, hash_mode, id)
 			}
 			hash_recipe["step"].each{|step_id, value|
 				hash_recipe["step"][step_id]["parent"].each{|parent_id|
-					if parent_id == id && hash_mode["step"][step_id]["is_finished?"]
+					if parent_id == id
 						hash_mode = uncheck_isFinished(hash_recipe, hash_mode, step_id)
 					end
 				}
@@ -214,15 +214,15 @@ def uncheck_isFinished(hash_recipe, hash_mode, id)
 					break
 				end
 			}
+			hash_recipe["step"].each{|step_id, value|
+				hash_recipe["step"][step_id]["parent"].each{|parent_id|
+					if parent_id == parent_step
+						hash_mode = uncheck_isFinished(hash_recipe, hash_mode, step_id)
+					end
+				}
+			}
 			if hash_recipe["step"][parent_step]["is_finished?"]
 				hash_mode["step"][parent_step]["is_finished?"] = false
-				hash_recipe["step"].each{|step_id, value|
-					hash_recipe["step"][step_id]["parent"].each{|parent_id|
-						if parent_id == parent_step && hash_mode["step"][step_id]["is_finished?"]
-							hash_mode = uncheck_isFinished(hash_recipe, hash_mode, step_id)
-						end
-					}
-				}
 			end
 		end
 	end
