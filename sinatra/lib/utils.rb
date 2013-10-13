@@ -72,8 +72,10 @@ end
 def jump2substep(hash_recipe, hash_mode, step_id, substep_id)
 	hash_mode["step"][step_id]["CURRENT?"] = true
 	hash_mode["step"][step_id]["open?"] = true
+	hash_mode["current_step"] = step_id
 	hash_mode["substep"][substep_id]["CURRENT?"] = true
 	hash_mode["shown"] = substep_id
+	hash_mode["current_substep"] = substep_id
 	media = ["audio", "video", "notification"]
 	media.each{|media_name|
 		hash_recipe["substep"][substep_id][media_name].each{|media_id|
@@ -127,24 +129,6 @@ def check_notification_FINISHED(hash_recipe, hash_mode, time)
 		end
 	}
 	return hash_mode
-end
-
-def search_CURRENT(hash_recipe, hash_mode)
-	current_step = nil
-	current_substep = nil
-	hash_mode["step"].each{|key, value|
-		if hash_mode["step"][key]["CURRENT?"]
-			current_step = key
-			hash_recipe["step"][key]["substep"].each{|substep_id|
-				if hash_mode["substep"][substep_id]["CURRENT?"]
-					current_substep = substep_id
-					break
-				end
-			}
-			break
-		end
-	}
-	return current_step, current_substep
 end
 
 def check_isFinished(hash_recipe, hash_mode, id)

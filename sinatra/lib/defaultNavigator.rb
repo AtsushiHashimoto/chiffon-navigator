@@ -34,9 +34,9 @@ class DefaultNavigator < NavigatorBase
 
 		@hash_body[session_id].each{|key, value|
 			if key == "DetailDraw" || key == "Cancel" || key == "NaviDraw"
-				@hash_body[sessino_id][key] = true
+				@hash_body[session_id][key] = true
 			else
-				@hash_body[sessino_id][key] = false
+				@hash_body[session_id][key] = false
 			end
 		}
 		body = bodyMaker(@hash_mode[session_id], @hash_body[session_id], jason_input["time"]["sec"], session_id)
@@ -217,9 +217,12 @@ end
 		next_substep = nil
 		case e_input["mode"]
 		when "order"
-			current_step, current_substep = search_CURRENT(@hash_recipe[session_id], @hash_mode[session_id])
+			current_step = @hash_mode[session_id]["current_step"]
+			current_substep = @hash_mode[session_id]["current_substep"]
 			@hash_mode[session_id]["substep"][current_substep]["CURRENT?"] = false
 			@hash_mode[session_id]["step"][current_step]["CURRENT?"] = false
+			@hash_mode[session_id]["prev_step"] = current_step
+			@hash_mode[session_id]["prev_substep"] = current_substep
 			@hash_mode[session_id] = check_isFinished(@hash_recipe[session_id], @hash_mode[session_id], current_substep)
 			if e_input["action"]["name"] == "next"
 				@hash_mode[session_id], next_step, next_substep = go2next(@hash_recipe[session_id], @hash_mode[session_id], current_step)
@@ -236,7 +239,8 @@ end
 			end
 
 			next_substep = searchNextSubstep(@hash_recipe[session_id], @hash_mode[session_id])
-			current_step, current_substep = search_CURRENT(@hash_recipe[session_id], @hash_mode[session_id])
+			current_step = @hash_mode[session_id]["current_step"]
+			current_substep = @hash_mode[session_id]["current_substep"]
 			if current_substep == next_substep
 				next_substep = nil
 			end
@@ -244,6 +248,8 @@ end
 				next_step = @hash_recipe[session_id]["substep"][next_substep]["parent_step"]
 				@hash_mode[session_id]["step"][current_step]["CURRENT?"] = false
 				@hash_mode[session_id]["substep"][current_substep]["CURRENT?"] = false
+				@hash_mode[session_id]["prev_step"] = current_step
+				@hash_mode[session_id]["prev_substep"] = current_substep
 				@hash_mode[session_id] = check_isFinished(@hash_recipe[session_id], @hash_mode[session_id], current_substep)
 				@hash_mode[session_id] = jump2substep(@hash_recipe[session_id], @hash_mode[session_id], next_step, next_substep)
 			end
