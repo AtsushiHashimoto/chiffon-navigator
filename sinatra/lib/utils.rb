@@ -23,28 +23,32 @@ def bodyMaker(hash_mode, hash_body, time, session_id)
 	return body
 end
 
-def set_ABLEorOTHERS(hash_recipe, hash_mode, current_step, current_substep)
+def set_ABLEorOTHERS(hash_recipe, hash_mode, current*)
+	current_step = nil
+	current_substep = nil
+	unless current == []
+		current_step = current[0]
+		current_substep = current[1]
+	end
 	hash_mode["step"].each{|step_id, value|
 		if !value["is_finished?"]
 			if hash_recipe["step"][step_id]["parent"].empty?
 				hash_mode["step"][step_id]["ABLE?"] = true
 			else
-				flag = -1
+				flag = false
 				hash_recipe["step"][step_id]["parent"].each{|parent_id|
 					if hash_mode["step"][parent_id]["is_finished?"]
-						flag = 1
-					elsif parent_id == current_step && hash_recipe["substep"][current_substep]["next_substep"] == nil
-						flag = 1
+						flag = true
+					elsif parent_id == current_step
+						if hash_recipe["substep"][current_substep]["next_substep"] == nil
+							flag = true
+						end
 					else
-						flag = -1
+						flag = false
 						break
 					end
 				}
-				if flag == 1
-					hash_mode["step"][step_id]["ABLE?"] = true
-				else
-					hash_mode["step"][step_id]["ABLE?"] = false
-				end
+				hash_mode["step"][step_id]["ABLE?"] = flag
 			end
 		else
 			hash_mode["step"][step_id]["ABLE?"] = false
@@ -57,9 +61,11 @@ def set_ABLEorOTHERS(hash_recipe, hash_mode, current_step, current_substep)
 			hash_recipe["step"][step_id]["substep"].each{|substep_id|
 				unless hash_mode["substep"][substep_id]["is_finished?"]
 					hash_mode["substep"][substep_id]["ABLE?"] = true
-					if step_id == current_step && substep_id == current_substep && hash_recipe["substep"][substep_id]["next_substep"] != nil
-						next_substep = hash_recipe["substep"][substep_id]["next_substep"]
-						hash_mode["substep"][next_substep]["ABLE?"] = true
+					if step_id == current_step && substep_id == current_substep
+						if hash_recipe["substep"][substep_id]["next_substep"] != nil
+							next_substep = hash_recipe["substep"][substep_id]["next_substep"]
+							hash_mode["substep"][next_substep]["ABLE?"] = true
+						end
 					end
 					break
 				end
