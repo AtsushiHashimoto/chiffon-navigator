@@ -22,37 +22,31 @@ class NavigatorBase
 		session_id = jason_input["session_id"]
 		fo = nil
 
-		if jason_input["situation"] == nil || jason_input["situation"] == ""
+		case jason_input["situation"]
+		when "NAVI_MENU"
+			fo = lock(session_id)
+			status, body = navi_menu(jason_input, session_id)
+		when "EXTERNAL_INPUT"
+			fo = lock(session_id)
+			status, body = external_input(jason_input, session_id)
+		when "CHANNEL"
+			fo = lock(session_id)
+			status, body = channel(jason_input, session_id)
+		when "CHECK"
+			fo = lock(session_id)
+			status, body = check(jason_input, session_id)
+		when "START"
+			status, body, fo = start(jason_input, session_id)
+		when "END"
+			fo = lock(session_id)
+			status, body = finish(jason_input, session_id)
+		when "PLAY_CONTROL"
+			fo = lock(session_id)
+			status, body = play_control(jason_input, session_id)
+		else
 			p "invalid params : jason_input['situation'] is wrong."
 			logger()
 			status = "invalid params"
-		else
-			case jason_input["situation"]
-			when "NAVI_MENU"
-				fo = lock(session_id)
-				status, body = navi_menu(jason_input, session_id)
-			when "EXTERNAL_INPUT"
-				fo = lock(session_id)
-				status, body = external_input(jason_input, session_id)
-			when "CHANNEL"
-				fo = lock(session_id)
-				status, body = channel(jason_input, session_id)
-			when "CHECK"
-				fo = lock(session_id)
-				status, body = check(jason_input, session_id)
-			when "START"
-				status, body, fo = start(jason_input, session_id)
-			when "END"
-				fo = lock(session_id)
-				status, body = finish(jason_input, session_id)
-			when "PLAY_CONTROL"
-				fo = lock(session_id)
-				status, body = play_control(jason_input, session_id)
-			else
-				p "invalid params : jason_input['situation'] is wrong."
-				logger()
-				status = "invalid params"
-			end
 		end
 
 		outputHashMode(session_id, @hash_mode[session_id])
@@ -98,11 +92,6 @@ class NavigatorBase
 
 	def channel(jason_input, session_id)
 		body = []
-		if @hash_mode[session_id]["display"] == jason_input["operation_contents"]
-			p "invalid params : #{@hash_mode[session_id]["display"]} is displayed now. You try to display same one."
-			logger()
-			return "invalid params", body
-		end
 
 		case jason_input["operation_contents"]
 		when "GUIDE"
@@ -148,11 +137,6 @@ class NavigatorBase
 
 	def check(jason_input, session_id)
 		body = []
-		unless @hash_mode[session_id]["display"] == "GUIDE"
-			p "invalid params : #{@hash_mode[session_id]["display"]} is displayed now."
-			logger()
-			return "invalid params", body
-		end
 
 		id = jason_input["operation_contents"]
 		# element_nameの確認

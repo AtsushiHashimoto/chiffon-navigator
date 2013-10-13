@@ -17,11 +17,6 @@ class DefaultNavigator < NavigatorBase
 
 	def navi_menu(jason_input, session_id)
 		body = []
-		unless @hash_mode[session_id]["display"] == "GUIDE"
-			p "invalid params : #{@hash_mode[session_id]["display"]} is displayed now."
-			logger()
-			return "invalid params", body
-		end
 
 		id = jason_input["operation_contents"]
 		unless @hash_recipe[session_id]["step"].key?(id) || @hash_recipe[session_id]["substep"].key?(id)
