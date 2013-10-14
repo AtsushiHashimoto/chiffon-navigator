@@ -122,10 +122,10 @@ def updateABLE(hash_recipe, hash_mode, *current)
 	return hash_mode
 end
 
-# id$B@h$K0\F0$9$k!%(B
-# mode=INITIALIZE$B$J$i!$(Bcurrent$B$J(Bsubstep$B$O(Bothers$B$K$9$k!%(B
-# mode=FINISH$B$J$i!$(Bcurrent$B$J(Bsubstep$B$O(Bis_finished$B$K$9$k!%(B
-# able$B$N@_DjEy$b$3$3$G$d$k!%(B
+# id先に移動する．
+# mode=INITIALIZEなら，currentなsubstepはothersにする．
+# mode=FINISHなら，currentなsubstepはis_finishedにする．
+# ableの設定等もここでやる．
 def jump(hash_recipe, hash_mode, next_substep, mode)
 	next_step = hash_recipe["substep"][next_substep]["parent_step"]
 	current_step = hash_mode["current_step"]
@@ -157,8 +157,8 @@ def jump(hash_recipe, hash_mode, next_substep, mode)
 	return hash_mode
 end
 
-# current$B$N(Bsubstep$B$r(Bis_finished=true$B$K$7!$<!$N(Bsubstep$B$KA+0\$9$k!%(B
-# abel$BEy$N@_Dj$bA4$F$3$3$G9T$&(B
+# currentのsubstepをis_finished=trueにし，次のsubstepに遷移する．
+# abel等の設定も全てここで行う
 def go2next(hash_recipe, hash_mode, *mode)
 	current_step = hash_mode["current_step"]
 	current_substep = hash_mode["current_substep"]
