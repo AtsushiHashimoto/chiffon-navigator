@@ -21,11 +21,7 @@ class DefaultNavigator < NavigatorBase
 		id = jason_input["operation_contents"]
 		if @hash_recipe[session_id]["step"].key?(id)
 			unless @hash_mode[session_id]["step"][id]["CURRENT?"]
-				if @hash_mode[session_id]["step"][id]["open?"]
-					@hash_mode[session_id]["step"][id]["open?"] = false
-				else
-					@hash_mode[session_id]["step"][id]["open?"] = true
-				end
+				@hash_mode[session_id]["step"][id]["open?"] = (not @hash_mode[session_id]["step"][id]["open?"])
 			end
 		elsif @hash_recipe[session_id]["substep"].key?(id)
 			if @hash_mode[session_id]["substep"][id]["ABLE?"]
