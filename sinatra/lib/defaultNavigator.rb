@@ -19,19 +19,29 @@ class DefaultNavigator < NavigatorBase
 		body = []
 
 		id = jason_input["operation_contents"]
-		unless @hash_recipe[session_id]["step"].key?(id) || @hash_recipe[session_id]["substep"].key?(id)
+		if @hash_recipe[session_id]["step"].key?(id)
+			unless @hash_mode[session_id]["step"][id]["CURRENT?"]
+				if @hash_mode[session_id]["step"][id]["open?"]
+					@hash_mode[session_id]["step"][id]["open?"] = false
+				else
+					@hash_mode[session_id]["step"][id]["open?"] = true
+				end
+			end
+		elsif @hash_recipe[session_id]["substep"].key?(id)
+			if @hash_mode[session_id]["substep"][id]["ABLE?"]
+				@hash_mode[session_id] = jump(@hash_recipe[session_id], @hash_mode[session_id], id, "INITIALIZE")
+			end
+		else
 			p "invalid params : jason_input['operation_contents'] is wrong when situation is NAVI_MENU."
 			logger()
 			return "invalid params", body
 		end
-		# modeの修正
-		modeUpdate_navimenu(jason_input["time"]["sec"], id, session_id)
 
 		@hash_body[session_id].each{|key, value|
-			if key == "DetailDraw" || key == "Cancel" || key == "NaviDraw"
-				@hash_body[session_id][key] = true
-			else
+			if key == "ChannelSwitch"
 				@hash_body[session_id][key] = false
+			else
+				@hash_body[session_id][key] = true
 			end
 		}
 		body = bodyMaker(@hash_mode[session_id], @hash_body[session_id], jason_input["time"]["sec"], session_id)
