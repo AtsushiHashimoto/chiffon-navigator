@@ -34,7 +34,7 @@ class NavigatorBase
 			status, body = channel(jason_input, session_id)
 		when "CHECK"
 			fo = lock(session_id)
-			status, body = check(jason_input, session_id)
+			status, body = check_uncheck(jason_input, session_id)
 		when "START"
 			status, body, fo = start(jason_input, session_id)
 		when "END"
@@ -135,53 +135,22 @@ class NavigatorBase
 		return "internal error", e
 	end
 
-	def check(jason_input, session_id)
+	def check_uncheck(jason_input, session_id)
 		body = []
 
 		id = jason_input["operation_contents"]
-		# element_nameの確認
 		if @hash_recipe[session_id]["step"].key?(id)
-			# modeの修正
 			if @hash_mode[session_id]["step"][id]["is_finished?"]
-				@hash_mode[session_id] = uncheck_isFinished(@hash_recipe[session_id], @hash_mode[session_id], id)
+				@hash_mode[session_id] = uncheck(@hash_recipe[session_id], @hash_mode[session_id], id)
 			else
-				@hash_mode[session_id] = check_isFinished(@hash_recipe[session_id], @hash_mode[session_id], id)
+				@hash_mode[session_id] = check(@hash_recipe[session_id], @hash_mode[session_id], id)
 			end
-			current_step = @hash_mode[session_id]["current_step"]
-			current_substep = @hash_mode[session_id]["current_substep"]
-			@hash_mode[session_id] = set_ABLEorOTHERS(@hash_recipe[session_id], @hash_mode[session_id], current_step, current_substep)
-			@hash_recipe[session_id]["step"].each{|step_id, value|
-				unless @hash_mode[session_id]["step"][step_id]["is_finished?"]
-					@hash_mode[session_id]["step"][current_step]["CURRENT?"] = false
-					@hash_mode[session_id]["substep"][current_substep]["CURRENT?"] = false
-					@hash_mode[session_id]["prev_step"] = current_step
-					@hash_mode[session_id]["prev_substep"] = current_substep
-					@hash_mode[session_id], next_step, next_substep = go2next(@hash_recipe[session_id], @hash_mode[session_id])
-					@hash_mode[session_id] = set_ABLEorOTHERS(@hash_recipe[session_id], @hash_mode[session_id], next_step, next_substep)
-					break
-				end
-			}
 		elsif @hash_recipe[session_id]["substep"].key?(id)
-			# modeの修正
 			if @hash_mode[session_id]["substep"][id]["is_finished?"]
-				@hash_mode[session_id] = uncheck_isFinished(@hash_recipe[session_id], @hash_mode[session_id], id)
+				@hash_mode[session_id] = uncheck(@hash_recipe[session_id], @hash_mode[session_id], id)
 			else
-				@hash_mode[session_id] = check_isFinished(@hash_recipe[session_id], @hash_mode[session_id], id)
+				@hash_mode[session_id] = check(@hash_recipe[session_id], @hash_mode[session_id], id)
 			end
-			current_step = @hash_mode[session_id]["current_step"]
-			current_substep = @hash_mode[session_id]["current_substep"]
-			@hash_mode[session_id] = set_ABLEorOTHERS(@hash_recipe[session_id], @hash_mode[session_id], current_step, current_substep)
-			@hash_recipe[session_id]["step"].each{|step_id, value|
-				unless @hash_mode[session_id]["step"][step_id]["is_finished?"]
-					@hash_mode[session_id]["step"][current_step]["CURRENT?"] = false
-					@hash_mode[session_id]["substep"][current_substep]["CURRENT?"] = false
-					@hash_mode[session_id]["prev_step"] = current_step
-					@hash_mode[session_id]["prev_substep"] = current_substep
-					@hash_mode[session_id], next_step, next_substep = go2next(@hash_recipe[session_id], @hash_mode[session_id], current_step)
-					@hash_mode[session_id] = set_ABLEorOTHERS(@hash_recipe[session_id], @hash_mode[session_id], next_step, next_substep)
-					break
-				end
-			}
 		else
 			p "invalid params : jason_input['operation_contents'] is wrong when situation is CHECK."
 			logger()

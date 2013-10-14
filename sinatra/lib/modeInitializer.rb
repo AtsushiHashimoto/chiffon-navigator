@@ -62,7 +62,7 @@ def initialize_mode(hash_recipe)
 	hash_mode["current_step"] = current_step
 	hash_mode["current_substep"] = current_substep
 	# stepとsubstepを適切にABLEにする．
-	hash_mode = set_ABLEorOTHERS(hash_recipe, hash_mode, current_step, current_substep)
+	hash_mode = updateABLE(hash_recipe, hash_mode, current_step, current_substep)
 	if hash_mode["substep"][current_substep]["ABLE?"]
 		media = ["audio", "video", "notification"]
 		media.each{|media_name|

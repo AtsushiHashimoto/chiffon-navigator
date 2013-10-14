@@ -250,7 +250,7 @@ end
 			end
 		end
 		if next_step != nil && next_substep != nil
-			@hash_mode[session_id] = set_ABLEorOTHERS(@hash_recipe[session_id], @hash_mode[session_id], next_step, next_substep)
+			@hash_mode[session_id] = updateABLE(@hash_recipe[session_id], @hash_mode[session_id], next_step, next_substep)
 		end
 		@hash_mode[session_id] = check_notification_FINISHED(@hash_recipe[session_id], @hash_mode[session_id], time)
 	end
