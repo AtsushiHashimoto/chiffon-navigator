@@ -25,7 +25,7 @@ class DefaultNavigator < NavigatorBase
 			end
 		elsif @hash_recipe[session_id]["substep"].key?(id)
 			if @hash_mode[session_id]["substep"][id]["ABLE?"]
-				@hash_mode[session_id] = jump(@hash_recipe[session_id], @hash_mode[session_id], id, "INITIALIZE")
+				@hash_mode[session_id] = jump(@hash_recipe[session_id], @hash_mode[session_id], id, "initialize", false)
 			end
 		else
 			p "invalid params : jason_input['operation_contents'] is wrong when situation is NAVI_MENU."
@@ -102,18 +102,90 @@ class DefaultNavigator < NavigatorBase
 	when "order"
 		case e_input["action"]["name"]
 		when "next"
-		when "jump"
-			unless e_input["action"].key?("destination")
-				message = "When 'action':'name' is 'jump', EXTERNAL_INPUT must have key, 'destination'."
+		when "prev"
+			if hash_mode["prev_substep"] == []
+				message = "prev_substep is not exist"
 				return false, message
 			end
-			substep_id = e_input["action"]["destination"]
+			array_size = hash_mode["prev_substep"].size - 1
+			delete_list = []
+			hash_mode["prev_substep"].reverse_each{|substep_id|
+				if hash_mode["substep"][substep_id]["is_finished?"]
+					break
+				else
+					delete_list.push(array_size)
+					array_size = array_size - 1
+				end
+			}
+			delete_list.each{|address|
+				hash_mode["prev_substep"].delete_at(address)
+			}
+		when "jump"
+			unless e_input["action"].key?("target")
+				message = "When 'action':'name' is 'jump', EXTERNAL_INPUT must have key, 'target'."
+				return false, message
+			end
+			substep_id = e_input["action"]["target"]
 			unless hash_recipe["substep"].key?(substep_id)
 				message = "#{substep_id} : No such substep in recipe.xml"
 				return false, message
 			end
 			unless hash_mode["substep"][substep_id]["ABLE?"]
 				message = "Can not jump to #{substep_id}, because #{substep_id} is not ABLE."
+				return false, message
+			end
+		when "change"
+			unless e_input["action"].key?("target")
+				message = "When 'action':'name' is 'change', EXTERNAL_INPUT must have key, 'target'."
+				return false, message
+			end
+			substep_id = e_input["action"]["target"]
+			unless hash_recipe["substep"].key?(substep_id)
+				message = "#{substep_id} : No such substep in recipe.xml"
+				return false, message
+			end
+			unless hash_mode["substep"][substep_id]["ABLE?"]
+				message = "Can not jump to #{substep_id}, because #{substep_id} is not ABLE."
+				return false, message
+			end
+		when "check"
+			unless e_input["action"].key?("target")
+				message = "When 'action':'name' is 'check', EXTERNAL_INPUT must have key, 'target'."
+				return false, message
+			end
+			id = e_input["action"]["target"]
+			if hash_recipe["step"].key?(id)
+				if hash_mode["step"][id]["is_finished?"]
+					message = "#{id} is already finished."
+					return false, message
+				end
+			elsif hash_recipe["substep"].key?(id)
+				if hash_mode["substep"][id]["is_finished?"]
+					message = "#{id} is already finished."
+					return false, message
+				end
+			else
+				message = "#{id} : No such step/substep in recipe.xml"
+				return false, message
+			end
+		when "uncheck"
+			unless e_input["action"].key?("target")
+				message = "When 'action':'name' is 'uncheck', EXTERNAL_INPUT must have key, 'target'."
+				return false, message
+			end
+			id = e_input["action"]["target"]
+			if hash_recipe["step"].key?(id)
+				unless hash_mode["step"][id]["is_finished?"]
+					message = "#{id} is not finished."
+					return false, message
+				end
+			elsif hash_recipe["substep"].key?(id)
+				unless hash_mode["substep"][id]["is_finished?"]
+					message = "#{id} is not finished."
+					return false, message
+				end
+			else
+				message = "#{id} : No such step/substep in recipe.xml"
 				return false, message
 			end
 		else
@@ -182,55 +254,28 @@ end
 		return nil
 	end
 
-	##########################################################
-	##### modeのupdate処理が複雑な2メソッドのmodeUpdater #####
-	##########################################################
-
-	def modeUpdate_navimenu(time, id, session_id)
-		if @hash_recipe[session_id]["step"].key?(id)
-			unless @hash_mode[session_id]["step"][id]["CURRENT?"]
-				if @hash_mode[session_id]["step"][id]["open?"]
-					@hash_mode[session_id]["step"][id]["open?"] = false
-				else
-					@hash_mode[session_id]["step"][id]["open?"] = true
-				end
-			end
-		elsif @hash_recipe[session_id]["substep"].key?(id)
-			# substepがクリックされた場合のみ，detailDrawが変化するので，動画と音声を停止する．
-			shown_substep = @hash_mode[session_id]["shown"]
-			# substepに含まれるaudio，videoは再生済み・再生中・再生待ち関わらずSTOPに．
-			media = ["audio", "video"]
-			media.each{|media_name|
-				@hash_recipe[session_id]["substep"][shown_substep][media_name].each{|media_id|
-					if @hash_mode[session_id][media_name][media_id]["PLAY_MODE"] == "PLAY"
-						@hash_mode[session_id][media_name][media_id]["PLAY_MODE"] = "STOP"
-					end
-				}
-			}
-			# クリックされたsubstepをshownにする
-			@hash_mode[session_id]["shown"] = id
-		end
-	end
-
 	# EXTERNAL_INPUTリクエストの場合のmodeアップデート
 	def modeUpdate_externalinput(time, e_input, session_id)
 		next_step = nil
 		next_substep = nil
 		case e_input["mode"]
 		when "order"
-			current_step = @hash_mode[session_id]["current_step"]
-			current_substep = @hash_mode[session_id]["current_substep"]
-			@hash_mode[session_id]["substep"][current_substep]["CURRENT?"] = false
-			@hash_mode[session_id]["step"][current_step]["CURRENT?"] = false
-			@hash_mode[session_id]["prev_step"] = current_step
-			@hash_mode[session_id]["prev_substep"] = current_substep
-			@hash_mode[session_id] = check_isFinished(@hash_recipe[session_id], @hash_mode[session_id], current_substep)
 			if e_input["action"]["name"] == "next"
-				@hash_mode[session_id], next_step, next_substep = go2next(@hash_recipe[session_id], @hash_mode[session_id], current_step)
+				@hash_mode[session_id] = go2next(@hash_recipe[session_id], @hash_mode[session_id])
+			elsif e_input["action"]["name"] == "prev"
+				@hash_mode[session_id] = prev(@hash_recipe[session_id], @hash_mode[session_id])
 			elsif e_input["action"]["name"] == "jump"
-				next_substep = e_input["action"]["destination"]
-				next_step = @hash_recipe[session_id]["substep"][next_substep]["parent_step"]
-				@hash_mode[session_id] = jump2substep(@hash_recipe[session_id], @hash_mode[session_id], next_step, next_substep)
+				target = e_input["action"]["target"]
+				@hash_mode[session_id] = jump(@hash_recipe[session_id], @hash_mode[session_id], target, "finish", false)
+			elsif e_input["action"]["name"] == "change"
+				target = e_input["action"]["target"]
+				@hash_mode[session_id] = jump(@hash_recipe[session_id], @hash_mode[session_id], target, "initialize", false)
+			elsif e_input["action"]["name"] == "check"
+				target = e_input["action"]["target"]
+				@hash_mode[session_id] = check(@hash_recipe[session_id], @hash_mode[session_id], target)
+			elsif e_input["action"]["name"] == "uncheck"
+				target = e_input["action"]["target"]
+				@hash_mode[session_id] = uncheck(@hash_recipe[session_id], @hash_mode[session_id], target)
 			end
 		when "recognizer"
 			if e_input["action"]["name"] == "put"
@@ -240,22 +285,16 @@ end
 			end
 
 			next_substep = searchNextSubstep(@hash_recipe[session_id], @hash_mode[session_id])
-			current_step = @hash_mode[session_id]["current_step"]
 			current_substep = @hash_mode[session_id]["current_substep"]
 			if current_substep == next_substep
 				next_substep = nil
 			end
 			unless next_substep == nil
-				next_step = @hash_recipe[session_id]["substep"][next_substep]["parent_step"]
-				@hash_mode[session_id]["step"][current_step]["CURRENT?"] = false
-				@hash_mode[session_id]["substep"][current_substep]["CURRENT?"] = false
-				@hash_mode[session_id]["prev_step"] = current_step
-				@hash_mode[session_id]["prev_substep"] = current_substep
-				@hash_mode[session_id] = check_isFinished(@hash_recipe[session_id], @hash_mode[session_id], current_substep)
-				@hash_mode[session_id] = jump2substep(@hash_recipe[session_id], @hash_mode[session_id], next_step, next_substep)
+				@hash_mode[session_id] = jump(@hash_recipe[session_id], @hash_mode[session_id], next_substep, "FINISH")
 			end
 		end
-		if next_step != nil && next_substep != nil
+		if next_substep != nil
+			next_step = @hash_recipe[session_id]["substep"][next_substep]["parent_step"]
 			@hash_mode[session_id] = updateABLE(@hash_recipe[session_id], @hash_mode[session_id], next_step, next_substep)
 		end
 		@hash_mode[session_id] = check_notification_FINISHED(@hash_recipe[session_id], @hash_mode[session_id], time)

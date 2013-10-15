@@ -126,30 +126,28 @@ end
 # mode=INITIALIZEなら，currentなsubstepはothersにする．
 # mode=FINISHなら，currentなsubstepはis_finishedにする．
 # ableの設定等もここでやる．
-def jump(hash_recipe, hash_mode, next_substep, mode)
+def jump(hash_recipe, hash_mode, next_substep, mode, prev)
 	next_step = hash_recipe["substep"][next_substep]["parent_step"]
 	current_step = hash_mode["current_step"]
 	current_substep = hash_mode["current_substep"]
 	hash_mode["step"][current_step]["CURRENT?"] = false
 	hash_mode["substep"][current_substep]["CURRENT?"] = false
-	hash_mode["prev_step"] = current_step
-	hash_mode["prev_substep"] = current_substep
 
 	hash_mode["current_step"] = next_step
 	hash_mode["current_substep"] = next_substep
+	unless prev
+		hash_mode["prev_substep"].push(current_substep)
+	end
 	hash_mode["step"][next_step]["CURRENT?"] = true
 	hash_mode["step"][next_step]["open?"] = true
 	hash_mode["substep"][next_substep]["CURRENT?"] = true
 	hash_mode["shown"] = next_substep
 
 	media = ["audio", "video", "notification"]
-	case mode
-	when "INITIALIZE"
-		hash_mode = controlMedia(hash_recipe, hash_mode, media, "STOP", current_substep)
-	when "FINISH"
+	if mode == "finish"
 		hash_mode = check_isFinished(hash_recipe, hash_mode, current_substep)
-	else
-		p "invalid mode for 'jump'"
+	elsif mode == "initialize"
+		hash_mode = controlMedia(hash_recipe, hash_mode, media, "STOP", current_substep)
 	end
 
 	hash_mode = controlMedia(hash_recipe, hash_mode, media, "START", next_substep)
@@ -162,6 +160,10 @@ end
 def go2next(hash_recipe, hash_mode, *mode)
 	current_step = hash_mode["current_step"]
 	current_substep = hash_mode["current_substep"]
+	if mode == []
+		hash_mode = check_isFinished(hash_recipe, hash_mode, current_substep)
+		hash_mode = updateABLE(hash_recipe, hash_mode)
+	end
 	next_substep = nil
 	if hash_mode["step"][current_step]["ABLE?"]
 		hash_recipe["step"][current_step]["substep"].each{|substep_id|
@@ -184,34 +186,42 @@ def go2next(hash_recipe, hash_mode, *mode)
 			end
 		}
 	end
-	if mode == []
-		hash_mode = jump(hash_recipe, hash_mode, next_substep, "FINISH")
-	else
-		hash_mode = jump(hash_recipe, hash_mode, next_substep, mode[0])
-	end
+	hash_mode = jump(hash_recipe, hash_mode, next_substep, "initialize", false)
 	return hash_mode
 end
 
 def prev(hash_recipe, hash_mode)
-	prev_substep = hash_mode["prev_substep"]
+	prev_substep = hash_mode["prev_substep"].pop
 	current_step = hash_mode["current_step"]
 	current_substep = hash_mode["current_substep"]
-	hash_mode = uncheck_is_Finished(hash_recipe, hash_mode, prev_substep)
-	hash_mode = jump(hash_recipe, hash_mode, prev_substep, "INITIALIZE")
+	hash_mode = uncheck_isFinished(hash_recipe, hash_mode, prev_substep)
+	hash_mode = jump(hash_recipe, hash_mode, prev_substep, "initialize", true)
 	return hash_mode
 end
 
 def check(hash_recipe, hash_mode, id)
 	hash_mode = check_isFinished(hash_recipe, hash_mode, id)
 	hash_mode = updateABLE(hash_recipe, hash_mode)
-	hash_mode = go2next(hash_recipe, hash_mode, "INITIALIZE")
+	current_step = hash_mode["current_step"]
+	current_substep = hash_mode["current_substep"]
+	if hash_mode["substep"][current_substep]["is_finished?"]
+		hash_mode = go2next(hash_recipe, hash_mode, "check")
+	else
+		hash_mode = updateABLE(hash_recipe, hash_mode, current_step, current_substep)
+	end
 	return hash_mode
 end
 
 def uncheck(hash_recipe, hash_mode, id)
 	hash_mode = uncheck_isFinished(hash_recipe, hash_mode, id)
 	hash_mode = updateABLE(hash_recipe, hash_mode)
-	hash_mode = go2next(hash_recipe, hash_mode, "INITIALIZE")
+	current_step = hash_mode["current_step"]
+	current_substep = hash_mode["current_substep"]
+	if hash_mode["substep"][current_substep]["ABLE?"]
+		hash_mode = updateABLE(hash_recipe, hash_mode, current_step, current_substep)
+	else
+		hash_mode = go2next(hash_recipe, hash_mode, "uncheck")
+	end
 	return hash_mode
 end
 

@@ -40,10 +40,8 @@ def initialize_mode(hash_recipe)
 	hash_mode["display"] = "OVERVIEW"
 	# DetailDrawで指定されるsubstepの管理
 	hash_mode["shown"] = nil
-	# 直前にcurrentであったstepの管理
-	hash_mode["prev_step"] = nil
-	# 直前にcurrentであったsubstepの管理
-	hash_mode["prev_substep"] = nil
+	# 過去にcurrentであったsubstepのリスト管理
+	hash_mode["prev_substep"] = []
 	# currentなstepの管理
 	hash_mode["current_step"] = nil
 	# currentなsubstepの管理
