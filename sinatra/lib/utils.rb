@@ -58,7 +58,7 @@ def controlMedia(hash_recipe, hash_mode, media_array, media_mode, *id_array)
 			media_array.each{|media_name|
 				hash_recipe["substep"][substep_id][media_name].each{|media_id|
 					if hash_mode[media_name][media_id]["PLAY_MODE"] == "PLAY"
-						hash_mode[media_name][media_id]["PLAY_MODE"] == "STOP"
+						hash_mode[media_name][media_id]["PLAY_MODE"] = "STOP"
 					end
 				}
 			}
@@ -282,7 +282,7 @@ def uncheck_isFinished(hash_recipe, hash_mode, id)
 			hash_mode["step"][id]["is_finished?"] = false
 			hash_recipe["step"][id]["substep"].each{|substep_id|
 				hash_mode["substep"][substep_id]["is_finished?"] = false
-				hash_mode = controlMedia(hash_recipe, hash_mode, media, "INITIALIZE", substep_id)
+				hash_mode = controlMedia(hash_recipe, hash_mode, media, "STOP", substep_id)
 			}
 			hash_recipe["step"].each{|step_id, value|
 				hash_recipe["step"][step_id]["parent"].each{|parent_id|
@@ -297,7 +297,7 @@ def uncheck_isFinished(hash_recipe, hash_mode, id)
 			parent_step = hash_recipe["substep"][id]["parent_step"]
 			hash_recipe["step"][parent_step]["substep"].reverse_each{|substep_id|
 				hash_mode["substep"][substep_id]["is_finished?"] = false
-				hash_mode = controlMedia(hash_recipe, hash_mode, media, "INITIALIZE", substep_id)
+				hash_mode = controlMedia(hash_recipe, hash_mode, media, "STOP", substep_id)
 				if substep_id == id
 					break
 				end
