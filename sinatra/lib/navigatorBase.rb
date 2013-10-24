@@ -72,6 +72,7 @@ class NavigatorBase
 			logger()
 			orders = {"status"=>"internal error"}
 		end
+		p orders
 		unlock(fo)
 		return orders
 	rescue => e
@@ -224,13 +225,7 @@ class NavigatorBase
 		# mediaをSTOPにする．
 		session_id = jason_input["session_id"]
 		media = ["audio", "video", "notification"]
-		media.each{|media_name|
-			@hash_mode[session_id][media_name].each{|media_id, value|
-				if value["PLAY_MODE"] == "PLAY"
-					@hash_mode[session_id][media_name][media_id]["PLAY_MODE"] = "STOP"
-				end
-			}
-		}
+		@hash_mode[session_id] = controlMedia(@hashrecipe[sesison_id], @hash_mode[session_id], media, "STOP")
 
 		@hash_body[session_id].each{|key, value|
 			if key == "Cancel"

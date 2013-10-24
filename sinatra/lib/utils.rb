@@ -24,44 +24,73 @@ def bodyMaker(hash_mode, hash_body, time, session_id)
 end
 
 def controlMedia(hash_recipe, hash_mode, media_array, media_mode, *id_array)
-	case media_mode
-	when "INITIALIZE"
-		unless id_array == []
-			substep_id = id_array[0]
-			media_array.each{|media_name|
-				hash_recipe["substep"][substep_id][media_name].each{|media_id|
-					hash_mode[media_name][media_id]["PLAY_MODE"] = "---"
-					hash_mode[media_name][media_id]["time"] = -1
-				}
-			}
+	if Array.try_convert(media_array) == nil
+		media_name = nil
+		media_id = media_array
+		media_mode = nil
+		if hash_recipe["audio"].key?(media_id)
+			media_name = "audio"
+			if hash_recipe["audio"][media_id]["trigger"][0] == "start"
+				media_mode = "START"
+			else
+				media_mode = "STOP"
+			end
+		elsif hash_recipe["video"].key?(media_id)
+			media_name = "video"
+		elsif hash_recipe["notification"].key?(media_id)
+			media_name = "notification"
 		end
-	when "START"
-		unless id_array == []
-			substep_id = id_array[0]
-			media_array.each{|media_name|
-				hash_recipe["substep"][substep_id][media_name].each{|media_id|
-					hash_mode[media_name][media_id]["PLAY_MODE"] = "START"
+		hash_mode[media_name][media_id]["PLAY_MODE"] = media_mode
+	else
+		case media_mode
+		when "INITIALIZE"
+			unless id_array == []
+				substep_id = id_array[0]
+				media_array.each{|media_name|
+					hash_recipe["substep"][substep_id][media_name].each{|media_id|
+						hash_mode[media_name][media_id]["PLAY_MODE"] = "---"
+						hash_mode[media_name][media_id]["time"] = -1
+					}
 				}
-			}
-		end
-	when "STOP"
-		if id_array = []
-			media_array.each{|media_name|
-				hash_mode[media_name].each{|media_id, value|
-					if value["PLAY_MODE"] == "PLAY"
-						hash_mode[media_name][media_id]["PLAY_MODE"] = "STOP"
-					end
+			end
+		when "START"
+			unless id_array == []
+				substep_id = id_array[0]
+				substep_trigger = nil
+				if hash_recipe["substep"][substep_id]["trigger"][0] != nil
+					substep_trigger = hash_recipe["substep"][substep_id]["trigger"][0][1]
+				end
+				media_array.each{|media_name|
+					hash_recipe["substep"][substep_id][media_name].each{|media_id|
+						media_trigger = nil
+						if hash_recipe[media_name][media_id]["trigger"][0] != nil
+							media_trigger = hash_recipe[media_name][media_id]["trigger"][0][1]
+						end
+						if media_trigger == substep_trigger
+							hash_mode[media_name][media_id]["PLAY_MODE"] = "START"
+						end
+					}
 				}
-			}
-		else
-			substep_id = id_array[0]
-			media_array.each{|media_name|
-				hash_recipe["substep"][substep_id][media_name].each{|media_id|
-					if hash_mode[media_name][media_id]["PLAY_MODE"] == "PLAY"
-						hash_mode[media_name][media_id]["PLAY_MODE"] = "STOP"
-					end
+			end
+		when "STOP"
+			if id_array = []
+				media_array.each{|media_name|
+					hash_mode[media_name].each{|media_id, value|
+						if value["PLAY_MODE"] == "PLAY"
+							hash_mode[media_name][media_id]["PLAY_MODE"] = "STOP"
+						end
+					}
 				}
-			}
+			else
+				substep_id = id_array[0]
+				media_array.each{|media_name|
+					hash_recipe["substep"][substep_id][media_name].each{|media_id|
+						if hash_mode[media_name][media_id]["PLAY_MODE"] == "PLAY"
+							hash_mode[media_name][media_id]["PLAY_MODE"] = "STOP"
+						end
+					}
+				}
+			end
 		end
 	end
 	return hash_mode

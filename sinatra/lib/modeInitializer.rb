@@ -63,6 +63,7 @@ def initialize_mode(hash_recipe)
 	hash_mode = updateABLE(hash_recipe, hash_mode, current_step, current_substep)
 	if hash_mode["substep"][current_substep]["ABLE?"]
 		media = ["audio", "video", "notification"]
+		hash_mode = controlMedia(hash_recipe, hash_mode, media, "START", current_substep)
 		media.each{|media_name|
 			hash_recipe["substep"][current_substep][media_name].each{|media_id|
 				hash_mode[media_name][media_id]["PLAY_MODE"] = "START"

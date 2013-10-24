@@ -51,7 +51,6 @@ class DefaultNavigator < NavigatorBase
 		body = []
 		# EXTERNALINPUTのチェック
 		e_input = nil
-		p jason_input["operation_contents"]
 		begin
 			e_input = JSON.load(jason_input["operation_contents"])
 		rescue
@@ -254,6 +253,30 @@ end
 		return nil
 	end
 
+	def searchPlayMedia(hash_recipe, hash_mode)
+		media = ["audio", "video"]
+		media.each{|media_name|
+			hash_recipe[media_name].each{|media_id, value|
+				value["trigger"].each{|value2|
+					flag = -1
+					array_trigger = value2[1]
+					array_trigger.each{|ref|
+						if hash_mode["taken"].include?(ref)
+							flag = 1
+						else
+							flag = 0
+							break
+						end
+					}
+					if flag == 1
+						return media_id
+					end
+				}
+			}
+		}
+		return nil
+	end
+
 	# EXTERNAL_INPUTリクエストの場合のmodeアップデート
 	def modeUpdate_externalinput(time, e_input, session_id)
 		next_step = nil
@@ -289,11 +312,16 @@ end
 			if current_substep == next_substep
 				next_substep = nil
 			end
-			unless next_substep == nil
+			if next_substep == nil
+				play_media = searchPlayMedia(@hash_recipe[session_id], @hash_mode[session_id])
+				unless play_media == nil
+					@hash_mode[session_id] = controlMedia(@hash_recipe[session_id], @hash_mode[session_id], play_media, "SOMETHING")
+				end
+			else
 				@hash_mode[session_id] = jump(@hash_recipe[session_id], @hash_mode[session_id], next_substep, "FINISH")
 			end
 		end
-		if next_substep != nil
+		unless next_substep == nil
 			next_step = @hash_recipe[session_id]["substep"][next_substep]["parent_step"]
 			@hash_mode[session_id] = updateABLE(@hash_recipe[session_id], @hash_mode[session_id], next_step, next_substep)
 		end
