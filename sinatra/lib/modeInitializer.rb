@@ -17,6 +17,7 @@ def initialize_mode(hash_recipe)
 			hash_mode["substep"][substep_id]["is_finished?"] = false
 			hash_mode["substep"][substep_id]["CURRENT?"] = false
 			hash_mode["substep"][substep_id]["can_be_searched?"] = false
+			hash_mode["substep"][substep_id]["have_be_current?"] = false
 		}
 	end
 	if hash_recipe.key?("audio")
@@ -66,7 +67,7 @@ def initialize_mode(hash_recipe)
 	# stepとsubstepを適切にABLEにする．
 	hash_mode = updateABLE(hash_recipe, hash_mode, current_step, current_substep)
 	if hash_mode["substep"][current_substep]["ABLE?"]
-		hash_mode = controlMedia(hash_recipe, hash_mode, ["audio", "video", "notification"], "START")
+		hash_mode = controlMedia(hash_recipe, hash_mode, "all", "START", current_substep)
 	end
 
 	return hash_mode

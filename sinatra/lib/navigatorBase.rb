@@ -107,10 +107,18 @@ class NavigatorBase
 			end
 		elsif @hash_recipe[session_id]["substep"].key?(clicked_id)
 			if @hash_mode[session_id]["substep"][clicked_id]["ABLE?"]
+				# 遷移先のsubstepにおいて，prev_substepがis_finished?==falseであった場合，substepを並べ替えhash_recipeを更新．
+				prev_of_clicked = @hash_recipe[session_id]["substep"][clicked_id]["prev_substep"]
+				unless @hash_mode[session_id]["substep"][prev_of_clicked]["is_finished?"]
+					@hash_recipe[session_id] = sortSubstep(@hash_recipe[session_id], @hash_mode[session_id], clicked_id)
+					open("records/#{session_id}/recipe.txt", "w"){|io|
+						io.puts(JSON.pretty_generate(@hash_recipe[session_id]))
+					}
+				end
 				# substepをchangeする．遷移元のsubstepはinitialize．
-				@hash_mode[session_id] = controlMedia(@hash_recipe[session_id], @hash_mode[session_id], ["audio", "video", "notification"], "STOP", @hash_mode[session_id]["current_substep"])
+				@hash_mode[session_id] = controlMedia(@hash_recipe[session_id], @hash_mode[session_id], "all", "STOP", @hash_mode[session_id]["current_substep"])
 				@hash_mode[session_id] = jump(@hash_recipe[session_id], @hash_mode[session_id], clicked_id)
-				@hash_mode[session_id] = controlMedia(@hash_recipe[session_id], @hash_mode[session_id], ["audio", "video", "notification"], "START", clicked_id)
+				@hash_mode[session_id] = controlMedia(@hash_recipe[session_id], @hash_mode[session_id], "all", "START", clicked_id)
 				# ユーザのsubstep切り替え操作はestimationのレベルが高くなる
 				@hash_mode[session_id]["current_estimation_level"] = "explicitly"
 				# 過去の遷移履歴は初期化してしまう．
@@ -152,7 +160,7 @@ class NavigatorBase
 			}
 		when "MATERIALS", "OVERVIEW"
 			# メディアを停止する
-			@hash_mode[session_id] = controlMedia(@hash_recipe[session_id], @hash_mode[session_id], ["audio", "video"], "STOP")
+			@hash_mode[session_id] = controlMedia(@hash_recipe[session_id], @hash_mode[session_id], ["audio", "video"], "STOP", @hash_mode[session_id]["current_substep"])
 			# notificationが再生済みかチェック．
 			@hash_mode[session_id] = check_notification_FINISHED(@hash_recipe[session_id], @hash_mode[session_id], jason_input["time"]["sec"])
 			# チャンネルの切り替え
@@ -288,7 +296,7 @@ class NavigatorBase
 		body = []
 		# mediaをSTOPにする．
 		session_id = jason_input["session_id"]
-		@hash_mode[session_id] = controlMedia(@hash_recipe[session_id], @hash_mode[session_id], ["audio", "video", "notification"], "STOP")
+		@hash_mode[session_id] = controlMedia(@hash_recipe[session_id], @hash_mode[session_id], "all", "STOP")
 
 		@hash_body[session_id].each{|key, value|
 			if key == "Cancel"
@@ -399,7 +407,7 @@ class NavigatorBase
 				if value["PLAY_MODE"] == "START"
 					if @hash_recipe[session_id][media_name][media_id]["trigger"].empty?
 						@hash_mode[session_id][media_name][media_id]["PLAY_MODE"] = "---"
-						return []
+						next
 					else
 						orders.push({"Play"=>{"id"=>media_id, "delay"=>@hash_recipe[session_id][media_name][media_id]["trigger"][0]["delay"].to_i}})
 						finish_time = time + @hash_recipe[session_id][media_name][media_id]["trigger"][0]["delay"].to_i * 1000
@@ -409,7 +417,7 @@ class NavigatorBase
 				end
 			}
 		}
-		p orders
+		# p orders
 		return orders
 	end
 
@@ -438,7 +446,7 @@ class NavigatorBase
 				@hash_mode[session_id]["audio"][audio_id]["time"] = finish_time
 			}
 		end
-		p orders
+		# p orders
 		return orders
 	end
 
@@ -450,7 +458,7 @@ class NavigatorBase
 			@hash_mode[session_id][media_name].each{|media_id, value|
 				if value["PLAY_MODE"] == "STOP"
 					orders.push({"Cancel"=>{"id"=>media_id}})
-					@hash_mode[session_id][media_name][media_id]["PLAY_MODE"] = "---"
+					@hash_mode[session_id][media_name][media_id]["PLAY_MODE"] = "PLAYED"
 					@hash_mode[session_id][media_name][media_id]["time"] = -1
 				end
 			}
@@ -459,16 +467,16 @@ class NavigatorBase
 			@hash_mode[session_id]["notification"].each{|id, value|
 				if value["PLAY_MODE"] == "STOP"
 					orders.push({"Cancel"=>{"id"=>id}})
-					@hash_mode[session_id]["notification"][id]["PLAY_MODE"] = "---"
+					@hash_mode[session_id]["notification"][id]["PLAY_MODE"] = "PLAYED"
 					@hash_mode[session_id]["notification"][id]["time"] = -1
 					@hash_recipe[session_id]["notification"][id]["audio"].each{|audio_id|
-						@hash_mode[session_id]["audio"][audio_id]["PLAY_MODE"] == "---"
+						@hash_mode[session_id]["audio"][audio_id]["PLAY_MODE"] == "PLAYED"
 						@hash_mode[session_id]["audio"][audio_id]["time"] = -1
 					}
 				end
 			}
 		end
-		p orders
+		# p orders
 		return orders
 	end
 

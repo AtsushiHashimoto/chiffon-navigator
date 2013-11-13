@@ -1,6 +1,7 @@
 #!/usr/bin/ruby
 
 def controlMedia(hash_recipe, hash_mode, media_array, play_mode, *id_array)
+	media_array = ["audio", "video", "notification"] if media_array == "all"
 	case play_mode
 	when "FIRST"
 		# 開始時に再生すべきnotificationが無いか探索し，そのidを返す
@@ -32,13 +33,19 @@ def controlMedia(hash_recipe, hash_mode, media_array, play_mode, *id_array)
 			if hash_recipe["substep"].key?(id)
 				substep_id = id
 			elsif hash_recipe["audio"].key?(id)
-				hash_mode["audio"][id]["PLAY_MODE"] = "START"
+				if hash_mode["audio"][id]["PLAY_MODE"] == "---"
+					hash_mode["audio"][id]["PLAY_MODE"] = "START"
+				end
 				return hash_mode
 			elsif hash_recipe["video"].key?(id)
-				hash_mode["video"][id]["PLAY_MODE"] = "START"
+				if hash_mode["video"][id]["PLAY_MODE"] == "---"
+					hash_mode["video"][id]["PLAY_MODE"] = "START"
+				end
 				return hash_mode
 			elsif hash_recipe["notification"].key?(id)
-				hash_mode["notification"][id]["PLAY_MODE"] = "START"
+				if hash_mode["notification"][id]["PLAY_MODE"] == "---"
+					hash_mode["notification"][id]["PLAY_MODE"] = "START"
+				end
 				return hash_mode
 			end
 		end
@@ -48,7 +55,7 @@ def controlMedia(hash_recipe, hash_mode, media_array, play_mode, *id_array)
 				if hash_recipe[media_name][media_id]["trigger"][0] != nil
 					media_trigger = hash_recipe[media_name][media_id]["trigger"][0]["ref"]["other"][0]
 				end
-				if media_trigger == "sametime"
+				if media_trigger == "sametime" && hash_mode[media_name][media_id]["PLAY_MODE"] == "---"
 					hash_mode[media_name][media_id]["PLAY_MODE"] = "START"
 				end
 			}
@@ -116,15 +123,29 @@ def updateABLE(hash_recipe, hash_mode, *current)
 
 		hash_recipe["step"][step_id]["substep"].each{|substep_id|
 			hash_mode["substep"][substep_id]["ABLE?"] = false
+			# have_be_current=trueならnext substepをcan_be_searched=trueにする．
+			if hash_mode["substep"][substep_id]["have_be_current?"]
+				next_substep = hash_mode["substep"][substep_id]["next_substep"]
+				hash_mode["substep"][substep_id]["can_be_searched?"] = true
+			end
 		}
 		if hash_mode["step"][step_id]["ABLE?"]
 			hash_recipe["step"][step_id]["substep"].each{|substep_id|
 				unless hash_mode["substep"][substep_id]["is_finished?"]
 					hash_mode["substep"][substep_id]["ABLE?"] = true
+					# ableはcan_be_searched=trueにする．
+					hash_mode["substep"][substep_id]["can_be_searched?"] = true
 					if step_id == current_step && substep_id == current_substep
 						if hash_recipe["substep"][substep_id]["next_substep"] != nil
 							next_substep = hash_recipe["substep"][substep_id]["next_substep"]
 							hash_mode["substep"][next_substep]["ABLE?"] = true
+							hash_mode["substep"][next_substep]["can_be_searched?"] = true
+						end
+					end
+					next_substep = hash_recipe["substep"][substep_id]["next_substep"]
+					unless next_substep == nil
+						if hash_recipe["substep"][substep_id]["order"] == hash_recipe["substep"][next_substep]["order"]
+							next
 						end
 					end
 					break
@@ -133,6 +154,77 @@ def updateABLE(hash_recipe, hash_mode, *current)
 		end
 	}
 	return hash_mode
+end
+
+def sortSubstep(hash_recipe, hash_mode, current_substep)
+	current_step = hash_recipe["substep"][current_substep]["parent_step"]
+	substep_list = hash_recipe["step"][current_step]["substep"]
+	# current_substepが一番目であれば，sortしない
+	if hash_recipe["substep"][current_substep]["prev_substep"] == nil
+		return hash_recipe
+	end
+	# orderが重複している事を確認
+	order = -1
+	flag = false
+	substep_list.each{|substep_id|
+		if flag
+			unless order == hash_recipe["substep"][substep_id]["order"]
+				return hash_recipe
+			end
+		end
+		if substep_id == current_substep
+			unless order == hash_recipe["substep"][substep_id]["order"]
+				return hash_recipe
+			end
+			break
+		end
+		unless hash_mode["substep"][substep_id]["is_finished?"]
+			order = hash_recipe["substep"][substep_id]["order"]
+			flag = true
+		end
+	}
+	i = 0
+	# substepリストを修正
+	substep_list.each{|substep_id|
+		unless hash_mode["substep"][substep_id]["is_finished?"] || substep_id == current_substep
+			# 先にcurrentになったsubstepをi番目に挿入する
+			hash_recipe["step"][current_step]["substep"].insert(i, current_substep)
+			# 挿入したsubstepのnext_susbtepを更新
+			hash_recipe["substep"][current_substep]["next_substep"] = hash_recipe["step"][current_step]["substep"][i+1]
+			# 挿入したsubstepのprev_substepを更新
+			if i == 0
+				hash_recipe["substep"][current_substep]["prev_substep"] = nil
+			else
+				hash_recipe["substep"][current_substep]["prev_substep"] = hash_recipe["step"][current_step]["substep"][i-1]
+			end
+			# i+1番目のsubstepのprev_substepを更新
+			i = i + 1
+			substep_id = hash_recipe["step"][current_step]["substep"][i]
+			hash_recipe["substep"][substep_id]["prev_substep"] = current_substep
+			# これ以降のlistはforループ内で更新
+			for j in (i+1)..(substep_list.size)
+				if hash_recipe["step"][current_step]["substep"][j] == current_substep
+					# j-1番目のsubstepのnext_substepを更新
+					substep_id = hash_recipe["step"][current_step]["substep"][j-1]
+					if j == substep_list.size
+						hash_recipe["substep"][substep_id]["next_substep"] = nil
+					else
+						hash_recipe["substep"][substep_id]["next_substep"] = hash_recipe["step"][current_step]["substep"][j+1]
+					end
+					# j番目のsubstepをdelete
+					hash_recipe["step"][current_step]["substep"].delete_at(j)
+					# j+1（deleteの結果本当はj）番目のsubstepのprev_substepを更新
+					substep_id_2 = hash_recipe["step"][current_step]["substep"][j]
+					hash_recipe["substep"][substep_id_2]["prev_substep"] = substep_id
+					break
+				end
+			end
+			break
+		end
+		i = i + 1
+	}
+
+	return hash_recipe
 end
 
 # id先に移動するだけ
@@ -249,6 +341,8 @@ def check_isFinished(hash_recipe, hash_mode, id)
 			hash_mode["step"][id]["is_finished?"] = true
 			hash_recipe["step"][id]["substep"].each{|substep_id|
 				hash_mode["substep"][substep_id]["is_finished?"] = true
+				# is_finished=trueなsubstepはcan_be_searched=trueにする
+				hash_mode["substep"][substep_id]["can_be_searched?"] = true
 				hash_mode = controlMedia(hash_recipe, hash_mode, "STOP", substep_id)
 			}
 			hash_recipe["step"][id]["parent"].each{|parent_id|
@@ -260,6 +354,8 @@ def check_isFinished(hash_recipe, hash_mode, id)
 			parent_step = hash_recipe["substep"][id]["parent_step"]
 			hash_recipe["step"][parent_step]["substep"].each{|substep_id|
 				hash_mode["substep"][substep_id]["is_finished?"] = true
+				# is_finished=trueなsubstepはcan_be_searched=trueにする
+				hash_mode["substep"][substep_id]["can_be_searched?"] = true
 				hash_mode = controlMedia(hash_recipe, hash_mode, "STOP", substep_id)
 				if substep_id == id
 					break
@@ -283,6 +379,8 @@ def uncheck_isFinished(hash_recipe, hash_mode, id)
 			hash_mode["step"][id]["is_finished?"] = false
 			hash_recipe["step"][id]["substep"].each{|substep_id|
 				hash_mode["substep"][substep_id]["is_finished?"] = false
+				# is_finished=falseにするときはcan_be_searched=falseにする
+				hash_mode["substep"][substep_id]["can_be_searched?"] = false
 				hash_mode = controlMedia(hash_recipe, hash_mode, media, "STOP", substep_id)
 			}
 			hash_recipe["step"].each{|step_id, value|
@@ -298,6 +396,8 @@ def uncheck_isFinished(hash_recipe, hash_mode, id)
 			parent_step = hash_recipe["substep"][id]["parent_step"]
 			hash_recipe["step"][parent_step]["substep"].reverse_each{|substep_id|
 				hash_mode["substep"][substep_id]["is_finished?"] = false
+				# is_finished=falseにするときはcan_be_searched=falseにする
+				hash_mode["substep"][substep_id]["can_be_searched?"] = false
 				hash_mode = controlMedia(hash_recipe, hash_mode, media, "STOP", substep_id)
 				if substep_id == id
 					break
