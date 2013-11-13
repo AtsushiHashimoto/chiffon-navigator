@@ -10,43 +10,6 @@ class DefaultNavigator < NavigatorBase
 
 	private
 
-	########################################################
-	##### situationに合わせて動作する7メソッドの内，   #####
-	##### navigatorの仕様に合わせて変更すべき3メソッド #####
-	########################################################
-
-	def navi_menu(jason_input, session_id)
-		body = []
-
-		id = jason_input["operation_contents"]
-		if @hash_recipe[session_id]["step"].key?(id)
-			unless @hash_mode[session_id]["step"][id]["CURRENT?"]
-				@hash_mode[session_id]["step"][id]["open?"] = (not @hash_mode[session_id]["step"][id]["open?"])
-			end
-		elsif @hash_recipe[session_id]["substep"].key?(id)
-			if @hash_mode[session_id]["substep"][id]["ABLE?"]
-				@hash_mode[session_id] = jump(@hash_recipe[session_id], @hash_mode[session_id], id, "initialize", false)
-			end
-		else
-			p "invalid params : jason_input['operation_contents'] is wrong when situation is NAVI_MENU."
-			logger()
-			return "invalid params", body
-		end
-
-		@hash_body[session_id].each{|key, value|
-			if key == "ChannelSwitch"
-				@hash_body[session_id][key] = false
-			else
-				@hash_body[session_id][key] = true
-			end
-		}
-		body = bodyMaker(@hash_mode[session_id], @hash_body[session_id], jason_input["time"]["sec"], session_id)
-
-		return "success", body
-	rescue => e
-		return "internal error", e
-	end
-
 	def external_input(jason_input, session_id)
 		body = []
 		# EXTERNALINPUTのチェック
@@ -54,11 +17,12 @@ class DefaultNavigator < NavigatorBase
 		begin
 			e_input = JSON.load(jason_input["operation_contents"])
 		rescue
-			p "EXTERNAL_INPUT is wrong."
+			p "EXTERNAL_INPUT can not be loaded because of invalid form."
 			p "EXTERNAL_INPUT must be {\"navigator\":hoge,\"mode\":\"hogehoge\",...}"
 			logger()
 			return "invalid params", body
 		end
+		p "e_input : #{e_input}"
 		# inputのチェック
 		result, message = inputChecker_externalinput(@hash_recipe[session_id], @hash_mode[session_id], e_input)
 		unless result
@@ -68,18 +32,23 @@ class DefaultNavigator < NavigatorBase
 			return "invalid params", body
 		end
 		# modeの修正
-		modeUpdate_externalinput(jason_input["time"]["sec"], e_input, session_id)
+		p "taken list : #{@hash_mode[session_id]["taken"]}"
+		updated = modeUpdate_externalinput(jason_input["time"]["sec"], e_input, session_id)
+		p "taken list : #{@hash_mode[session_id]["taken"]}"
 
-		@hash_body[session_id].each{|key, value|
-			if key == "ChannelSwitch"
-				@hash_body[session_id][key] = false
-			else
-				@hash_body[session_id][key] = true
-			end
-		}
-		body = bodyMaker(@hash_mode[session_id], @hash_body[session_id], jason_input["time"]["sec"], session_id)
-
-		return "success", body
+		# modeが修正された場合は，bodyを形成する
+		if updated
+			@hash_body[session_id].each{|key, value|
+				if key == "ChannelSwitch"
+					@hash_body[session_id][key] = false
+				else
+					@hash_body[session_id][key] = true
+				end
+			}
+			body = bodyMaker(jason_input["time"]["sec"], session_id)
+			return "success", body
+		end
+		return "success", []
 	rescue => e
 		return "internal error", e
 	end
@@ -192,27 +161,32 @@ class DefaultNavigator < NavigatorBase
 			return false, message
 		end
 	when "recognizer"
+		unless e_input["action"].key?("object")
+			message = "When 'mode' is 'recognizer', EXTERNAL_INPUT must have keys, 'object' in 'action'."
+			return false, message
+		end
+		unless e_input["action"]["object"].key?("name")
+			message = "When 'mode' is 'recognizer', EXTERNAL_INPUT must have keys, 'name' in 'object'."
+			return false, message
+		end
+		unless e_input["action"]["object"].key?("class")
+			message = "When 'mode' is 'recognizer', EXTERNAL_INPUT must have keys, 'class' in 'object'."
+			return false, message
+		end
+		unless e_input["action"]["object"]["class"] == "food" || e_input["action"]["object"]["class"] == "utensil" || e_input["action"]["object"]["class"] == "seasoning"
+			message = "e_input['action']['object']['class'] must be 'food', 'utensil' or 'seasoning'."
+			return false, message
+		end
 		case e_input["action"]["name"]
 		when "put"
-			unless e_input["action"].key?("tool")
-				message = "When 'mode' is 'recognizer', EXTERNAL_INPUT must have keys, 'tool'."
-				return false, message
-			end
-			unless hash_mode["taken"].include?(e_input["action"]["tool"])
-				message = "#{e_input["action"]["tool"]} : System user does not take such tool."
+			unless hash_mode["taken"][e_input["action"]["object"]["class"]].include?(e_input["action"]["object"]["name"])
+				message = "#{e_input["action"]["object"]["name"]} : System user does not take such object."
 				return false, message
 			end
 		when "taken"
-			unless e_input["action"].key?("tool")
-				message = "When 'mode' is 'recognizer', EXTERNAL_INPUT must have keys, 'tool'."
-				return false, message
-			end
-			if hash_mode["taken"].size > 1
-				message = "System user may not be able to take more than 2 tool."
-				return false, message
-			end
-			unless hash_recipe["object"].key?(e_input["action"]["tool"]) || hash_recipe["event"].key?(e_input["action"]["tool"])
-				message = "#{e_input["action"]["tool"]} : No such tool in recipe."
+			event = "taken_" + e_input["action"]["object"]["class"] + "_" + e_input["action"]["object"]["name"]
+			unless hash_recipe["event"].key?(event)
+				message = "#{event} : No such event in recipe."
 				return false, message
 			end
 		else
@@ -230,51 +204,212 @@ end
 	##### EXTERNAL_INPUT時の，次のsubstepを探索する #####
 	#####################################################
 
-	def searchNextSubstep(hash_recipe, hash_mode)
+	def searchNextSubstep(hash_recipe, hash_mode, object)
+		explicitly_substep_array = []
+		probably_substep_array = []
 		hash_recipe["substep"].each{|substep_id, value|
-			if hash_mode["substep"][substep_id]["ABLE?"]
-				value["trigger"].each{|value2|
-					flag = -1
-					array_trigger = value2[1]
-					array_trigger.each{|ref|
-						if hash_mode["taken"].include?(ref)
-							flag = 1
-						else
-							flag = 0
+			level = "recommend"
+			p "substep id : #{substep_id}"
+			p "substep is able? : #{hash_mode["substep"][substep_id]["ABLE?"]}"
+			p "substep is finished? : #{hash_mode["substep"][substep_id]["is_finished?"]}"
+			p "substep can be searched? : #{hash_mode["substep"][substep_id]["can_be_searched?"]}"
+			if hash_mode["substep"][substep_id]["ABLE?"] || (!hash_mode["substep"][substep_id]["is_finished?"] && hash_mode["substep"][substep_id]["can_be_searched?"])
+				value["trigger"].each{|trigger|
+					level_temp = "recommend"
+					if trigger["timing"] == "start"
+						trigger["ref"]["taken"]["food"].each{|ref|
+							unless hash_mode["taken"]["food"].key?(ref)
+								if level_temp == "explicitly"
+									level_temp = "probably"
+								elsif level_temp == "probably"
+									# ありえない
+								elsif level_temp == "not match"
+									# ありえない
+								elsif level_temp == "recommend"
+									level_temp = "not match"
+								end
+								break
+							end
+							level_temp = "explicitly"
+						}
+						print "level_temp food : #{level_temp}, "
+						trigger["ref"]["taken"]["seasoning"].each{|ref|
+							unless hash_mode["taken"]["seasoning"].key?(ref)
+								if level_temp == "explicitly"
+									level_temp = "probably"
+								elsif level_temp == "probably"
+									# 何もしない
+								elsif level_temp == "not match"
+									# 何もしない
+								elsif level_temp == "recommend"
+									level_temp = "not match"
+								end
+								break
+							end
+							if level_temp == "not match"
+								level_temp = "probably"
+							elsif level_temp == "recommend"
+								level_temp = "explicitly"
+							end
+						}
+						print "level_temp seasoning : #{level_temp}, "
+						trigger["ref"]["taken"]["utensil"].each{|ref|
+							unless hash_mode["taken"]["utensil"].key?(ref)
+								if level_temp == "explicitly"
+									level_temp = "probably"
+								elsif level_temp == "probably"
+									# 何もしない
+								elsif level_temp == "not match"
+									# 何もしない
+								elsif level_temp == "recommend"
+									level_temp = "not match"
+								end
+								break
+							end
+							if level_temp == "not match"
+								level_temp = "probably"
+							elsif level_temp == "recommend"
+								level_temp = "explicitly"
+							end
+						}
+						print "level_temp utensil : #{level_temp}\n"
+						if level_temp == "explicitly"
+							level = level_temp
 							break
+						elsif level_temp == "probably"
+							level = level_temp
 						end
-					}
-					if flag == 1
-						return substep_id
 					end
 				}
 			end
+			p "level : #{level}"
+			if level == "explicitly"
+				explicitly_substep_array.push(substep_id)
+			elsif level == "probably"
+				probably_substep_array.push(substep_id)
+			end
 		}
-		return nil
+		p "explicitly array : #{explicitly_substep_array}"
+		p "probably array : #{probably_substep_array}"
+		unless explicitly_substep_array.empty?
+			if explicitly_substep_array.include?(hash_mode["current_substep"])
+				p "exp array include current substep."
+				return hash_mode["current_substep"], "explicitly"
+			end
+			current_step = hash_mode["current_step"]
+			explicitly_substep_array.each{|substep_id|
+				step_id = hash_recipe["substep"][substep_id]["parent_step"]
+				if step_id == current_step
+					p "exp array include current step."
+					return substep_id, "explicitly"
+				end
+			}
+			p "reurn exp array[0]"
+			return explicitly_substep_array[0], "explicitly"
+		end
+		unless probably_substep_array.empty?
+			if probably_substep_array.include?(hash_mode["current_substep"])
+				p "prob array include current substep."
+				return hash_mode["current_substep"], "probably"
+			end
+			current_step = hash_mode["current_step"]
+			probably_substep_array.each{|substep_id|
+				step_id = hash_recipe["substep"][substep_id]["parent_step"]
+				if step_id == current_step
+					p "prob array include current step."
+					return substep_id, "probably"
+				end
+			}
+			next_substep = hash_recipe["substep"][hash_mode["current_substep"]]["next_substep"]
+			probably_substep_array.each{|substep_id|
+				if substep_id == next_substep
+					p "prob array include next substep of current substep"
+					return substep_id, "explicitly"
+				end
+			}
+			p "return prob array[0]"
+			return probably_substep_array[0], "probably"
+		end
+		return nil, nil
 	end
 
-	def searchPlayMedia(hash_recipe, hash_mode)
-		media = ["audio", "video"]
+	def searchPlayMedia(hash_recipe, hash_mode, action)
+		action_string = nil
+		media = ["audio", "video", "notification"]
+		if action["name"] == "put"
+			# actionがputのときは，特別にputされたobjectとメディアのrefを比較して判断
+			media.each{|media_name|
+				hash_recipe[media_name].each{|media_id, value|
+					value["trigger"].each{|trigger|
+						trigger["ref"]["put"][action["object"]["class"]].each{|ref|
+							if ref == action["object"]["name"]
+								return media_id, trigger["timing"]
+							end
+						}
+					}
+				}
+			}
+		end
+		# takenリストと比較して判断
 		media.each{|media_name|
 			hash_recipe[media_name].each{|media_id, value|
-				value["trigger"].each{|value2|
-					flag = -1
-					array_trigger = value2[1]
-					array_trigger.each{|ref|
-						if hash_mode["taken"].include?(ref)
-							flag = 1
-						else
-							flag = 0
+				value["trigger"].each{|trigger|
+					flag = false
+					trigger["ref"]["taken"]["food"].each{|ref|
+						unless hash_mode["taken"]["food"].key?(ref)
+							flag = false
 							break
 						end
+						flag = true
 					}
-					if flag == 1
-						return media_id
+					next unless flag
+					trigger["ref"]["taken"]["seasoning"].each{|ref|
+						unless hash_mode["taken"]["seasoning"].key?(ref)
+							flag = false
+							break
+						end
+						flag = true
+					}
+					next unless flag
+					trigger["ref"]["taken"]["utensil"].each{|ref|
+						unless hash_mode["taken"]["utensil"].key?(ref)
+							flag = false
+							break
+						end
+						flag = true
+					}
+					if flag
+						return media_id, trigger["timing"]
 					end
 				}
 			}
 		}
-		return nil
+		return nil, nil
+	end
+
+	def putObject_relate2Current?(hash_recipe, current_substep, put_object)
+		hash_recipe["substep"][current_substep]["trigger"].each{|trigger|
+			if trigger["ref"]["taken"][put_object["class"]].include?(put_object["name"])
+				return true
+			elsif trigger["ref"]["put"][put_object["class"]].include?(put_object["name"])
+				return true
+			end
+		}
+		return false
+	end
+
+	def currentSubstep_isFinished?(hash_recipe, current_substep, object)
+		hash_recipe["substep"][current_substep]["trigger"].each{|trigger|
+			timing = trigger["timing"]
+			if timing == "end"
+				trigger["ref"]["put"][object["class"]].each{|ref|
+					if ref == object["name"]
+						return true
+					end
+				}
+			end
+		}
+		return false
 	end
 
 	# EXTERNAL_INPUTリクエストの場合のmodeアップデート
@@ -284,102 +419,326 @@ end
 		case e_input["mode"]
 		when "order"
 			if e_input["action"]["name"] == "next"
+				@hash_mode[session_id] = check_isFinished(@hash_recipe[session_id], @hash_mode[session_id], @hash_mode[session_id]["current_substep"])
+				@hash_mode[session_id] = updateABLE(@hash_recipe[session_id], @hash_mode[session_id])
 				@hash_mode[session_id] = go2next(@hash_recipe[session_id], @hash_mode[session_id])
+				@hash_mode[session_id] = controlMedia(@hash_recipe[session_id], @hash_mode[session_id], ["audio", "video", "notification"], "START", @hash_mode[session_id]["current_substep"])
+				@hash_mode[session_id]["current_estimation_level"] = "explicitly"
+				@hash_mode[session_id]["prev_substep"] = []
+				@hash_mode[session_id]["prev_estimation_level"] = nil
 			elsif e_input["action"]["name"] == "prev"
+				@hash_mode[session_id] = controlMedia(@hash_recipe[session_id], @hash_mode[session_id], ["audio", "video", "notification"], "STOP", @hash_mode[session_id]["current_substep"])
 				@hash_mode[session_id] = prev(@hash_recipe[session_id], @hash_mode[session_id])
+				@hash_mode[session_id]["current_estimation_level"] = "explicitly"
+				@hash_mode[session_id]["prev_substep"] = []
+				@hash_mode[session_id]["prev_estimation_level"] = nil
 			elsif e_input["action"]["name"] == "jump"
 				target = e_input["action"]["target"]
-				@hash_mode[session_id] = jump(@hash_recipe[session_id], @hash_mode[session_id], target, "finish", false)
+				@hash_mode[session_id] = check_isFinished(@hash_recipe[session_id], @hash_mode[session_id], @hash_mode[session_id]["current_substep"])
+				@hash_mode[session_id] = jump(@hash_recipe[session_id], @hash_mode[session_id], target)
+				@hash_mode[session_id] = controlMedia(@hash_recipe[session_id], @hash_mode[session_id], ["audio", "video", "notification"], "START", target)
+				@hash_mode[session_id]["current_estimation_level"] = "explicitly"
+				@hash_mode[session_id]["prev_substep"] = []
+				@hash_mode[session_id]["prev_estimation_level"] = nil
 			elsif e_input["action"]["name"] == "change"
+				@hash_mode[session_id] = controlMedia(@hash_recipe[session_id], @hash_mode[session_id], ["audio", "video", "notification"], "STOP", @hash_mode[session_id]["current_substep"])
 				target = e_input["action"]["target"]
-				@hash_mode[session_id] = jump(@hash_recipe[session_id], @hash_mode[session_id], target, "initialize", false)
+				@hash_mode[session_id] = jump(@hash_recipe[session_id], @hash_mode[session_id], target)
+				@hash_mode[session_id] = controlMedia(@hash_recipe[session_id], @hash_mode[session_id], ["audio", "video", "notification"], "START", target)
+				@hash_mode[session_id]["current_estimation_level"] = "explicitly"
+				@hash_mode[session_id]["prev_substep"] = []
+				@hash_mode[session_id]["prev_estimation_level"] = nil
 			elsif e_input["action"]["name"] == "check"
 				target = e_input["action"]["target"]
 				@hash_mode[session_id] = check(@hash_recipe[session_id], @hash_mode[session_id], target)
+				@hash_mode[session_id]["current_estimation_level"] = "explicitly"
+				@hash_mode[session_id]["prev_substep"] = []
+				@hash_mode[session_id]["prev_estimation_level"] = nil
 			elsif e_input["action"]["name"] == "uncheck"
 				target = e_input["action"]["target"]
 				@hash_mode[session_id] = uncheck(@hash_recipe[session_id], @hash_mode[session_id], target)
+				@hash_mode[session_id]["current_estimation_level"] = "explicitly"
+				@hash_mode[session_id]["prev_substep"] = []
+				@hash_mode[session_id]["prev_estimation_level"] = nil
 			end
+			@hash_mode[session_id] = check_notification_FINISHED(@hash_recipe[session_id], @hash_mode[session_id], time)
+			return true
 		when "recognizer"
 			if e_input["action"]["name"] == "put"
-				@hash_mode[session_id]["taken"].delete_if{|x| x == e_input["action"]["tool"]}
-			elsif e_input["action"]["name"] == "taken"
-				@hash_mode[session_id]["taken"].push(e_input["action"]["tool"])
-			end
-
-			next_substep = searchNextSubstep(@hash_recipe[session_id], @hash_mode[session_id])
-			current_substep = @hash_mode[session_id]["current_substep"]
-			if current_substep == next_substep
-				next_substep = nil
-			end
-			if next_substep == nil
-				play_media = searchPlayMedia(@hash_recipe[session_id], @hash_mode[session_id])
-				unless play_media == nil
-					@hash_mode[session_id] = controlMedia(@hash_recipe[session_id], @hash_mode[session_id], play_media, "SOMETHING")
+				p "put"
+				# put時の処理
+				# 初めに，再生/停止すべきメディアの探索（foodのputも用いる）
+				media_id, timing = searchPlayMedia(@hash_recipe[session_id], @hash_mode[session_id], e_input["action"])
+				unless media_id == nil
+					if timing == "start"
+						@hash_mode[session_id] = controlMedia(@hash_recipe[session_id], @hash_mode[session_id], [""], "START", media_id)
+					elsif timing == "end"
+						@hash_mode[session_id] = controlMedia(@hash_recipe[session_id], @hash_mode[session_id], [""], "STOP", media_id)
+					end
 				end
+				"playMedia in put : #{media_id}"
+				# put時間とtaken時間の取得
+				put_time = time
+				taken_time = @hash_mode[session_id]["taken"][e_input["action"]["object"]["class"]][e_input["action"]["object"]["name"]]
+				p "put time in 'put' : #{put_time}"
+				p "taken time in 'put' : #{taken_time}"
+				# taken listからput objectのdelete
+				@hash_mode[session_id]["taken"][e_input["action"]["object"]["class"]].delete(e_input["action"]["object"]["name"])
+				# estimation levelに合わせて処理を変更
+				p "estimation level in 'put' : #{@hash_mode[session_id]["current_estimation_level"]}"
+				case @hash_mode[session_id]["current_estimation_level"]
+				when "recommend"
+					# 特に何もしない
+				when "probably", "explicitly"
+					# put objectがcurrent substepに関係あるか調べる
+					if putObject_relate2Current?(@hash_recipe[session_id], @hash_mode[session_id]["current_substep"], e_input["action"]["object"])
+						p "put object relates to current."
+						p "put time - taken time = #{put_time - taken_time}"
+						# 経過時間を用いた移動判定（注意！！混合は移動とはしたくない！！）
+						if (put_time - taken_time) > 1
+							p "put object is not moved, maybe cooked."
+							# 移動でなかった場合，終了判定（foodは用いない）
+							if e_input["action"]["object"]["class"] == "seasoning" || e_input["action"]["object"]["class"] == "utensil"
+								# seasoningまたはutensilを用いて終了判定
+								if currentSubstep_isFinished?(@hash_recipe[session_id], @hash_mode[session_id]["current_substep"], e_input["action"]["object"])
+									p "current substep is finished by putting object #{e_input["action"]["object"]["name"]}."
+									# estimation levelがexplicitlyのときのみ，current substepをfinishする
+									if @hash_mode[session_id]["current_estimation_level"] == "explicitly"
+										@hash_mode[session_id] = check_isFinished(@hash_recipe[session_id], @hash_mode[session_id], @hash_mode[session_id]["current_substep"])
+										@hash_mode[session_id] = updateABLE(@hash_recipe[session_id], @hash_mode[session_id])
+									end
+									# current substepが終了だった場合，ユーザの挙動に合った次のsubstepを探す（probablyかexplisitlyになる）．
+									next_substep, level = searchNextSubstep(@hash_recipe[session_id], @hash_mode[session_id], e_input["action"]["object"])
+									p "next substep is #{next_substep}"
+									# 見つからなければnext（recommendになる）
+									if next_substep == nil
+										p "next substep is nil, so we use next function(recommend)."
+										@hash_mode[session_id] = updateABLE(@hash_recipe[session_id], @hash_mode[session_id])
+										@hash_mode[session_id] = go2next(@hash_recipe[session_id], @hash_mode[session_id])
+										# estimation levelの更新
+										@hash_mode[session_id]["prev_estimation_level"] = @hash_mode[session_id]["current_estimation_level"]
+										@hash_mode[session_id]["current_estimation_level"] = "recommend"
+										@hash_mode[session_id] = check_notification_FINISHED(@hash_recipe[session_id], @hash_mode[session_id], time)
+										return true
+									end
+									# estimation levelの更新
+									@hash_mode[session_id]["prev_estimation_level"] = @hash_mode[session_id]["current_estimation_level"]
+									@hash_mode[session_id]["current_estimation_level"] = level
+									if @hash_mode[session_id]["current_estimation_level"] == "probably"
+										# can_be_searchedの更新
+										unless @hash_recipe[session_id]["substep"][next_substep]["next_substep"] == nil
+											@hash_mode[session_id]["substep"][@hash_recipe[session_id]["substep"][next_substep]["next_substep"]]["can_be_searched?"] = true
+										end
+										p "estimation level is probably, so do not play media."
+										@hash_mode[session_id] = jump(@hash_recipe[session_id], @hash_mode[session_id], next_substep)
+									elsif @hash_mode[session_id]["current_estimation_level"] == "explicitly"
+										# can_be_searchedの更新
+										unless @hash_recipe[session_id]["substep"][next_substep]["next_substep"] == nil
+											@hash_mode[session_id]["substep"][@hash_recipe[session_id]["substep"][next_substep]["next_substep"]]["can_be_searched?"] = true
+										end
+										p "estimation level is explicitly, so play media."
+										prev_substep = @hash_recipe[session_id]["substep"][next_substep]["prev_substep"]
+										@hash_mode[session_id] = check_isFinished(@hash_recipe[session_id], @hash_mode[session_id], prev_substep)
+										@hash_mode[session_id] = jump(@hash_recipe[session_id], @hash_mode[session_id], next_substep)
+										@hash_mode[session_id] = controlMedia(@hash_recipe[session_id], @hash_mode[session_id], ["audio", "video", "notification"], "START", next_substep)
+									end
+									@hash_mode[session_id] = check_notification_FINISHED(@hash_recipe[session_id], @hash_mode[session_id], time)
+									return true
+								else
+									p "current substep is not finished."
+									# current substepが終了ではなかった場合，substepでは何もしない
+									# taken_listを参照してsubstepを探索しても，currentなsubstepと同じ値が返ってくるはず
+									# levelもprobablyから変更はないはず．
+									if media_id == nil
+										return false
+									end
+									@hash_mode[session_id] = check_notification_FINISHED(@hash_recipe[session_id], @hash_mode[session_id], time)
+									return true
+								end
+							else
+								p "we don't validate finished function because put object is food."
+								# foodのputは終了判定に関係ないので，substepでは何もしない
+								if media_id == nil
+									return false
+								end
+								@hash_mode[session_id] = check_notification_FINISHED(@hash_recipe[session_id], @hash_mode[session_id], time)
+								return true
+							end
+						else
+							p "put object is only moved."
+							# 移動であった場合，current substepのnext substepをsearchSubstepの対象から外す
+							next_substep = @hash_recipe[session_id]["substep"][@hash_mode[session_id]["current_substep"]]["next_substep"]
+							unless next_substep == nil
+								@hash_mode[session_id]["substep"][next_substep]["can_be_searched?"] = false
+							end
+							# 移動であった場合，再度ユーザの挙動に合ったsubstepを探す（probablyかexplicitlyになる）．
+							next_substep = nil
+							next_substep, level = searchNextSubstep(@hash_recipe[session_id], @hash_mode[session_id], e_input["action"]["object"])
+							p "next substep is #{next_substep}"
+							# 見つからなければnext（recommendになる）
+							if next_substep == nil
+								p "next substep is nil, so use next function(recommend)."
+								# メディアを再生していれば停止しておく
+								@hash_mode[session_id] = controlMedia(@hash_recipe[session_id], @hash_mode[session_id], ["audio", "video", "notification"], "STOP", @hash_mode[session_id]["current_substep"])
+								@hash_mode[session_id]["prev_substep"].push(@hash_mode[session_id]["current_substep"])
+								@hash_mode[session_id] = updateABLE(@hash_recipe[session_id], @hash_mode[session_id])
+								@hash_mode[session_id] = go2next(@hash_recipe[session_id], @hash_mode[session_id], "put", "NOT_PLAY")
+								# estimation levelの更新
+								@hash_mode[session_id]["prev_estimation_level"] = @hash_mode[session_id]["current_estimation_level"]
+								@hash_mode[session_id]["current_estimation_level"] = "recommend"
+								@hash_mode[session_id] = check_notification_FINISHED(@hash_recipe[session_id], @hash_mode[session_id], time)
+								return true
+							end
+							# estimation levelの更新
+							@hash_mode[session_id]["prev_estimation_level"] = @hash_mode[session_id]["current_estimation_level"]
+							@hash_mode[session_id]["current_estimation_level"] = level
+							@hash_mode[session_id]["prev_substep"].push(@hash_mode[session_id]["current_substep"])
+							@hash_mode[session_id] = controlMedia(@hash_recipe[session_id], @hash_mode[session_id], ["audio", "video", "notification"], "STOP", @hash_mode[session_id]["current_substep"])
+							# 直前のsubstepはただの移動だったので，finishにしてはいけない=>changeしか使わない
+							if @hash_mode[session_id]["current_estimation_level"] == "probably"
+								# can_be_searchedの更新
+								unless @hash_recipe[session_id]["substep"][next_substep]["next_substep"] == nil
+									@hash_mode[session_id]["substep"][@hash_recipe[session_id]["substep"][next_substep]["next_substep"]]["can_be_searched?"] = true
+								end
+								p "estimation level is probably, so do not play media."
+								@hash_mode[session_id] = jump(@hash_recipe[session_id], @hash_mode[session_id], next_substep)
+							elsif @hash_mode[session_id]["current_estimation_level"] == "explicitly"
+								# can_be_searchedの更新
+								unless @hash_recipe[session_id]["substep"][next_substep]["next_substep"] == nil
+									@hash_mode[session_id]["substep"][@hash_recipe[session_id]["substep"][next_substep]["next_substep"]]["can_be_searched?"] = true
+								end
+								p "estimation level is explicitly, so play media."
+								prev_substep = @hash_recipe[session_id]["substep"][next_substep]["prev_substep"]
+								@hash_mode[session_id] = check_isFinished(@hash_recipe[session_id], @hash_mode[session_id], prev_substep)
+								@hash_mode[session_id] = jump(@hash_recipe[session_id], @hash_mode[session_id], next_substep)
+								@hash_mode[session_id] = controlMedia(@hash_recipe[session_id], @hash_mode[session_id], ["audio", "video", "notification"], "START", next_substep)
+							end
+							@hash_mode[session_id] = check_notification_FINISHED(@hash_recipe[session_id], @hash_mode[session_id], time)
+							return true
+						end
+					end
+					p "put object does not relate to current."
+					# put objectがcurrent substepに関係なければ，特に何もしない
+				end
+				# ここにくる場合，substep関係では何もしないということ
+				if media_id == nil
+					return false
+				end
+				@hash_mode[session_id] = check_notification_FINISHED(@hash_recipe[session_id], @hash_mode[session_id], time)
+				return true
+			elsif e_input["action"]["name"] == "taken"
+				p "taken"
+				# taken時の処理
+				# takenされた物体のnameとtimeを取得
+				@hash_mode[session_id]["taken"][e_input["action"]["object"]["class"]][e_input["action"]["object"]["name"]] = time
+				p @hash_mode[session_id]["taken"]
+				# メディアの探索
+				media_id, timing = searchPlayMedia(@hash_recipe[session_id], @hash_mode[session_id], e_input["action"])
+				unless media_id == nil
+					if timing == "start"
+						@hash_mode[session_id] = controlMedia(@hash_recipe[session_id], @hash_mode[session_id], [""], "START", media_id)
+					elsif timing == "end"
+						@hash_mode[session_id] = controlMedia(@hash_recipe[session_id], @hash_mode[session_id], [""], "STOP", media_id)
+					end
+				end
+				p "playMedia in taken : #{media_id}"
+				# taken_listと比較してsubstepを探索
+				next_substep, level = searchNextSubstep(@hash_recipe[session_id], @hash_mode[session_id], e_input["action"]["object"])
+				p "next substep is :#{next_substep}"
+				p "level is : #{level}"
+				if @hash_mode[session_id]["current_substep"] == next_substep
+					p "next substep equals to current substep"
+					# estimation lavelの状態に合わせてjump
+					# estimation levelの更新
+					@hash_mode[session_id]["prev_estimation_level"] = @hash_mode[session_id]["current_estimation_level"]
+					@hash_mode[session_id]["current_estimation_level"] = level
+					if @hash_mode[session_id]["current_estimation_level"] == "explicitly"
+						# can_be_searchedの更新
+						unless @hash_recipe[session_id]["substep"][@hash_mode[session_id]["current_substep"]]["next_substep"] == nil
+							@hash_mode[session_id]["substep"][@hash_recipe[session_id]["substep"][next_substep]["next_substep"]]["can_be_searched?"] = true
+						end
+						p "estimation level is explicitly, so play media."
+						# 念のために一つ前のsubstepはfinishedにしておく
+						prev_substep = @hash_recipe[session_id]["substep"][@hash_mode[session_id]["current_substep"]]["prev_substep"]
+						@hash_mode[session_id] = check_isFinished(@hash_recipe[session_id], @hash_mode[session_id], prev_substep)
+						@hash_mode[session_id] = updateABLE(@hash_recipe[session_id], @hash_mode[session_id], @hash_mode[session_id]["current_step"], @hash_mode[session_id]["current_substep"])
+						@hash_mode[session_id] = controlMedia(@hash_recipe[session_id], @hash_mode[session_id], ["audio", "video", "notification"], "START", @hash_mode[session_id]["current_substep"])
+					else
+						# can_be_searchedの更新
+						unless @hash_recipe[session_id]["substep"][@hash_mode[session_id]["current_substep"]]["next_substep"] == nil
+							@hash_mode[session_id]["substep"][@hash_recipe[session_id]["substep"][next_substep]["next_substep"]]["can_be_searched?"] = true
+						end
+						p "estimation level is probably, so do not play media."
+					end
+					@hash_mode[session_id] = check_notification_FINISHED(@hash_recipe[session_id], @hash_mode[session_id], time)
+					return true
+				end
+				unless next_substep == nil
+					p "next substep does not equal to current."
+					# estimation levelの更新
+					@hash_mode[session_id]["prev_estimation_level"] = @hash_mode[session_id]["current_estimation_level"]
+					@hash_mode[session_id]["current_estimation_level"] = level
+					if @hash_mode[session_id]["current_estimation_level"] == "explicitly"
+						if @hash_mode[session_id]["prev_estimation_level"] == "explicitly"
+							# can_be_searchedの更新
+							unless @hash_recipe[session_id]["substep"][next_substep]["next_substep"] == nil
+								@hash_mode[session_id]["substep"][@hash_recipe[session_id]["substep"][next_substep]["next_substep"]]["can_be_searched?"] = true
+							end
+							p "estimation level is explicitly and prev estimation level is explicitly, so use jump function."
+							@hash_mode[session_id] = check_isFinished(@hash_recipe[session_id], @hash_mode[session_id], @hash_mode[session_id]["current_substep"])
+							@hash_mode[session_id]["prev_substep"].push(@hash_mode[session_id]["current_substep"])
+							# 次のsubstepの一つ前のsubstepは念のためにfinishedにしておく
+							prev_substep = @hash_recipe[session_id]["substep"][next_substep]["prev_substep"]
+							@hash_mode[session_id] = check_isFinished(@hash_recipe[session_id], @hash_mode[session_id], prev_substep)
+							@hash_mode[session_id] = jump(@hash_recipe[session_id], @hash_mode[session_id], next_substep)
+							@hash_mode[session_id] = controlMedia(@hash_recipe[session_id], @hash_mode[session_id], ["audio", "video", "notification"], "START", next_substep)
+						else
+							# can_be_searchedの更新
+							unless @hash_recipe[session_id]["substep"][next_substep]["next_substep"] == nil
+								@hash_mode[session_id]["substep"][@hash_recipe[session_id]["substep"][next_substep]["next_substep"]]["can_be_searched?"] = true
+							end
+							p "estimation level is explicitly and prev estimation level is probably, so use change function."
+							@hash_mode[session_id] = controlMedia(@hash_recipe[session_id], @hash_mode[session_id], ["audio", "video", "notification"], "STOP", @hash_mode[session_id]["current_substep"])
+							@hash_mode[session_id]["prev_substep"].push(@hash_mode[session_id]["current_substep"])
+							# 次のsubstepのprev substepは念のためにfinishedにしておく
+							prev_substep = @hash_recipe[session_id]["substep"][next_substep]["prev_substep"]
+							@hash_mode[session_id] = check_isFinished(@hash_recipe[session_id], @hash_mode[session_id], prev_substep)
+							@hash_mode[session_id] = jump(@hash_recipe[session_id], @hash_mode[session_id], next_substep)
+							@hash_mode[session_id] = controlMedia(@hash_recipe[session_id], @hash_mode[session_id], ["audio", "video", "notification"], "START", next_substep)
+						end
+					else
+						if @hash_mode[session_id]["prev_estimation_level"] == "explicitly"
+							# can_be_searchedの更新
+							unless @hash_recipe[session_id]["substep"][next_substep]["next_substep"] == nil
+								@hash_mode[session_id]["substep"][@hash_recipe[session_id]["substep"][next_substep]["next_substep"]]["can_be_searched?"] = true
+							end
+							p "estimation level is probably and prev estimation level is explicitly, so use jump function."
+							@hash_mode[session_id] = check_isFinished(@hash_recipe[session_id], @hash_mode[session_id], @hash_mode[session_id]["current_substep"])
+							@hash_mode[session_id]["prev_substep"].push(@hash_mode[session_id]["current_substep"])
+							@hash_mode[session_id] = jump(@hash_recipe[session_id], @hash_mode[session_id], next_substep)
+						else
+							# can_be_searchedの更新
+							unless @hash_recipe[session_id]["substep"][next_substep]["next_substep"] == nil
+								@hash_mode[session_id]["substep"][@hash_recipe[session_id]["substep"][next_substep]["next_substep"]]["can_be_searched?"] = true
+							end
+							@hash_mode[session_id] = controlMedia(@hash_recipe[session_id], @hash_mode[session_id], ["audio", "video", "notification"], "STOP", @hash_mode[session_id]["current_substep"])
+							@hash_mode[session_id]["prev_substep"].push(@hash_mode[session_id]["current_substep"])
+							p "estimation level is probably and prev estimation level is probably or recommend, so use change function."
+							@hash_mode[session_id] = jump(@hash_recipe[session_id], @hash_mode[session_id], next_substep)
+						end
+					end
+					@hash_mode[session_id] = check_notification_FINISHED(@hash_recipe[session_id], @hash_mode[session_id], time)
+					return true
+				end
+				# next_substep==nilならば，substepに対しては何もしない
+				if media_id == nil
+					return false
+				end
+				@hash_mode[session_id] = check_notification_FINISHED(@hash_recipe[session_id], @hash_mode[session_id], time)
+				return true
 			else
-				@hash_mode[session_id] = jump(@hash_recipe[session_id], @hash_mode[session_id], next_substep, "FINISH")
+				return false
 			end
 		end
-		unless next_substep == nil
-			next_step = @hash_recipe[session_id]["substep"][next_substep]["parent_step"]
-			@hash_mode[session_id] = updateABLE(@hash_recipe[session_id], @hash_mode[session_id], next_step, next_substep)
-		end
-		@hash_mode[session_id] = check_notification_FINISHED(@hash_recipe[session_id], @hash_mode[session_id], time)
 	end
-
-	###################################################
-	##### NAVI_MENU用の特別なnaviDrawを再定義する #####
-	###################################################
-
-		# ナビ画面の表示を決定するNaviDraw命令．
-	def naviDraw(session_id)
-		# sorted_stepの順に表示させる．
-		orders = []
-		orders.push({"NaviDraw"=>{"steps"=>[]}})
-		@hash_recipe[session_id]["sorted_step"].each{|v|
-			id = v[1]
-			visual_step = nil
-			is_finished = -1
-			is_open = -1
-			if @hash_mode[session_id]["step"][id]["CURRENT?"]
-				visual_step = "CURRENT"
-			elsif @hash_mode[session_id]["step"][id]["ABLE?"]
-				visual_step = "ABLE"
-			else
-				visual_step = "OTHERS"
-			end
-			if @hash_mode[session_id]["step"][id]["is_finished?"]
-				is_finished = 1
-			else
-				is_finished = 0
-			end
-			if @hash_mode[session_id]["step"][id]["open?"]
-				is_open = 1
-			else
-				is_open = 0
-			end
-			orders[0]["NaviDraw"]["steps"].push({"id"=>id, "visual"=>visual_step, "is_finished"=>is_finished, "is_open"=>is_open})
-			# CURRENTなstepの場合，substepも表示させる．
-			if @hash_mode[session_id]["step"][id]["open?"]
-				@hash_recipe[session_id]["step"][id]["substep"].each{|id|
-					visual_substep = nil
-					if @hash_mode[session_id]["substep"][id]["CURRENT?"]
-						visual_substep = "CURRENT"
-					elsif @hash_mode[session_id]["substep"][id]["ABLE?"]
-						visual_substep = "ABLE"
-					else
-						visual_substep = "OTHERS"
-					end
-					if @hash_mode[session_id]["substep"][id]["is_finished?"]
-						orders[0]["NaviDraw"]["steps"].push({"id"=>id, "visual"=>visual_substep, "is_finished"=>1})
-					else
-						orders[0]["NaviDraw"]["steps"].push({"id"=>id, "visual"=>visual_substep, "is_finished"=>0})
-					end
-				}
-			end
-		}
-		return orders
-	end
-
 end

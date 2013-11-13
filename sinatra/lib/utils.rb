@@ -1,98 +1,82 @@
 #!/usr/bin/ruby
 
-def bodyMaker(hash_mode, hash_body, time, session_id)
-	body = []
-	if hash_body["DetailDraw"]
-		body.concat(detailDraw(session_id))
-	end
-	if hash_body["Play"]
-		body.concat(play(time, session_id))
-	end
-	if hash_body["Notify"]
-		body.concat(notify(time, session_id))
-	end
-	if hash_body["Cancel"]
-		body.concat(cancel(session_id))
-	end
-	if hash_body["ChannelSwitch"]
-		body.push({"ChannelSwitch"=>{"channel"=>hash_mode["display"]}})
-	end
-	if hash_body["NaviDraw"]
-		body.concat(naviDraw(session_id))
-	end
-	return body
-end
-
-def controlMedia(hash_recipe, hash_mode, media_array, media_mode, *id_array)
-	if Array.try_convert(media_array) == nil
-		media_name = nil
-		media_id = media_array
-		media_mode = nil
-		if hash_recipe["audio"].key?(media_id)
-			media_name = "audio"
-			if hash_recipe["audio"][media_id]["trigger"][0] == "start"
-				media_mode = "START"
-			else
-				media_mode = "STOP"
+def controlMedia(hash_recipe, hash_mode, media_array, play_mode, *id_array)
+	case play_mode
+	when "FIRST"
+		# 開始時に再生すべきnotificationが無いか探索し，そのidを返す
+		hash_recipe["notification"].each{|id, value|
+			trigger = value["trigger"][0]["ref"]["other"][0]
+			if trigger == "first"
+				return id
 			end
-		elsif hash_recipe["video"].key?(media_id)
-			media_name = "video"
-		elsif hash_recipe["notification"].key?(media_id)
-			media_name = "notification"
-		end
-		hash_mode[media_name][media_id]["PLAY_MODE"] = media_mode
-	else
-		case media_mode
-		when "INITIALIZE"
-			unless id_array == []
-				substep_id = id_array[0]
-				media_array.each{|media_name|
-					hash_recipe["substep"][substep_id][media_name].each{|media_id|
-						hash_mode[media_name][media_id]["PLAY_MODE"] = "---"
-						hash_mode[media_name][media_id]["time"] = -1
-					}
+		}
+		return nil
+	when "INITIALIZE"
+		# 与えられたsubstepのメディアを初期化する
+		unless id_array == []
+			substep_id = id_array[0]
+			media_array.each{|media_name|
+				hash_recipe["substep"][substep_id][media_name].each{|media_id|
+					hash_mode[media_name][media_id]["PLAY_MODE"] = "---"
+					hash_mode[media_name][media_id]["time"] = -1
 				}
+			}
+		end
+		return hash_mode
+	when "START"
+		substep_id = nil
+		if id_array == []
+			substep_id = hash_mode["current_substep"]
+		else
+			id = id_array[0]
+			if hash_recipe["substep"].key?(id)
+				substep_id = id
+			elsif hash_recipe["audio"].key?(id)
+				hash_mode["audio"][id]["PLAY_MODE"] = "START"
+				return hash_mode
+			elsif hash_recipe["video"].key?(id)
+				hash_mode["video"][id]["PLAY_MODE"] = "START"
+				return hash_mode
+			elsif hash_recipe["notification"].key?(id)
+				hash_mode["notification"][id]["PLAY_MODE"] = "START"
+				return hash_mode
 			end
-		when "START"
-			unless id_array == []
-				substep_id = id_array[0]
-				substep_trigger = nil
-				if hash_recipe["substep"][substep_id]["trigger"][0] != nil
-					substep_trigger = hash_recipe["substep"][substep_id]["trigger"][0][1]
+		end
+		media_array.each{|media_name|
+			hash_recipe["substep"][substep_id][media_name].each{|media_id|
+				media_trigger = nil
+				if hash_recipe[media_name][media_id]["trigger"][0] != nil
+					media_trigger = hash_recipe[media_name][media_id]["trigger"][0]["ref"]["other"][0]
 				end
-				media_array.each{|media_name|
-					hash_recipe["substep"][substep_id][media_name].each{|media_id|
-						media_trigger = nil
-						if hash_recipe[media_name][media_id]["trigger"][0] != nil
-							media_trigger = hash_recipe[media_name][media_id]["trigger"][0][1]
-						end
-						if media_trigger == substep_trigger
-							hash_mode[media_name][media_id]["PLAY_MODE"] = "START"
-						end
-					}
+				if media_trigger == "sametime"
+					hash_mode[media_name][media_id]["PLAY_MODE"] = "START"
+				end
+			}
+		}
+		return hash_mode
+	when "STOP"
+		# 全てのメディア，または与えられたsubstepのメディアを停止する
+		if id_array = []
+			media_array.each{|media_name|
+				hash_mode[media_name].each{|media_id, value|
+					if value["PLAY_MODE"] == "PLAY"
+						hash_mode[media_name][media_id]["PLAY_MODE"] = "STOP"
+					end
 				}
-			end
-		when "STOP"
-			if id_array = []
-				media_array.each{|media_name|
-					hash_mode[media_name].each{|media_id, value|
-						if value["PLAY_MODE"] == "PLAY"
-							hash_mode[media_name][media_id]["PLAY_MODE"] = "STOP"
-						end
-					}
-				}
-			else
-				substep_id = id_array[0]
-				media_array.each{|media_name|
-					hash_recipe["substep"][substep_id][media_name].each{|media_id|
-						if hash_mode[media_name][media_id]["PLAY_MODE"] == "PLAY"
-							hash_mode[media_name][media_id]["PLAY_MODE"] = "STOP"
-						end
-					}
-				}
-			end
+			}
+			return hash_mode
 		end
+		substep_id = id_array[0]
+		media_array.each{|media_name|
+			hash_recipe["substep"][substep_id][media_name].each{|media_id|
+				if hash_mode[media_name][media_id]["PLAY_MODE"] == "PLAY"
+					hash_mode[media_name][media_id]["PLAY_MODE"] = "STOP"
+				end
+			}
+		}
+		return hash_mode
 	end
+	# invalid play_mode
 	return hash_mode
 end
 
@@ -151,11 +135,9 @@ def updateABLE(hash_recipe, hash_mode, *current)
 	return hash_mode
 end
 
-# id先に移動する．
-# mode=INITIALIZEなら，currentなsubstepはothersにする．
-# mode=FINISHなら，currentなsubstepはis_finishedにする．
-# ableの設定等もここでやる．
-def jump(hash_recipe, hash_mode, next_substep, mode, prev)
+# id先に移動するだけ
+# ableの設定はここでやる．
+def jump(hash_recipe, hash_mode, next_substep)
 	next_step = hash_recipe["substep"][next_substep]["parent_step"]
 	current_step = hash_mode["current_step"]
 	current_substep = hash_mode["current_substep"]
@@ -164,35 +146,21 @@ def jump(hash_recipe, hash_mode, next_substep, mode, prev)
 
 	hash_mode["current_step"] = next_step
 	hash_mode["current_substep"] = next_substep
-	unless prev
-		hash_mode["prev_substep"].push(current_substep)
-	end
 	hash_mode["step"][next_step]["CURRENT?"] = true
 	hash_mode["step"][next_step]["open?"] = true
 	hash_mode["substep"][next_substep]["CURRENT?"] = true
 	hash_mode["shown"] = next_substep
 
-	media = ["audio", "video", "notification"]
-	if mode == "finish"
-		hash_mode = check_isFinished(hash_recipe, hash_mode, current_substep)
-	elsif mode == "initialize"
-		hash_mode = controlMedia(hash_recipe, hash_mode, media, "STOP", current_substep)
-	end
-
-	hash_mode = controlMedia(hash_recipe, hash_mode, media, "START", next_substep)
 	hash_mode = updateABLE(hash_recipe, hash_mode, next_step, next_substep)
 	return hash_mode
 end
 
-# currentのsubstepをis_finished=trueにし，次のsubstepに遷移する．
-# abel等の設定も全てここで行う
-def go2next(hash_recipe, hash_mode, *mode)
+# 次のsubstepを探し，jumpで移動．
+# 次のsubstepが無かったら何もしない
+def go2next(hash_recipe, hash_mode)
 	current_step = hash_mode["current_step"]
 	current_substep = hash_mode["current_substep"]
-	if mode == []
-		hash_mode = check_isFinished(hash_recipe, hash_mode, current_substep)
-		hash_mode = updateABLE(hash_recipe, hash_mode)
-	end
+
 	next_substep = nil
 	if hash_mode["step"][current_step]["ABLE?"]
 		hash_recipe["step"][current_step]["substep"].each{|substep_id|
@@ -215,7 +183,9 @@ def go2next(hash_recipe, hash_mode, *mode)
 			end
 		}
 	end
-	hash_mode = jump(hash_recipe, hash_mode, next_substep, "initialize", false)
+	unless next_substep == nil
+		hash_mode = jump(hash_recipe, hash_mode, next_substep)
+	end
 	return hash_mode
 end
 
@@ -224,7 +194,7 @@ def prev(hash_recipe, hash_mode)
 	current_step = hash_mode["current_step"]
 	current_substep = hash_mode["current_substep"]
 	hash_mode = uncheck_isFinished(hash_recipe, hash_mode, prev_substep)
-	hash_mode = jump(hash_recipe, hash_mode, prev_substep, "initialize", true)
+	hash_mode = jump(hash_recipe, hash_mode, prev_substep)
 	return hash_mode
 end
 
@@ -234,7 +204,8 @@ def check(hash_recipe, hash_mode, id)
 	current_step = hash_mode["current_step"]
 	current_substep = hash_mode["current_substep"]
 	if hash_mode["substep"][current_substep]["is_finished?"]
-		hash_mode = go2next(hash_recipe, hash_mode, "check")
+		hash_mode = go2next(hash_recipe, hash_mode)
+		hash_mode = controlMedia(hash_recipe, hash_mode, ["audio", "video", "notification"], "START")
 	else
 		hash_mode = updateABLE(hash_recipe, hash_mode, current_step, current_substep)
 	end
@@ -249,7 +220,8 @@ def uncheck(hash_recipe, hash_mode, id)
 	if hash_mode["substep"][current_substep]["ABLE?"]
 		hash_mode = updateABLE(hash_recipe, hash_mode, current_step, current_substep)
 	else
-		hash_mode = go2next(hash_recipe, hash_mode, "uncheck")
+		hash_mode = go2next(hash_recipe, hash_mode)
+		hash_mode = controlMedia(hash_recipe, hash_mode, ["audio", "video", "notification"], "START")
 	end
 	return hash_mode
 end
@@ -260,7 +232,7 @@ def check_notification_FINISHED(hash_recipe, hash_mode, time)
 			if time > value["time"]
 				hash_mode["notification"][key]["PLAY_MODE"] = "---"
 				hash_mode["notification"][key]["time"] = -1
-				hash_recipe["notification"][key]["audio"].empty{|audio_id|
+				hash_recipe["notification"][key]["audio"].each{|audio_id|
 					hash_mode["audio"][audio_id]["PLAY_MODE"] = "---"
 					hash_mode["audio"][audio_id]["time"] = -1
 				}

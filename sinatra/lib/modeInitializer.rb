@@ -16,6 +16,7 @@ def initialize_mode(hash_recipe)
 			hash_mode["substep"][substep_id]["ABLE?"] = false
 			hash_mode["substep"][substep_id]["is_finished?"] = false
 			hash_mode["substep"][substep_id]["CURRENT?"] = false
+			hash_mode["substep"][substep_id]["can_be_searched?"] = false
 		}
 	end
 	if hash_recipe.key?("audio")
@@ -36,20 +37,23 @@ def initialize_mode(hash_recipe)
 			hash_mode["notification"][notification_id]["time"] = -1
 		}
 	end
-	# 表示されている画面の管理のために（START時はOVERVIEW）
+	# 表示されている画面（START時はOVERVIEW）
 	hash_mode["display"] = "OVERVIEW"
-	# DetailDrawで指定されるsubstepの管理
+	# DetailDrawで指定される（currentな）substep
 	hash_mode["shown"] = nil
-	# 過去にcurrentであったsubstepのリスト管理
+	# 過去にcurrentであったsubstepのリスト
 	hash_mode["prev_substep"] = []
-	# currentなstepの管理
+	# currentなstep
 	hash_mode["current_step"] = nil
-	# currentなsubstepの管理
+	# currentなsubstep
 	hash_mode["current_substep"] = nil
-	# EXTERNAL_INPUTで入力された，Takenされている物体リスト（サイズは最大２）
-	hash_mode["taken"] = []
+	# EXTERNAL_INPUTで入力された，takenされているリスト
+	hash_mode["taken"] = {"food"=>{}, "seasoning"=>{}, "utensil"=>{}}
+	# 直前のestimationのstate
+	hash_mode["prev_estimation_level"] = nil
+	# 現在のestimationのstate
+	hash_mode["current_estimation_level"] = "recommend"
 
-	# hahs_modeにおける各要素の初期設定
 	# 優先度の最も高いstepをCURRENTとし，その一番目のsubstepもCURRENTにする．
 	current_step = hash_recipe["sorted_step"][0][1]
 	current_substep = hash_recipe["step"][current_step]["substep"][0]
@@ -62,13 +66,7 @@ def initialize_mode(hash_recipe)
 	# stepとsubstepを適切にABLEにする．
 	hash_mode = updateABLE(hash_recipe, hash_mode, current_step, current_substep)
 	if hash_mode["substep"][current_substep]["ABLE?"]
-		media = ["audio", "video", "notification"]
-		hash_mode = controlMedia(hash_recipe, hash_mode, media, "START", current_substep)
-		media.each{|media_name|
-			hash_recipe["substep"][current_substep][media_name].each{|media_id|
-				hash_mode[media_name][media_id]["PLAY_MODE"] = "START"
-			}
-		}
+		hash_mode = controlMedia(hash_recipe, hash_mode, ["audio", "video", "notification"], "START")
 	end
 
 	return hash_mode
