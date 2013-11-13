@@ -262,6 +262,21 @@ def go2next(hash_recipe, hash_mode)
 			end
 		}
 	end
+	# chainなstepの探索
+	if next_substep == nil
+		hash_recipe["step"].each{|step_id, value|
+			chain_step = hash_recipe["step"][step_id]["chain"][0]
+			if chain_step == current_step && hash_mode["step"][step_id]["ABLE?"]
+				hash_recipe["step"][step_id]["substep"].each{|substep_id|
+					unless hash_mode["substep"][substep_id]["is_finished?"]
+						next_substep = substep_id
+						break
+					end
+				}
+				break
+			end
+		}
+	end
 	if next_substep == nil
 		hash_recipe["sorted_step"].each{|value|
 			if hash_mode["step"][value[1]]["ABLE?"]
