@@ -509,7 +509,8 @@ end
 									# estimation levelがexplicitlyのとき，current substepをfinishする
 									# level = probablyで終了判定trueの場合，食材をtakenされていない可能性が高い
 									# taken listに何も含まれなかった場合は，is_finished=trueにし，taken listに何か含まれている場合は移動とみなす
-									if @hash_mode[session_id]["current_estimation_level"] == "explicitly" || @hash_mode[session_id]["taken"] == {"food"=>{}, "seasoning"=>{}, "utensil"=>{}}
+									# waterがprobably時にputされても無視する．
+									if @hash_mode[session_id]["current_estimation_level"] == "explicitly" || @hash_mode[session_id]["taken"] == {"food"=>{}, "seasoning"=>{}, "utensil"=>{}} || (@hash_mode[session_id]["current_estimation_level"] != "probably" || e_input["action"]["object"]["name"] != "water")
 										# prev_substepの更新
 										unless @hash_mode[session_id]["prev_substep"].last == @hash_mode[session_id]["currnet_substep"]
 											@hash_mode[session_id]["prev_substep"].push(@hash_mode[session_id]["currnet_substep"])

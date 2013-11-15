@@ -354,6 +354,7 @@ def check_isFinished(hash_recipe, hash_mode, id)
 	if hash_recipe["step"].key?(id)
 		unless hash_mode["step"][id]["is_finished?"]
 			hash_mode["step"][id]["is_finished?"] = true
+			hash_mode["step"][id]["open?"] = false
 			hash_recipe["step"][id]["substep"].each{|substep_id|
 				hash_mode["substep"][substep_id]["is_finished?"] = true
 				# is_finished=trueなsubstepはcan_be_searched=trueにする
@@ -381,6 +382,7 @@ def check_isFinished(hash_recipe, hash_mode, id)
 			}
 			if hash_recipe["substep"][id]["next_substep"] == nil
 				hash_mode["step"][parent_step]["is_finished?"] = true
+				hash_mode["step"][parent_step]["open?"] = false
 			end
 		end
 	end

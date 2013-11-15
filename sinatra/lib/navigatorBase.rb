@@ -20,6 +20,7 @@ class NavigatorBase
 
 	# viewerからの入力を受け付け，振り分ける
 	def counsel(jason_input)
+		p "begin"
 		status = nil
 		body = []
 		orders = {}
@@ -79,6 +80,7 @@ class NavigatorBase
 		end
 		#p orders
 		unlock(fo)
+		p "end"
 		return orders
 	rescue => e
 		p e.class
@@ -193,18 +195,14 @@ class NavigatorBase
 		if @hash_recipe[session_id]["step"].key?(clicked_id)
 			if @hash_mode[session_id]["step"][clicked_id]["is_finished?"]
 				@hash_mode[session_id] = uncheck(@hash_recipe[session_id], @hash_mode[session_id], clicked_id)
-				@hash_mode[session_id]["how_changed_to_last_state"] = "by_uncheck"
 			else
 				@hash_mode[session_id] = check(@hash_recipe[session_id], @hash_mode[session_id], clicked_id)
-				@hash_mode[session_id]["how_changed_to_last_state"] = "by_check"
 			end
 		elsif @hash_recipe[session_id]["substep"].key?(clicked_id)
 			if @hash_mode[session_id]["substep"][clicked_id]["is_finished?"]
 				@hash_mode[session_id] = uncheck(@hash_recipe[session_id], @hash_mode[session_id], clicked_id)
-				@hash_mode[session_id]["how_changed_to_last_state"] = "by_uncheck"
 			else
 				@hash_mode[session_id] = check(@hash_recipe[session_id], @hash_mode[session_id], clicked_id)
-				@hash_mode[session_id]["how_changed_to_last_state"] = "by_check"
 			end
 		else
 			p "invalid params : jason_input['operation_contents'] is wrong when situation is CHECK."
