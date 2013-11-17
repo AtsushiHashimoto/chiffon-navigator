@@ -20,7 +20,6 @@ class NavigatorBase
 
 	# viewerからの入力を受け付け，振り分ける
 	def counsel(jason_input)
-		p "begin"
 		status = nil
 		body = []
 		orders = {}
@@ -49,44 +48,44 @@ class NavigatorBase
 			fo = lock(session_id)
 			status, body = play_control(jason_input, session_id)
 		else
-			p "invalid params : jason_input['situation'] is wrong."
-			logger()
+			message = "invalid params : jason_input['situation'] is wrong."
+			p message
+			logger(jason_input, "invalid params", message)
 			status = "invalid params"
 		end
 
-		p "current estimation level in navigatorBase : #{@hash_mode[session_id]["current_estimation_level"]}"
-		outputHashMode(session_id, @hash_mode[session_id])
+		outputHashMode(session_id, jason_input["time"], @hash_mode[session_id])
 
 		if status == "internal error"
 			p body.class
 			p body.message
 			p body.backtrace
-			logger()
+			logger(jason_input, "internal error", body.message)
 			orders = {"status"=>status}
 		elsif status == "internal error in 'system'"
-			p "Cannot make some directory and files"
-			logger()
+			message = "Cannot make some directory and files"
+			p message
+			logger(jason_input, "internal error in 'system'", message)
 			orders = {"status"=>"internal error"}
 		elsif status == "invalid params"
 			orders = {"status"=>status}
 		elsif status == "success"
-			logger()
+			logger(jason_input, "success", body, @hash_mode[session_id]["current_estimation_level"])
 			orders = {"status"=>status, "body"=>body}
 		else
 			p "internal error"
-			p "navigatorBase.rb: parameter 'status' is wrong."
-			logger()
+			message = "navigatorBase.rb: parameter 'status' is wrong."
+			p message
+			logger(jason_input, "internal error", message)
 			orders = {"status"=>"internal error"}
 		end
-		#p orders
 		unlock(fo)
-		p "end"
 		return orders
 	rescue => e
 		p e.class
 		p e.message
 		p e.backtrace
-		logger()
+		logger(jason_input, "internal error", e.message)
 		unlock(fo)
 		return {"status"=>"internal error"}
 	end
@@ -128,8 +127,9 @@ class NavigatorBase
 				@hash_mode[session_id]["prev_estimation_level"] = nil
 			end
 		else
-			p "invalid params : jason_input['operation_contents'] is wrong when situation is NAVI_MENU."
-			logger()
+			message = "invalid params : jason_input['operation_contents'] is wrong when situation is NAVI_MENU."
+			p message
+			logger(jason_input, "invalid params", message)
 			return "invalid params", body
 		end
 
@@ -205,8 +205,9 @@ class NavigatorBase
 				@hash_mode[session_id] = check(@hash_recipe[session_id], @hash_mode[session_id], clicked_id)
 			end
 		else
-			p "invalid params : jason_input['operation_contents'] is wrong when situation is CHECK."
-			logger()
+			message =  "invalid params : jason_input['operation_contents'] is wrong when situation is CHECK."
+			p message
+			logger(jason_input, "invalid params", message)
 			return "invalid params", body
 		end
 
@@ -239,6 +240,9 @@ class NavigatorBase
 			return "internal error in 'system'", body
 		end
 		fo = lock(session_id)
+		unless system("mkdir -p records/#{session_id}/mode")
+			return "internal error in 'system'", body
+		end
 		unless system("touch records/#{session_id}/log.txt")
 			return "internal error in 'system'", body, fo
 		end
@@ -328,13 +332,15 @@ class NavigatorBase
 			when "MUTE"
 			when "VOLUME"
 			else
-				p "invalid params : jason_input['operation_contents']['operation'] is wrong when situation is PLAY_CONTROL."
-				logger()
+				message ="invalid params : jason_input['operation_contents']['operation'] is wrong when situation is PLAY_CONTROL."
+				p message
+				logger(jason_input, "invalid params", )
 				return "invalid params", body
 			end
 		else
-			p "invalid params : jason_input['operation_contents']['id'] is wrong when situation is PLAY_CONTROL."
-			logger()
+			message = "invalid params : jason_input['operation_contents']['id'] is wrong when situation is PLAY_CONTROL."
+			p message
+			logger(jason_input, "invalid params", message)
 			return "invalid params", body
 		end
 
@@ -415,7 +421,6 @@ class NavigatorBase
 				end
 			}
 		}
-		# p orders
 		return orders
 	end
 
@@ -444,7 +449,6 @@ class NavigatorBase
 				@hash_mode[session_id]["audio"][audio_id]["time"] = finish_time
 			}
 		end
-		# p orders
 		return orders
 	end
 
@@ -474,7 +478,6 @@ class NavigatorBase
 				end
 			}
 		end
-		# p orders
 		return orders
 	end
 

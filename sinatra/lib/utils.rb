@@ -456,11 +456,20 @@ def inputHashMode(session_id)
 	return hash_mode
 end
 
-def outputHashMode(session_id, hash_mode)
-	open("records/#{session_id}/mode.txt", "w"){|io|
+def outputHashMode(session_id, time, hash_mode)
+	open("records/#{session_id}/mode/#{time["sec"]}-#{time["usec"]}.mode", "w"){|io|
 		io.puts(JSON.pretty_generate(hash_mode))
 	}
 end
 
-def logger()
+def logger(jason_input, status, message, *estimation_level)
+	open("records/#{jason_input["session_id"]}/log", "a"){|io|
+		io.puts("time:#{jason_input["time"]["sec"]}")
+		io.puts("input:#{jason_input}")
+		io.puts("status:#{status}")
+		unless estimation_level == []
+			io.puts("estimation_level:#{estimation_level[0]}")
+		end
+		io.puts("output:#{message}")
+	}
 end

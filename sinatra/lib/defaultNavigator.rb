@@ -17,9 +17,10 @@ class DefaultNavigator < NavigatorBase
 		begin
 			e_input = JSON.load(jason_input["operation_contents"])
 		rescue
-			p "EXTERNAL_INPUT can not be loaded because of invalid form."
+			message = "EXTERNAL_INPUT can not be loaded because of invalid form."
+			p message
 			p "EXTERNAL_INPUT must be {\"navigator\":hoge,\"mode\":\"hogehoge\",...}"
-			logger()
+			logger(jason_input, "invalid params", message)
 			return "invalid params", body
 		end
 		# inputのチェック
@@ -27,7 +28,7 @@ class DefaultNavigator < NavigatorBase
 		unless result
 			p "EXTERNAL_INPUT is wrong."
 			p message
-			logger()
+			logger(jason_input, "invalid params", message)
 			return "invalid params", body
 		end
 		# modeの修正
@@ -206,10 +207,10 @@ end
 		probably_substep_array = []
 		hash_recipe["substep"].each{|substep_id, value|
 			level = "recommend"
-			p "substep id : #{substep_id}"
-			p "substep is able? : #{hash_mode["substep"][substep_id]["ABLE?"]}"
-			p "substep is finished? : #{hash_mode["substep"][substep_id]["is_finished?"]}"
-			p "substep can be searched? : #{hash_mode["substep"][substep_id]["can_be_searched?"]}"
+			#p "substep id : #{substep_id}"
+			#p "substep is able? : #{hash_mode["substep"][substep_id]["ABLE?"]}"
+			#p "substep is finished? : #{hash_mode["substep"][substep_id]["is_finished?"]}"
+			#p "substep can be searched? : #{hash_mode["substep"][substep_id]["can_be_searched?"]}"
 			if hash_mode["substep"][substep_id]["can_be_searched?"]
 				value["trigger"].each{|trigger|
 					level_temp = "recommend"
@@ -229,7 +230,7 @@ end
 							end
 							level_temp = "explicitly"
 						}
-						print "level_temp food : #{level_temp}, "
+						#print "level_temp food : #{level_temp}, "
 						trigger["ref"]["taken"]["seasoning"].each{|ref|
 							unless hash_mode["taken"]["seasoning"].key?(ref)
 								if level_temp == "explicitly"
@@ -249,7 +250,7 @@ end
 								level_temp = "explicitly"
 							end
 						}
-						print "level_temp seasoning : #{level_temp}, "
+						#print "level_temp seasoning : #{level_temp}, "
 						trigger["ref"]["taken"]["utensil"].each{|ref|
 							unless hash_mode["taken"]["utensil"].key?(ref)
 								if level_temp == "explicitly"
@@ -269,7 +270,7 @@ end
 								level_temp = "explicitly"
 							end
 						}
-						print "level_temp utensil : #{level_temp}\n"
+						#print "level_temp utensil : #{level_temp}\n"
 						if level_temp == "explicitly"
 							level = level_temp
 							break
@@ -279,40 +280,40 @@ end
 					end
 				}
 			end
-			p "level : #{level}"
+			#p "level : #{level}"
 			if level == "explicitly"
 				explicitly_substep_array.push(substep_id)
 			elsif level == "probably"
 				probably_substep_array.push(substep_id)
 			end
 		}
-		p "explicitly array : #{explicitly_substep_array}"
-		p "probably array : #{probably_substep_array}"
+		#p "explicitly array : #{explicitly_substep_array}"
+		#p "probably array : #{probably_substep_array}"
 		unless explicitly_substep_array.empty?
 			if explicitly_substep_array.include?(hash_mode["current_substep"])
-				p "exp array include current substep."
+				#p "exp array include current substep."
 				return hash_mode["current_substep"], "explicitly"
 			end
 			current_step = hash_mode["current_step"]
 			explicitly_substep_array.each{|substep_id|
 				step_id = hash_recipe["substep"][substep_id]["parent_step"]
 				if step_id == current_step
-					p "exp array include current step."
+					#p "exp array include current step."
 					return substep_id, "explicitly"
 				end
 			}
-			p "return exp array[0]"
+			#p "return exp array[0]"
 			return explicitly_substep_array[0], "explicitly"
 		end
 		unless probably_substep_array.empty?
 			if probably_substep_array.include?(hash_mode["current_substep"])
-				p "prob array include current substep."
+				#p "prob array include current substep."
 				return hash_mode["current_substep"], "probably"
 			end
 			next_substep = hash_recipe["substep"][hash_mode["current_substep"]]["next_substep"]
 			probably_substep_array.each{|substep_id|
 				if substep_id == next_substep && (hash_mode["current_estimation_level"] == "explicitly" || hash_mode["current_estimation_level"] == "probably")
-					p "prob array include next substep of current substep"
+					#p "prob array include next substep of current substep"
 					return substep_id, "explicitly"
 				end
 			}
@@ -322,12 +323,12 @@ end
 				chain_step = hash_recipe["step"][next_step]["chain"][0]
 				unless chain_step == nil
 					if current_step == chain_step && hash_recipe["substep"][hash_mode["current_substep"]]["next_substep"] == nil && (hash_mode["current_estimation_level"] == "explicitly" || hash_mode["current_estimation_level"] == "probably")
-						p "prob array include next chain substep of current substep"
+						#p "prob array include next chain substep of current substep"
 						return substep_id, "explicitly"
 					end
 				end
 			}
-			p "return prob array[0]"
+			#p "return prob array[0]"
 			probably_substep_array.each{|substep_id|
 				unless hash_mode["substep"][substep_id]["is_finished?"]
 					return substep_id, "probably"
@@ -469,7 +470,7 @@ end
 			return true
 		when "recognizer"
 			if e_input["action"]["name"] == "put"
-				p "put"
+				#p "put"
 				# put時の処理
 				# 初めに，再生/停止すべきメディアの探索（foodのputも用いる）
 				media_id, timing = searchPlayMedia(@hash_recipe[session_id], @hash_mode[session_id], e_input["action"])
@@ -480,55 +481,57 @@ end
 						@hash_mode[session_id] = controlMedia(@hash_recipe[session_id], @hash_mode[session_id], [""], "STOP", media_id)
 					end
 				end
-				"playMedia in put : #{media_id}"
+				#p "playMedia in put : #{media_id}"
 				# put時間とtaken時間の取得
 				put_time = time
 				taken_time = @hash_mode[session_id]["taken"][e_input["action"]["object"]["class"]][e_input["action"]["object"]["name"]]
-				p "put time in 'put' : #{put_time}"
-				p "taken time in 'put' : #{taken_time}"
+				#p "put time in 'put' : #{put_time}"
+				#p "taken time in 'put' : #{taken_time}"
 				# taken listからput objectのdelete
 				@hash_mode[session_id]["taken"][e_input["action"]["object"]["class"]].delete(e_input["action"]["object"]["name"])
 				# estimation levelに合わせて処理を変更
-				p "estimation level in 'put' : #{@hash_mode[session_id]["current_estimation_level"]}"
+				#p "estimation level in 'put' : #{@hash_mode[session_id]["current_estimation_level"]}"
 				case @hash_mode[session_id]["current_estimation_level"]
 				when "recommend"
 					# 特に何もしない
 				when "probably", "explicitly"
 					# put objectがcurrent substepに関係あるか調べる
 					if putObject_relate2Current?(@hash_recipe[session_id], @hash_mode[session_id]["current_substep"], e_input["action"]["object"])
-						p "put object relates to current."
-						p "put time - taken time = #{put_time - taken_time}"
+						#p "put object relates to current."
+						#p "put time - taken time = #{put_time - taken_time}"
 						# 経過時間を用いた移動判定（注意！！混合は移動とはしたくない！！）
 						if (put_time - taken_time) > 1
-							p "put object is not moved, maybe cooked."
+							#p "put object is not moved, maybe cooked."
 							# 移動でなかった場合，終了判定（foodは用いない）
 							if e_input["action"]["object"]["class"] == "seasoning" || e_input["action"]["object"]["class"] == "utensil"
 								# seasoningまたはutensilを用いて終了判定
 								if currentSubstep_isFinished?(@hash_recipe[session_id], @hash_mode[session_id]["current_substep"], e_input["action"]["object"])
-									p "current substep is finished by putting object #{e_input["action"]["object"]["name"]}."
+									#p "current substep is finished by putting object #{e_input["action"]["object"]["name"]}."
 									# estimation levelがexplicitlyのとき，current substepをfinishする
 									# level = probablyで終了判定trueの場合，食材をtakenされていない可能性が高い
 									# taken listに何も含まれなかった場合は，is_finished=trueにし，taken listに何か含まれている場合は移動とみなす
 									# waterがprobably時にputされても無視する．
-									if @hash_mode[session_id]["current_estimation_level"] == "explicitly" || @hash_mode[session_id]["taken"] == {"food"=>{}, "seasoning"=>{}, "utensil"=>{}} || (@hash_mode[session_id]["current_estimation_level"] != "probably" || e_input["action"]["object"]["name"] != "water")
-										# prev_substepの更新
-										unless @hash_mode[session_id]["prev_substep"].last == @hash_mode[session_id]["currnet_substep"]
-											@hash_mode[session_id]["prev_substep"].push(@hash_mode[session_id]["currnet_substep"])
+									if @hash_mode[session_id]["current_estimation_level"] == "explicitly" || @hash_mode[session_id]["taken"] == {"food"=>{}, "seasoning"=>{}, "utensil"=>{}}
+										if (@hash_mode[session_id]["current_estimation_level"] != "probably" || e_input["action"]["object"]["name"] != "water")
+											# prev_substepの更新
+											unless @hash_mode[session_id]["prev_substep"].last == @hash_mode[session_id]["currnet_substep"]
+												@hash_mode[session_id]["prev_substep"].push(@hash_mode[session_id]["currnet_substep"])
+											end
+											# recommend next substep
+											@hash_mode[session_id] = check_isFinished(@hash_recipe[session_id], @hash_mode[session_id], @hash_mode[session_id]["current_substep"])
+											@hash_mode[session_id] = updateABLE(@hash_recipe[session_id], @hash_mode[session_id])
+											# current substepをis_finished=trueにした場合は，next substepを提示した方が自然
+											@hash_mode[session_id] = go2next(@hash_recipe[session_id], @hash_mode[session_id])
+											# メディアは再生しない
+											# estimation levelの更新
+											@hash_mode[session_id]["prev_estimation_level"] = @hash_mode[session_id]["current_estimation_level"]
+											@hash_mode[session_id]["current_estimation_level"] = "recommend"
+											@hash_mode[session_id] = check_notification_FINISHED(@hash_recipe[session_id], @hash_mode[session_id], time)
+											return true
 										end
-										# recommend next substep
-										@hash_mode[session_id] = check_isFinished(@hash_recipe[session_id], @hash_mode[session_id], @hash_mode[session_id]["current_substep"])
-										@hash_mode[session_id] = updateABLE(@hash_recipe[session_id], @hash_mode[session_id])
-										# current substepをis_finished=trueにした場合は，next substepを提示した方が自然
-										@hash_mode[session_id] = go2next(@hash_recipe[session_id], @hash_mode[session_id])
-										# メディアは再生しない
-										# estimation levelの更新
-										@hash_mode[session_id]["prev_estimation_level"] = @hash_mode[session_id]["current_estimation_level"]
-										@hash_mode[session_id]["current_estimation_level"] = "recommend"
-										@hash_mode[session_id] = check_notification_FINISHED(@hash_recipe[session_id], @hash_mode[session_id], time)
-										return true
 									end
 								else
-									p "current substep is not finished."
+									#p "current substep is not finished."
 									# current substepが終了ではなかった場合，substepでは何もしない
 									# taken_listを参照してsubstepを探索しても，currentなsubstepと同じ値が返ってくるはず
 									# levelもprobablyから変更はないはず．
@@ -539,7 +542,7 @@ end
 									return true
 								end
 							else
-								p "we don't validate finished function because put object is food."
+								#p "we don't validate finished function because put object is food."
 								# foodのputは終了判定に関係ないので，substepでは何もしない
 								if media_id == nil
 									return false
@@ -548,7 +551,7 @@ end
 								return true
 							end
 						end
-						p "put object is only moved."
+						#p "put object is only moved."
 						# 移動であった場合，current substepのnext substepをsearchSubstepの対象から外す
 						next_substep = @hash_recipe[session_id]["substep"][@hash_mode[session_id]["current_substep"]]["next_substep"]
 						unless next_substep == nil
@@ -558,14 +561,14 @@ end
 						# 移動だったsubstep(prev)はpushしない
 						next_substep = nil
 						next_substep, level = searchNextSubstep(@hash_recipe[session_id], @hash_mode[session_id], e_input["action"]["object"])
-						p "next substep is #{next_substep}"
+						#p "next substep is #{next_substep}"
 						# 見つからなければnext（recommendになる）
 						if next_substep == nil
-							p "next substep is nil, so use next function(recommend)."
+							#p "next substep is nil, so use next function(recommend)."
 							# メディアを再生していれば停止しておく
 							@hash_mode[session_id] = controlMedia(@hash_recipe[session_id], @hash_mode[session_id], "all", "STOP", @hash_mode[session_id]["current_substep"])
 							@hash_mode[session_id] = updateABLE(@hash_recipe[session_id], @hash_mode[session_id])
-							@hash_mode[session_id] = go2next(@hash_recipe[session_id], @hash_mode[session_id], "put", "NOT_PLAY")
+							@hash_mode[session_id] = go2next(@hash_recipe[session_id], @hash_mode[session_id])
 							# estimation levelの更新
 							@hash_mode[session_id]["prev_estimation_level"] = @hash_mode[session_id]["current_estimation_level"]
 							@hash_mode[session_id]["current_estimation_level"] = "recommend"
@@ -582,7 +585,7 @@ end
 							unless @hash_recipe[session_id]["substep"][next_substep]["next_substep"] == nil
 								@hash_mode[session_id]["substep"][@hash_recipe[session_id]["substep"][next_substep]["next_substep"]]["can_be_searched?"] = true
 							end
-							p "estimation level is probably, so do not play media."
+							#p "estimation level is probably, so do not play media."
 							# next_substepがis_finished=trueならuncheckすべきだが，probablyではそのようなケースは発生しない．
 							@hash_mode[session_id] = jump(@hash_recipe[session_id], @hash_mode[session_id], next_substep)
 						elsif @hash_mode[session_id]["current_estimation_level"] == "explicitly"
@@ -590,7 +593,7 @@ end
 							unless @hash_recipe[session_id]["substep"][next_substep]["next_substep"] == nil
 								@hash_mode[session_id]["substep"][@hash_recipe[session_id]["substep"][next_substep]["next_substep"]]["can_be_searched?"] = true
 							end
-							p "estimation level is explicitly, so play media."
+							#p "estimation level is explicitly, so play media."
 							# levelがexplicitlyのときはprev_substepをis_finished?=trueにするので，substepを念のために並べ替える
 							prev_substep = @hash_recipe[session_id]["substep"][next_substep]["prev_substep"]
 							unless prev_substep == nil
@@ -609,9 +612,9 @@ end
 							# can_be_searchedの更新
 							# parent stepのsubstep群をcan_be_searched=falseにする
 							next_step = @hash_recipe[session_id]["substep"][next_substep]["parent_step"]
-							p "next step : #{next_step}"
+							#p "next step : #{next_step}"
 							@hash_recipe[session_id]["step"][next_step]["parent"].each{|step_id|
-								p "parent step : #{step_id}"
+								#p "parent step : #{step_id}"
 								@hash_recipe[session_id]["step"][step_id]["substep"].each{|substep_id|
 									@hash_mode[session_id]["substep"][substep_id]["can_be_searched?"] = false
 								}
@@ -620,7 +623,7 @@ end
 						@hash_mode[session_id] = check_notification_FINISHED(@hash_recipe[session_id], @hash_mode[session_id], time)
 						return true
 					end
-					p "put object does not relate to current."
+					#p "put object does not relate to current."
 					# put objectがcurrent substepに関係なければ，特に何もしない
 				end
 				# ここにくる場合，substep関係では何もしないということ
@@ -630,7 +633,7 @@ end
 				@hash_mode[session_id] = check_notification_FINISHED(@hash_recipe[session_id], @hash_mode[session_id], time)
 				return true
 			elsif e_input["action"]["name"] == "taken"
-				p "taken"
+				#p "taken"
 				# taken時の処理
 				# takenされた物体のnameとtimeを取得
 				@hash_mode[session_id]["taken"][e_input["action"]["object"]["class"]][e_input["action"]["object"]["name"]] = time
@@ -643,13 +646,13 @@ end
 						@hash_mode[session_id] = controlMedia(@hash_recipe[session_id], @hash_mode[session_id], [""], "STOP", media_id)
 					end
 				end
-				p "playMedia in taken : #{media_id}"
+				#p "playMedia in taken : #{media_id}"
 				# taken_listと比較してsubstepを探索
 				next_substep, level = searchNextSubstep(@hash_recipe[session_id], @hash_mode[session_id], e_input["action"]["object"])
-				p "next substep is :#{next_substep}"
-				p "level is : #{level}"
+				#p "next substep is :#{next_substep}"
+				#p "level is : #{level}"
 				if @hash_mode[session_id]["current_substep"] == next_substep
-					p "next substep equals to current substep"
+					#p "next substep equals to current substep"
 					# estimation lavelの状態に合わせてjump
 					# estimation levelの更新
 					@hash_mode[session_id]["prev_estimation_level"] = @hash_mode[session_id]["current_estimation_level"]
@@ -659,7 +662,7 @@ end
 						unless @hash_recipe[session_id]["substep"][@hash_mode[session_id]["current_substep"]]["next_substep"] == nil
 							@hash_mode[session_id]["substep"][@hash_recipe[session_id]["substep"][next_substep]["next_substep"]]["can_be_searched?"] = true
 						end
-						p "estimation level is explicitly, so play media."
+						#p "estimation level is explicitly, so play media."
 						# 念のために一つ前のsubstepはfinishedにしておく
 						prev_substep = @hash_recipe[session_id]["substep"][@hash_mode[session_id]["current_substep"]]["prev_substep"]
 						# substepの並べ替え
@@ -675,9 +678,9 @@ end
 						# can_be_searchedの更新
 						# parent stepのsubstep群をcan_be_searched=falseにする
 						next_step = @hash_recipe[session_id]["substep"][next_substep]["parent_step"]
-						p "next step : #{next_step}"
+						#p "next step : #{next_step}"
 						@hash_recipe[session_id]["step"][next_step]["parent"].each{|step_id|
-							p "parent_step : #{step_id}"
+							#p "parent_step : #{step_id}"
 							@hash_recipe[session_id]["step"][step_id]["substep"].each{|substep_id|
 								@hash_mode[session_id]["substep"][substep_id]["can_be_searched?"] = false
 							}
@@ -687,13 +690,13 @@ end
 						unless @hash_recipe[session_id]["substep"][@hash_mode[session_id]["current_substep"]]["next_substep"] == nil
 							@hash_mode[session_id]["substep"][@hash_recipe[session_id]["substep"][next_substep]["next_substep"]]["can_be_searched?"] = true
 						end
-						p "estimation level is probably, so do not play media."
+						#p "estimation level is probably, so do not play media."
 					end
 					@hash_mode[session_id] = check_notification_FINISHED(@hash_recipe[session_id], @hash_mode[session_id], time)
 					return true
 				end
 				unless next_substep == nil
-					p "next substep does not equal to current."
+					#p "next substep does not equal to current."
 					# estimation levelの更新
 					@hash_mode[session_id]["prev_estimation_level"] = @hash_mode[session_id]["current_estimation_level"]
 					@hash_mode[session_id]["current_estimation_level"] = level
@@ -703,7 +706,7 @@ end
 							unless @hash_recipe[session_id]["substep"][next_substep]["next_substep"] == nil
 								@hash_mode[session_id]["substep"][@hash_recipe[session_id]["substep"][next_substep]["next_substep"]]["can_be_searched?"] = true
 							end
-							p "estimation level is explicitly and prev estimation level is explicitly, so use jump function."
+							#p "estimation level is explicitly and prev estimation level is explicitly, so use jump function."
 							@hash_mode[session_id] = check_isFinished(@hash_recipe[session_id], @hash_mode[session_id], @hash_mode[session_id]["current_substep"])
 							unless @hash_mode[session_id]["prev_substep"].last == @hash_mode[session_id]["current_substep"]
 								@hash_mode[session_id]["prev_substep"].push(@hash_mode[session_id]["current_substep"])
@@ -727,9 +730,9 @@ end
 							# can_be_searchedの更新
 							# parent stepのsubstep群をcan_be_searched=falseにする
 							next_step = @hash_recipe[session_id]["substep"][next_substep]["parent_step"]
-							p "next step : #{next_step}"
+							#p "next step : #{next_step}"
 							@hash_recipe[session_id]["step"][next_step]["parent"].each{|step_id|
-								p "parent_step : #{step_id}"
+								#p "parent_step : #{step_id}"
 								@hash_recipe[session_id]["step"][step_id]["substep"].each{|substep_id|
 									@hash_mode[session_id]["substep"][substep_id]["can_be_searched?"] = false
 								}
@@ -739,7 +742,7 @@ end
 							unless @hash_recipe[session_id]["substep"][next_substep]["next_substep"] == nil
 								@hash_mode[session_id]["substep"][@hash_recipe[session_id]["substep"][next_substep]["next_substep"]]["can_be_searched?"] = true
 							end
-							p "estimation level is explicitly and prev estimation level is probably, so use change function."
+							#p "estimation level is explicitly and prev estimation level is probably, so use change function."
 							@hash_mode[session_id] = controlMedia(@hash_recipe[session_id], @hash_mode[session_id], "all", "STOP", @hash_mode[session_id]["current_substep"])
 							unless @hash_mode[session_id]["prev_substep"].last == @hash_mode[session_id]["current_substep"]
 								@hash_mode[session_id]["prev_substep"].push(@hash_mode[session_id]["current_substep"])
@@ -763,9 +766,9 @@ end
 							# can_be_searchedの更新
 							# parent stepのsubstep群をcan_be_searched=falseにする
 							next_step = @hash_recipe[session_id]["substep"][next_substep]["parent_step"]
-							p "next_step : #{next_step}"
+							#p "next_step : #{next_step}"
 							@hash_recipe[session_id]["step"][next_step]["parent"].each{|step_id|
-								p "parent step : #{step_id}"
+								#p "parent step : #{step_id}"
 								@hash_recipe[session_id]["step"][step_id]["substep"].each{|substep_id|
 									@hash_mode[session_id]["substep"][substep_id]["can_be_searched?"] = false
 								}
@@ -777,7 +780,7 @@ end
 							unless @hash_recipe[session_id]["substep"][next_substep]["next_substep"] == nil
 								@hash_mode[session_id]["substep"][@hash_recipe[session_id]["substep"][next_substep]["next_substep"]]["can_be_searched?"] = true
 							end
-							p "estimation level is probably and prev estimation level is explicitly, so use jump function."
+							#p "estimation level is probably and prev estimation level is explicitly, so use jump function."
 							@hash_mode[session_id] = check_isFinished(@hash_recipe[session_id], @hash_mode[session_id], @hash_mode[session_id]["current_substep"])
 							unless @hash_mode[session_id]["prev_substep"].last == @hash_mode[session_id]["current_substep"]
 								@hash_mode[session_id]["prev_substep"].push(@hash_mode[session_id]["current_substep"])
@@ -792,7 +795,7 @@ end
 							unless @hash_mode[session_id]["prev_substep"].last == @hash_mode[session_id]["current_substep"]
 								@hash_mode[session_id]["prev_substep"].push(@hash_mode[session_id]["current_substep"])
 							end
-							p "estimation level is probably and prev estimation level is probably or recommend, so use change function."
+							#p "estimation level is probably and prev estimation level is probably or recommend, so use change function."
 							@hash_mode[session_id] = jump(@hash_recipe[session_id], @hash_mode[session_id], next_substep)
 						end
 					end
