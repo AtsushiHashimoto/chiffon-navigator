@@ -244,12 +244,19 @@ end
 								end
 								break
 							end
-							if level_temp == "not match"
-								level_temp = "probably"
-							elsif level_temp == "recommend"
-								level_temp = "explicitly"
+							if ref == "water"
+								if level_temp == "not match"
+									level_temp = "probably"
+								elsif level_temp == "recommend"
+									level_temp = "explicitly"
+								end
+							else
+								level_temp = "explicitly_seasoning"
 							end
 						}
+						if level_temp == "explicitly_seasoning"
+							level = "explicitly"
+						end
 						#print "level_temp seasoning : #{level_temp}, "
 						trigger["ref"]["taken"]["utensil"].each{|ref|
 							unless hash_mode["taken"]["utensil"].key?(ref)
@@ -502,8 +509,26 @@ end
 						# 経過時間を用いた移動判定（注意！！混合は移動とはしたくない！！）
 						if (put_time - taken_time) > 1
 							#p "put object is not moved, maybe cooked."
-							# 移動でなかった場合，終了判定（foodは用いない）
-							if e_input["action"]["object"]["class"] == "seasoning" || e_input["action"]["object"]["class"] == "utensil"
+							# 移動でなかった場合，終了判定（foodは用いない→トリガーがfoodだけのときは混合なので使うことにする）
+							#if e_input["action"]["object"]["class"] == "seasoning" || e_input["action"]["object"]["class"] == "utensil"
+								# currentのsubstepのトリガーがfoodひとつのみならば，終了判定に突入できる
+							if e_input["action"]["object"]["class"] == "food"
+								flag = false
+								@hash_recipe[session_id]["substep"][@hash_mode[session_id]["current_substep"]]["trigger"].each{|trigger|
+									if trigger["ref"]["taken"]["utensil"].empty? && trigger["ref"]["taken"]["seasoning"].empty?
+										flag = true
+										break
+									end
+								}
+								unless flag
+									# 終了判定しない
+									if media_id == nil
+										return false
+									end
+									@hash_mode[session_id] = check_notification_FINISHED(@hash_recipe[session_id], @hash_mode[session_id], time)
+									return true
+								end
+							end
 								# seasoningまたはutensilを用いて終了判定
 								if currentSubstep_isFinished?(@hash_recipe[session_id], @hash_mode[session_id]["current_substep"], e_input["action"]["object"])
 									#p "current substep is finished by putting object #{e_input["action"]["object"]["name"]}."
@@ -541,15 +566,15 @@ end
 									@hash_mode[session_id] = check_notification_FINISHED(@hash_recipe[session_id], @hash_mode[session_id], time)
 									return true
 								end
-							else
+							#else
 								#p "we don't validate finished function because put object is food."
 								# foodのputは終了判定に関係ないので，substepでは何もしない
-								if media_id == nil
-									return false
-								end
-								@hash_mode[session_id] = check_notification_FINISHED(@hash_recipe[session_id], @hash_mode[session_id], time)
-								return true
-							end
+							#	if media_id == nil
+							#		return false
+							#	end
+							#	@hash_mode[session_id] = check_notification_FINISHED(@hash_recipe[session_id], @hash_mode[session_id], time)
+							#	return true
+							#end
 						end
 						#p "put object is only moved."
 						# 移動であった場合，current substepのnext substepをsearchSubstepの対象から外す

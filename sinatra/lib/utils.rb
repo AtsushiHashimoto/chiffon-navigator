@@ -257,42 +257,71 @@ def go2next(hash_recipe, hash_mode)
 	if hash_mode["step"][current_step]["ABLE?"]
 		hash_recipe["step"][current_step]["substep"].each{|substep_id|
 			unless hash_mode["substep"][substep_id]["is_finished?"]
-				next_substep = substep_id
-				break
+				hash_mode = jump(hash_recipe, hash_mode, substep_id)
+				return hash_mode
 			end
 		}
 	end
 	# chainなstepの探索
-	if next_substep == nil
-		hash_recipe["step"].each{|step_id, value|
-			chain_step = hash_recipe["step"][step_id]["chain"][0]
-			if chain_step == current_step && hash_mode["step"][step_id]["ABLE?"]
-				hash_recipe["step"][step_id]["substep"].each{|substep_id|
-					unless hash_mode["substep"][substep_id]["is_finished?"]
-						next_substep = substep_id
-						break
-					end
-				}
-				break
-			end
-		}
-	end
-	if next_substep == nil
-		hash_recipe["sorted_step"].each{|value|
+	hash_recipe["step"].each{|step_id, value|
+		chain_step = hash_recipe["step"][step_id]["chain"][0]
+		if chain_step == current_step && hash_mode["step"][step_id]["ABLE?"]
+			hash_recipe["step"][step_id]["substep"].each{|substep_id|
+				unless hash_mode["substep"][substep_id]["is_finished?"]
+					hash_mode = jump(hash_recipe, hash_mode, substep_id)
+					return hash_mode
+				end
+			}
+			break
+		end
+	}
+	# priorityが一つしたのstepを探索
+	flag = false
+	hash_recipe["sorted_step"].each{|value|
+		if flag
 			if hash_mode["step"][value[1]]["ABLE?"]
 				hash_recipe["step"][value[1]]["substep"].each{|substep_id|
-					unless hash_mode["substep"][substep_id]["is_finished?"]
-						next_substep = substep_id
-						break
+					unless  hash_mode["substep"][substep_id]["is_finished?"]
+						hash_mode = jump(hash_recipe, hash_mode, substep_id)
+						return hash_mode
 					end
 				}
-				break
 			end
-		}
-	end
-	unless next_substep == nil
-		hash_mode = jump(hash_recipe, hash_mode, next_substep)
-	end
+		end
+		if value[1] == current_step
+			flag = true
+		end
+	}
+	# current stepをparentにもつstepの探索
+	# そのようなstepはableではないので，まだ終了していないparent stepを探索する
+	hash_recipe["sorted_step"].each{|value|
+		unless hash_mode["step"][value[1]]["is_finished?"]
+			hash_recipe["step"][value[1]]["parent"].each{|step_id|
+				if step_id == current_step
+					hash_recipe["step"][value[1]]["parent"].each{|step_id|
+						if !hash_mode["step"][step_id]["is_finished?"] && hash_mode["step"][step_id]["ABLE?"]
+							hash_recipe["step"][step_id]["substep"].each{|substep_id|
+								unless hash_mode["substep"][substep_id]["is_finished?"]
+									hash_mode = jump(hash_recipe, hash_mode, substep_id)
+									return hash_mode
+								end
+							}
+						end
+					}
+				end
+			}
+		end
+	}
+	hash_recipe["sorted_step"].each{|value|
+		if hash_mode["step"][value[1]]["ABLE?"]
+			hash_recipe["step"][value[1]]["substep"].each{|substep_id|
+				unless hash_mode["substep"][substep_id]["is_finished?"]
+					hash_mode = jump(hash_recipe, hash_mode, substep_id)
+					return hash_mode
+				end
+			}
+		end
+	}
 	return hash_mode
 end
 
