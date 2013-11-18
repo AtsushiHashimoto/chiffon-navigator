@@ -460,7 +460,8 @@ class NavigatorBase
 			@hash_mode[session_id][media_name].each{|media_id, value|
 				if value["PLAY_MODE"] == "STOP"
 					orders.push({"Cancel"=>{"id"=>media_id}})
-					@hash_mode[session_id][media_name][media_id]["PLAY_MODE"] = "PLAYED"
+					#@hash_mode[session_id][media_name][media_id]["PLAY_MODE"] = "PLAYED"
+					@hash_mode[session_id][media_name][media_id]["PLAY_MODE"] = "---"
 					@hash_mode[session_id][media_name][media_id]["time"] = -1
 				end
 			}
@@ -469,10 +470,12 @@ class NavigatorBase
 			@hash_mode[session_id]["notification"].each{|id, value|
 				if value["PLAY_MODE"] == "STOP"
 					orders.push({"Cancel"=>{"id"=>id}})
-					@hash_mode[session_id]["notification"][id]["PLAY_MODE"] = "PLAYED"
+					#@hash_mode[session_id]["notification"][id]["PLAY_MODE"] = "PLAYED"
+					@hash_mode[session_id]["notification"][id]["PLAY_MODE"] = "---"
 					@hash_mode[session_id]["notification"][id]["time"] = -1
 					@hash_recipe[session_id]["notification"][id]["audio"].each{|audio_id|
-						@hash_mode[session_id]["audio"][audio_id]["PLAY_MODE"] == "PLAYED"
+						#@hash_mode[session_id]["audio"][audio_id]["PLAY_MODE"] == "PLAYED"
+						@hash_mode[session_id]["audio"][audio_id]["PLAY_MODE"] == "---"
 						@hash_mode[session_id]["audio"][audio_id]["time"] = -1
 					}
 				end
