@@ -243,7 +243,7 @@ class NavigatorBase
 		unless system("mkdir -p records/#{session_id}/mode")
 			return "internal error in 'system'", body
 		end
-		unless system("touch records/#{session_id}/log.txt")
+		unless system("touch records/#{session_id}/log")
 			return "internal error in 'system'", body, fo
 		end
 		unless system("touch records/#{session_id}/recipe.xml")
@@ -334,7 +334,7 @@ class NavigatorBase
 			else
 				message ="invalid params : jason_input['operation_contents']['operation'] is wrong when situation is PLAY_CONTROL."
 				p message
-				logger(jason_input, "invalid params", )
+				logger(jason_input, "invalid params", message)
 				return "invalid params", body
 			end
 		else

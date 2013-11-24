@@ -287,6 +287,8 @@ def go2next(hash_recipe, hash_mode)
 					end
 				}
 			end
+		else
+			flag = false
 		end
 		if value[1] == current_step
 			flag = true
@@ -492,13 +494,55 @@ def outputHashMode(session_id, time, hash_mode)
 end
 
 def logger(jason_input, status, message, *estimation_level)
-	open("records/#{jason_input["session_id"]}/log", "a"){|io|
-		io.puts("time:#{jason_input["time"]["sec"]}")
-		io.puts("input:#{jason_input}")
-		io.puts("status:#{status}")
-		unless estimation_level == []
-			io.puts("estimation_level:#{estimation_level[0]}")
+	time = Time.at(jason_input["time"]["sec"].to_i, jason_input["time"]["usec"].to_i).strftime("%Y.%m.%d-%H.%M.%S-%L")
+	situation = jason_input["situation"]
+	output = nil
+	if status == "success"
+		if situation == "CHANNEL"
+			if jason_input["operation_contents"] == "GUIDE"
+				message.each{|part|
+					if part.key?("DetailDraw")
+						if part["DetailDraw"].key?("id")
+							output = "#{situation} : #{part["DetailDraw"]["id"]}"
+						else
+							output = "#{situation} : {}"
+						end
+						break
+					end
+				}
+				if output == nil
+					output = "#{situation} : #{jason_input["operation_contents"]}"
+				end
+			else
+				output = "#{situation} : #{jason_input["operation_contents"]}"
+			end
+		elsif situation == "PLAY_CONTROL"
+			if jason_input["operation_contents"].key?("value")
+				output = "#{situation} : #{jason_input["operation_contents"]["value"]} : #{jason_input["operation_contents"]["operation"]} : #{jason_input["operation_contents"]["id"]}"
+			else
+				output = "#{situation} : #{jason_input["operation_contents"]["operation"]} : #{jason_input["operation_contents"]["id"]}"
+			end
+		elsif situation == "START" || situation == "END"
+			output = "#{situation}"
+		elsif situation == "CHECK" || situation == "NAVI_MENU" || situation == "EXTERNAL_INPUT"
+			output = "#{situation}"
+			message.each{|part|
+				if part.key?("DetailDraw")
+					if part["DetailDraw"].key?("id")
+						output = output + " : #{part["DetailDraw"]["id"]} : #{estimation_level[0]}"
+					else
+						output = output + " : {} : #{estimation_level[0]}"
+					end
+					break
+				end
+			}
 		end
-		io.puts("output:#{message}")
+	else
+		output = message
+	end
+	open("records/#{jason_input["session_id"]}/log", "a"){|io|
+		io.print("[#{time}]")
+		io.print(" [#{status}]")
+		io.puts(" #{output}")
 	}
 end
