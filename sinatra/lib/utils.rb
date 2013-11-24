@@ -503,9 +503,9 @@ def logger(jason_input, status, message, *estimation_level)
 				message.each{|part|
 					if part.key?("DetailDraw")
 						if part["DetailDraw"].key?("id")
-							output = "#{situation} : #{part["DetailDraw"]["id"]}"
+							output = "#{situation} : #{jason_input["operation_contents"]} : #{part["DetailDraw"]["id"]}"
 						else
-							output = "#{situation} : {}"
+							output = "#{situation} : #{jason_input["operation_contents"]} : {}"
 						end
 						break
 					end
