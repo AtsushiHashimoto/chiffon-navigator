@@ -215,7 +215,9 @@ def sortSubstep(hash_recipe, hash_mode, current_substep)
 					hash_recipe["step"][current_step]["substep"].delete_at(j)
 					# j+1（deleteの結果本当はj）番目のsubstepのprev_substepを更新
 					substep_id_2 = hash_recipe["step"][current_step]["substep"][j]
-					hash_recipe["substep"][substep_id_2]["prev_substep"] = substep_id
+					unless substep_id_2 == nil
+						hash_recipe["substep"][substep_id_2]["prev_substep"] = substep_id
+					end
 					break
 				end
 			end
@@ -487,14 +489,17 @@ def inputHashMode(session_id)
 	return hash_mode
 end
 
-def outputHashMode(session_id, time, hash_mode)
+def outputHashMode(session_id, time, hash_mode, hash_recipe)
 	open("records/#{session_id}/mode/#{time["sec"]}-#{time["usec"]}.mode", "w"){|io|
 		io.puts(JSON.pretty_generate(hash_mode))
+	}
+	open("records/#{session_id}/recipe/#{time["sec"]}-#{time["usec"]}.recipe", "w"){|io|
+		io.puts(JSON.pretty_generate(hash_recipe))
 	}
 end
 
 def logger(jason_input, status, message, *estimation_level)
-	time = Time.at(jason_input["time"]["sec"].to_i, jason_input["time"]["usec"].to_i).strftime("%Y.%m.%d-%H.%M.%S-%L")
+	time = Time.at(jason_input["time"]["sec"].to_i, jason_input["time"]["usec"].to_i).strftime("%Y.%m.%d_%H.%M.%S.%6N")
 	situation = jason_input["situation"]
 	output = nil
 	if status == "success"
@@ -544,5 +549,8 @@ def logger(jason_input, status, message, *estimation_level)
 		io.print("[#{time}]")
 		io.print(" [#{status}]")
 		io.puts(" #{output}")
+	}
+	open("records/#{jason_input["session_id"]}/logall", "a"){|io|
+		io.puts("#{message}")
 	}
 end

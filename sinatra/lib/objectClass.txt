@@ -21,7 +21,7 @@ water:seasoning
 soySauce:seasoning
 chickenStock:seasoning
 starch:seasoning
-seasmiOil:seasoning
+sesameOil:seasoning
 oil:seasoning
 saltPepper:seasoning
 ricePaddle:utensil

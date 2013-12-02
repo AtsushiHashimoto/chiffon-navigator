@@ -54,7 +54,7 @@ class NavigatorBase
 			status = "invalid params"
 		end
 
-		outputHashMode(session_id, jason_input["time"], @hash_mode[session_id])
+		outputHashMode(session_id, jason_input["time"], @hash_mode[session_id], @hash_recipe[session_id])
 
 		if status == "internal error"
 			p body.class
@@ -112,9 +112,6 @@ class NavigatorBase
 				prev_of_clicked = @hash_recipe[session_id]["substep"][clicked_id]["prev_substep"]
 				unless @hash_mode[session_id]["substep"][prev_of_clicked]["is_finished?"]
 					@hash_recipe[session_id] = sortSubstep(@hash_recipe[session_id], @hash_mode[session_id], clicked_id)
-					open("records/#{session_id}/recipe.txt", "w"){|io|
-						io.puts(JSON.pretty_generate(@hash_recipe[session_id]))
-					}
 				end
 				# substepをchangeする．遷移元のsubstepはinitialize．
 				@hash_mode[session_id] = controlMedia(@hash_recipe[session_id], @hash_mode[session_id], "all", "STOP", @hash_mode[session_id]["current_substep"])
@@ -243,7 +240,19 @@ class NavigatorBase
 		unless system("mkdir -p records/#{session_id}/mode")
 			return "internal error in 'system'", body
 		end
+		unless system("mkdir -p records/#{session_id}/mode/submode")
+			return "internal error in 'system'", body
+		end
+		unless system("mkdir -p records/#{session_id}/recipe")
+			return "internal error in 'system'", body
+		end
+		unless system("mkdir -p records/#{session_id}/recipe/subrecipe")
+			return "internal error in 'system'", body
+		end
 		unless system("touch records/#{session_id}/log")
+			return "internal error in 'system'", body, fo
+		end
+		unless system("touch records/#{session_id}/logall")
 			return "internal error in 'system'", body, fo
 		end
 		unless system("touch records/#{session_id}/recipe.xml")
@@ -285,9 +294,6 @@ class NavigatorBase
 			body = bodyMaker(jason_input["time"]["sec"], session_id, notification_id)
 		end
 
-		open("records/#{session_id}/recipe.txt", "w"){|io|
-			io.puts(JSON.pretty_generate(@hash_recipe[session_id]))
-		}
 		return "success", body, fo
 	rescue => e
 		return "internal error", e, fo

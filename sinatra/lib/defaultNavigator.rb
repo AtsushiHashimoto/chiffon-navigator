@@ -323,10 +323,6 @@ end
 			return explicitly_substep_array[0], "explicitly"
 		end
 		unless probably_substep_array.empty?
-			if probably_substep_array.include?(hash_mode["current_substep"])
-				#p "prob array include current substep."
-				return hash_mode["current_substep"], "explicitly"
-			end
 			next_substep = hash_recipe["substep"][hash_mode["current_substep"]]["next_substep"]
 			probably_substep_array.each{|substep_id|
 				if substep_id == next_substep && (hash_mode["current_estimation_level"] == "explicitly" || hash_mode["current_estimation_level"] == "probably")
@@ -336,6 +332,9 @@ end
 			}
 			current_step = hash_recipe["substep"][hash_mode["current_substep"]]["parent_step"]
 			probably_substep_array.each{|substep_id|
+				if hash_mode["substep"][substep_id]["is_finished?"]
+					next
+				end
 				next_step = hash_recipe["substep"][substep_id]["parent_step"]
 				flag = false
 				hash_recipe["step"][next_step]["parent"].each{|parent|
@@ -352,6 +351,10 @@ end
 					return substep_id, "explicitly"
 				end
 			}
+			if probably_substep_array.include?(hash_mode["current_substep"])
+				#p "prob array include current substep."
+				return hash_mode["current_substep"], "explicitly"
+			end
 			#p "return prob array[0]"
 			probably_substep_array.each{|substep_id|
 				unless hash_mode["substep"][substep_id]["is_finished?"]
@@ -524,7 +527,7 @@ end
 						#p "put object relates to current."
 						#p "put time - taken time = #{put_time - taken_time}"
 						# 経過時間を用いた移動判定（注意！！混合は移動とはしたくない！！）
-						if (put_time - taken_time) > 1
+						if (put_time - taken_time) > 2
 							#p "put object is not moved, maybe cooked."
 							# 移動でなかった場合，終了判定（foodは用いない→トリガーがfoodだけのときは混合なので使うことにする）
 							#if e_input["action"]["object"]["class"] == "seasoning" || e_input["action"]["object"]["class"] == "utensil"
@@ -593,6 +596,28 @@ end
 							#	@hash_mode[session_id] = check_notification_FINISHED(@hash_recipe[session_id], @hash_mode[session_id], time)
 							#	return true
 							#end
+							else
+								array_mode = Dir::entries("records/#{session_id}/mode").sort
+#								array_mode.each{|v|
+#									p v
+#								}
+								array_recipe = Dir::entries("records/#{session_id}/recipe").sort
+#								array_recipe.each{|v|
+#									p v
+#								}
+								`mv records/#{session_id}/mode/#{array_mode[array_mode.size-2]} records/#{session_id}/mode/submode/`
+								open("records/#{session_id}/mode/#{array_mode[array_mode.size-3]}", "r"){|io|
+									@hash_mode[session_id] = JSON.load(io)
+								}
+#								`mv records/#{session_id}/mode/#{array_mode[array_mode.size-2]} records/#{session_id}/mode/submode/`
+								`mv records/#{session_id}/mode/#{array_mode[array_mode.size-3]} records/#{session_id}/mode/submode/`
+								`mv records/#{session_id}/recipe/#{array_recipe[array_recipe.size-2]} records/#{session_id}/recipe/subrecipe/`
+								open("records/#{session_id}/recipe/#{array_recipe[array_recipe.size-3]}", "r"){|io|
+									@hash_recipe[session_id] = JSON.load(io)
+								}
+#								`mv records/#{session_id}/recipe/#{array_recipe[array_recipe.size-2]} records/#{session_id}/recipe/subrecipe/`
+								`mv records/#{session_id}/recipe/#{array_recipe[array_recipe.size-3]} records/#{session_id}/recipe/subrecipe/`
+								return true
 						end
 						#p "put object is only moved."
 						# 移動であった場合，current substepのnext substepをsearchSubstepの対象から外す
@@ -607,6 +632,14 @@ end
 							}
 						else
 							@hash_mode[session_id]["substep"][next_substep]["can_be_searched?"] = false
+						end
+						# estimation_levelがexplicitlyであった場合，can_be_searchedがfalseにされたsubstepが存在するので，trueに変更する
+						if @hash_mode[session_id]["current_estimation_level"] == "explicitly"
+							@hash_recipe[session_id]["step"][@hash_recipe[session_id]["substep"][@hash_mode[session_id]["current_substep"]]["parent_step"]]["parent"].each{|parent|
+								@hash_recipe[session_id]["step"][parent]["substep"].each{|substep|
+									@hash_mode[session_id]["substep"][substep]["can_be_searched?"] = true
+								}
+							}
 						end
 						# 移動であった場合，再度ユーザの挙動に合ったsubstepを探す（probablyかexplicitlyになる）．
 						# 移動だったsubstep(prev)はpushしない
