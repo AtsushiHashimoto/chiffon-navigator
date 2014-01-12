@@ -199,7 +199,7 @@ class NavigatorBase
 			if @hash_mode[session_id]["substep"][clicked_id]["is_finished?"]
 				@hash_mode[session_id] = uncheck(@hash_recipe[session_id], @hash_mode[session_id], clicked_id)
 			else
-				@hash_mode[session_id] = check(@hash_recipe[session_id], @hash_mode[session_id], clicked_id)
+				@hash_mode[session_id] = check(@hash_recipe[session_id], @hash_mode[session_id], clicked_id, true)
 			end
 		else
 			message =  "invalid params : jason_input['operation_contents'] is wrong when situation is CHECK."

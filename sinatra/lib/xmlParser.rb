@@ -92,69 +92,6 @@ def get_step(doc, hash_recipe)
 			# priorityを持たないならば，nilとしてpush代入する
 			priority_list.push([step_id,nil])
 		end
-		# trigger
-		hash_recipe["step"][step_id]["trigger"] = []
-		unless doc.xpath("//recipe/directions/step[@id=\"#{step_id}\"]/trigger")[0] == nil
-			doc.xpath("//recipe/directions/step[@id=\"#{step_id}\"]/trigger").each{|trigger|
-				# timing
-				timing = nil
-				if trigger["timing"] == nil
-					timing = "start"
-				else
-					timing = trigger["timing"]
-				end
-				# delay
-				delay = -1
-				if trigger["delay"] == nil
-					delay = 0
-				else
-					delay = trigger["delay"]
-				end
-				# ref
-				ref1 = {"taken"=>{"food"=>[], "seasoning"=>[], "utensil"=>[]}, "put"=>{"food"=>[], "seasoning"=>[], "utensil"=>[]}, "other"=>[]}
-				ref2 = {"taken"=>{"food"=>[], "seasoning"=>[], "utensil"=>[]}, "put"=>{"food"=>[], "seasoning"=>[], "utensil"=>[]}, "other"=>[]}
-				trigger["ref"].split(" ").each{|value|
-					if object_class_hash.key?(value)
-						ref1["taken"][object_class_hash[value]].push(value)
-						if object_class_hash[value] != "food"
-							ref2 = {"taken"=>{"food"=>[], "seasoning"=>[], "utensil"=>[]}, "put"=>{"food"=>[], "seasoning"=>[], "utensil"=>[]}, "other"=>[]}
-							ref2["put"][object_class_hash[value]].push(value)
-							hash_recipe["step"][step_id]["trigger"].push({"timing"=>"end", "ref"=>ref2, "delay"=>delay})
-						end
-					else
-						ref1["other"].push(value)
-					end
-				}
-				if ref1["taken"]["seasoning"].empty? && ref1["taken"]["utensil"].empty? && ref1["taken"]["food"].size == 1
-					ref2 = {"taken"=>{"food"=>[], "seasoning"=>[], "utensil"=>[]}, "put"=>{"food"=>[], "seasoning"=>[], "utensil"=>[]}, "other"=>[]}
-					ref2["put"]["food"].push(ref1["taken"]["food"][0])
-					hash_recipe["step"][step_id]["trigger"].push({"timing"=>"end", "ref"=>ref2, "delay"=>delay})
-				end
-				hash_recipe["step"][step_id]["trigger"].push({"timing"=>timing, "ref"=>ref1, "delay"=>delay})
-=begin
-if /^taken_.*$/ =~ value
-						if /^taken_food_(.*)$/ =~ value
-							ref["taken"]["food"].push($1)
-						elsif /^taken_seasoning_(.*)$/ =~ value
-							ref["taken"]["seasoning"].push($1)
-						elsif /^taken_utensil_(.*)$/ =~ value
-							ref["taken"]["utensil"].push($1)
-						end
-					elsif /^put_.*$/ =~ value
-						if /^put_food_(.*)$/ =~ value
-							ref["put"]["food"].push($1)
-						elsif /^put_seasoning_(.*)$/ =~ value
-							ref["put"]["seasoning"].push($1)
-						elsif /^put_utensil_(.*)$/ =~ value
-							ref["put"]["utensil"].push($1)
-						end
-					else
-						ref["other"].push(value)
-					end
-				}
-=end
-			}
-		end
 		# substep
 		hash_recipe["step"][step_id]["substep"] = []
 		doc.xpath("//recipe/directions/step[@id=\"#{step_id}\"]/substep").each{|node2|
@@ -203,6 +140,8 @@ def get_substep(doc, hash_recipe, step_id, substep_id, object_class_hash)
 	end
 	# trigger
 	hash_recipe["substep"][substep_id]["trigger"] = []
+	hash_recipe["substep"][substep_id]["food_mixing"] = false
+	hash_recipe["substep"][substep_id]["Extrafood_mixing"] = false
 	unless doc.xpath("//substep[@id=\"#{substep_id}\"]/trigger")[0] == nil
 		doc.xpath("//substep[@id=\"#{substep_id}\"]/trigger").each{|trigger|
 			# timing
@@ -233,35 +172,28 @@ def get_substep(doc, hash_recipe, step_id, substep_id, object_class_hash)
 					ref1["other"].push(value)
 				end
 			}
+
 			if ref1["taken"]["utensil"].empty? && ref1["taken"]["seasoning"].empty? && ref1["taken"]["food"].size == 1
 				ref2 = {"taken"=>{"food"=>[], "seasoning"=>[], "utensil"=>[]}, "put"=>{"food"=>[], "seasoning"=>[], "utensil"=>[]}, "other"=>[]}
 				ref2["put"]["food"].push(ref1["taken"]["food"][0])
 				hash_recipe["substep"][substep_id]["trigger"].push({"timing"=>"end", "ref"=>ref2, "delay"=>delay})
 			end
 			hash_recipe["substep"][substep_id]["trigger"].push({"timing"=>timing, "ref"=>ref1, "delay"=>delay})
-=begin				if /^taken_.*$/ =~ value
-					if /^taken_food_(.*)$/ =~ value
-						ref["taken"]["food"].push($1)
-					elsif /^taken_seasoning_(.*)$/ =~ value
-						ref["taken"]["seasoning"].push($1)
-					elsif /^taken_utensil_(.*)$/ =~ value
-						ref["taken"]["utensil"].push($1)
-					end
-				elsif /^put_.*$/ =~ value
-					if /^put_food_(.*)$/ =~ value
-						ref["put"]["food"].push($1)
-					elsif /^put_seasoning_(.*)$/ =~ value
-						ref["put"]["seasoning"].push($1)
-					elsif /^put_utensil_(.*)$/ =~ value
-						ref["put"]["utensil"].push($1)
-					end
-				else
-					ref["other"].push(value)
-				end
-			}
-=end
 		}
 	end
+	# 食材混合時は，stepのparentが二つ以上であり，食材のputがriggerになっているはず
+	if hash_recipe["substep"][substep_id]["trigger"][0]["ref"]["put"]["food"] != [] && hash_recipe["step"][hash_recipe["substep"][substep_id]["parent_step"]]["parent"].size > 1
+		hash_recipe["substep"][substep_id]["food_mixing"] = true
+	end
+	# 特殊食材混合時は，特殊食材のみ，または特殊食材+調理器具
+	if hash_recipe["substep"][substep_id]["trigger"][1]["ref"]["taken"]["seasoning"] != [] && hash_recipe["substep"][substep_id]["trigger"][1]["ref"]["taken"]["food"] == [] && hash_recipe["substep"][substep_id]["trigger"][1]["ref"]["taken"]["utensil"] == []
+		hash_recipe["substep"][substep_id]["Extrafood_mixing"] = true
+	elsif hash_recipe["substep"][substep_id]["trigger"].size > 2
+		if hash_recipe["substep"][substep_id]["trigger"][2]["ref"]["taken"]["seasoning"] != [] && hash_recipe["substep"][substep_id]["trigger"][2]["ref"]["taken"]["utensil"] != []
+			hash_recipe["substep"][substep_id]["Extrafood_mixing"] = true
+		end
+	end
+
 	# notification
 	hash_recipe["substep"][substep_id]["notification"] = []
 	unless doc.xpath("//substep[@id=\"#{substep_id}\"]/notification")[0] == nil
@@ -352,28 +284,6 @@ def get_notification(doc, hash_recipe, substep_id, notification_id, object_class
 				hash_recipe["notification"][notification_id]["trigger"].push({"timing"=>timing, "ref"=>ref2, "delay"=>delay})
 			end
 			hash_recipe["notification"][notification_id]["trigger"].push({"timing"=>timing, "ref"=>ref1, "delay"=>delay})
-=begin
-if /^taken_.*$/ =~ value
-					if /^taken_food_(.*)$/ =~ value
-						ref["taken"]["food"].push($1)
-					elsif /^taken_seasoning_(.*)$/ =~ value
-						ref["taken"]["seasoning"].push($1)
-					elsif /^taken_utensil_(.*)$/ =~ value
-						ref["taken"]["utensil"].push($1)
-					end
-				elsif /^put_.*$/ =~ value
-					if /^put_food_(.*)$/ =~ value
-						ref["put"]["food"].push($1)
-					elsif /^put_seasoning_(.*)$/ =~ value
-						ref["put"]["seasoning"].push($1)
-					elsif /^put_utensil_(.*)$/ =~ value
-						ref["put"]["utensil"].push($1)
-					end
-				else
-					ref["other"].push(value)
-				end
-			}
-=end
 		}
 	end
 	# audioの取り出し
@@ -438,28 +348,6 @@ def get_audio(doc, hash_recipe, substep_id, notification_id, audio_id, object_cl
 				hash_recipe["audio"][audio_id]["trigger"].push({"timing"=>timing, "ref"=>ref2, "delay"=>delay})
 			end
 			hash_recipe["audio"][audio_id]["trigger"].push({"timing"=>timing, "ref"=>ref1, "delay"=>delay})
-=begin
-if /^taken_.*$/ =~ value
-					if /^taken_food_(.*)$/ =~ value
-						ref["taken"]["food"].push($1)
-					elsif /^taken_seasoning_(.*)$/ =~ value
-						ref["taken"]["seasoning"].push($1)
-					elsif /^taken_utensil_(.*)$/ =~ value
-						ref["taken"]["utensil"].push($1)
-					end
-				elsif /^put_.*$/ =~ value
-					if /^put_food_(.*)$/ =~ value
-						ref["put"]["food"].push($1)
-					elsif /^put_seasoning_(.*)$/ =~ value
-						ref["put"]["seasoning"].push($1)
-					elsif /^put_utensil_(.*)$/ =~ value
-						ref["put"]["utensil"].push($1)
-					end
-				else
-					ref["other"].push(value)
-				end
-			}
-=end
 		}
 	end
 	return hash_recipe
@@ -509,27 +397,6 @@ def get_video(doc, hash_recipe, substep_id, video_id, object_class_hash)
 				hash_recipe["video"][video_id]["trigger"].push({"timing"=>timing, "ref"=>ref2, "delay"=>delay})
 			end
 			hash_recipe["video"][video_id]["trigger"].push({"timing"=>timing, "ref"=>ref1, "delay"=>delay})
-=begin				if /^taken_.*$/ =~ value
-					if /^taken_food_(.*)$/ =~ value
-						ref["taken"]["food"].push($1)
-					elsif /^taken_seasoning_(.*)$/ =~ value
-						ref["taken"]["seasoning"].push($1)
-					elsif /^taken_utensil_(.*)$/ =~ value
-						ref["taken"]["utensil"].push($1)
-					end
-				elsif /^put_.*$/ =~ value
-					if /^put_food_(.*)$/ =~ value
-						ref["put"]["food"].push($1)
-					elsif /^put_seasoning_(.*)$/ =~ value
-						ref["put"]["seasoning"].push($1)
-					elsif /^put_utensil_(.*)$/ =~ value
-						ref["put"]["utensil"].push($1)
-					end
-				else
-					ref["other"].push(value)
-				end
-			}
-=end
 		}
 	end
 	return hash_recipe

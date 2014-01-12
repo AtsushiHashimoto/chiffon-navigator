@@ -129,29 +129,30 @@ def updateABLE(hash_recipe, hash_mode, *current)
 				hash_mode["substep"][substep_id]["can_be_searched?"] = true
 			end
 		}
-		if hash_mode["step"][step_id]["ABLE?"]
-			hash_recipe["step"][step_id]["substep"].each{|substep_id|
-				unless hash_mode["substep"][substep_id]["is_finished?"]
-					hash_mode["substep"][substep_id]["ABLE?"] = true
-					# ableはcan_be_searched=trueにする．
-					hash_mode["substep"][substep_id]["can_be_searched?"] = true
-					if step_id == current_step && substep_id == current_substep
-						if hash_recipe["substep"][substep_id]["next_substep"] != nil
-							next_substep = hash_recipe["substep"][substep_id]["next_substep"]
-							hash_mode["substep"][next_substep]["ABLE?"] = true
-							hash_mode["substep"][next_substep]["can_be_searched?"] = true
+		flag = false
+		hash_recipe["step"][step_id]["substep"].each{|substep_id|
+			unless hash_mode["substep"][substep_id]["is_finished?"]
+				unless flag
+					if hash_mode["step"][step_id]["ABLE?"]
+						hash_mode["substep"][substep_id]["ABLE?"] = true
+						# ableはcan_be_searched=trueにする．
+						hash_mode["substep"][substep_id]["can_be_searched?"] = true
+						if step_id == current_step && substep_id == current_substep
+							if hash_recipe["substep"][substep_id]["next_substep"] != nil
+								next_substep = hash_recipe["substep"][substep_id]["next_substep"]
+								hash_mode["substep"][next_substep]["ABLE?"] = true
+								hash_mode["substep"][next_substep]["can_be_searched?"] = true
+							end
 						end
+						flag = true
 					end
-					next_substep = hash_recipe["substep"][substep_id]["next_substep"]
-					unless next_substep == nil
-						if hash_recipe["substep"][substep_id]["order"] == hash_recipe["substep"][next_substep]["order"]
-							next
-						end
-					end
-					break
 				end
-			}
-		end
+				if hash_recipe["substep"][substep_id]["Extrafood_mixing"]
+					hash_mode["substep"][substep_id]["ABLE?"] = true
+					hash_mode["substep"][substep_id]["can_be_searched?"] = true
+				end
+			end
+		}
 	}
 	return hash_mode
 end
@@ -338,8 +339,25 @@ def prev(hash_recipe, hash_mode)
 	return hash_mode
 end
 
-def check(hash_recipe, hash_mode, id)
-	hash_mode = check_isFinished(hash_recipe, hash_mode, id)
+def check(hash_recipe, hash_mode, id, *bigStick)
+	if hash_recipe["substep"].key?(id)
+		if hash_mode["substep"][id]["Extrafood_mixing"]
+			if bigStick != []
+				if bigStick
+					hash_mode = check_isFinished(hash_recipe, hash_mode, id)
+				else
+					hash_mode = check_isFinished(hash_recipe, hash_mode, id, true)
+				end
+			else
+				hash_mode = check_isFinished(hash_recipe, hash_mode, id, true)
+			end
+		else
+			hash_mode = check_isFinished(hash_recipe, hash_mode, id)
+		end
+	else
+		hash_mode = check_isFinished(hash_recipe, hash_mode, id)
+	end
+
 	hash_mode = updateABLE(hash_recipe, hash_mode)
 	current_step = hash_mode["current_step"]
 	current_substep = hash_mode["current_substep"]
@@ -382,7 +400,7 @@ def check_notification_FINISHED(hash_recipe, hash_mode, time)
 	return hash_mode
 end
 
-def check_isFinished(hash_recipe, hash_mode, id)
+def check_isFinished(hash_recipe, hash_mode, id, *extra_mixing)
 	media = ["audio", "video", "notification"]
 	if hash_recipe["step"].key?(id)
 		unless hash_mode["step"][id]["is_finished?"]
@@ -401,21 +419,59 @@ def check_isFinished(hash_recipe, hash_mode, id)
 	elsif hash_recipe["substep"].key?(id)
 		unless hash_mode["substep"][id]["is_finished?"]
 			parent_step = hash_recipe["substep"][id]["parent_step"]
-			hash_recipe["step"][parent_step]["substep"].each{|substep_id|
-				hash_mode["substep"][substep_id]["is_finished?"] = true
-				# is_finished=trueなsubstepはcan_be_searched=trueにする
-				hash_mode["substep"][substep_id]["can_be_searched?"] = true
-				hash_mode = controlMedia(hash_recipe, hash_mode, "STOP", substep_id)
-				if substep_id == id
-					break
+			if extra_mixing != []
+				if extra_mixing
+					p "!!!!test"
+					p id
+					hash_mode["substep"][id]["is_finished?"] = true
+					hash_mode["substep"][id]["can_be_searched?"] = true
+					flag = true
+					hash_recipe["step"][parent_step]["substep"].each{|substep_id|
+						unless hash_mode["substep"][substep_id]["is_finished?"]
+							flag = false
+							break
+						end
+					}
+					if flag
+						p "really?"
+						hash_mode["step"][parent_step]["is_finished?"] = true
+						hash_mode["step"][parent_step]["open?"] = false
+					end
+				else
+					hash_recipe["step"][parent_step]["substep"].each{|substep_id|
+						hash_mode["substep"][substep_id]["is_finished?"] = true
+						# is_finished=trueなsubstepはcan_be_searched=trueにする
+						hash_mode["substep"][substep_id]["can_be_searched?"] = true
+						hash_mode = controlMedia(hash_recipe, hash_mode, "STOP", substep_id)
+						if substep_id == id
+							break
+						end
+					}
+					hash_recipe["step"][parent_step]["parent"].each{|parent_id|
+						hash_mode = check_isFinished(hash_recipe, hash_mode, parent_id)
+					}
+					if hash_recipe["substep"][id]["next_substep"] == nil
+						hash_mode["step"][parent_step]["is_finished?"] = true
+						hash_mode["step"][parent_step]["open?"] = false
+					end
 				end
-			}
-			hash_recipe["step"][parent_step]["parent"].each{|parent_id|
-				hash_mode = check_isFinished(hash_recipe, hash_mode, parent_id)
-			}
-			if hash_recipe["substep"][id]["next_substep"] == nil
-				hash_mode["step"][parent_step]["is_finished?"] = true
-				hash_mode["step"][parent_step]["open?"] = false
+			else
+				hash_recipe["step"][parent_step]["substep"].each{|substep_id|
+					hash_mode["substep"][substep_id]["is_finished?"] = true
+					# is_finished=trueなsubstepはcan_be_searched=trueにする
+					hash_mode["substep"][substep_id]["can_be_searched?"] = true
+					hash_mode = controlMedia(hash_recipe, hash_mode, "STOP", substep_id)
+					if substep_id == id
+						break
+					end
+				}
+				hash_recipe["step"][parent_step]["parent"].each{|parent_id|
+					hash_mode = check_isFinished(hash_recipe, hash_mode, parent_id)
+				}
+				if hash_recipe["substep"][id]["next_substep"] == nil
+					hash_mode["step"][parent_step]["is_finished?"] = true
+					hash_mode["step"][parent_step]["open?"] = false
+				end
 			end
 		end
 	end
