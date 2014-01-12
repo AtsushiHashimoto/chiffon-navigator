@@ -54,6 +54,10 @@ def initialize_mode(hash_recipe)
 	hash_mode["prev_estimation_level"] = nil
 	# 現在のestimationのstate
 	hash_mode["current_estimation_level"] = "recommend"
+	# 直前の動作の管理
+	hash_mode["prev_action"] = "nothing"
+	# 直前の動作の行われた時間
+	hash_mode["prev_action_time"] = -1
 
 	# 優先度の最も高いstepをCURRENTとし，その一番目のsubstepもCURRENTにする．
 	current_step = hash_recipe["sorted_step"][0][1]

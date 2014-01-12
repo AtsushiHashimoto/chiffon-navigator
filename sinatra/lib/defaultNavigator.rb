@@ -32,7 +32,7 @@ class DefaultNavigator < NavigatorBase
 			return "invalid params", body
 		end
 		# modeの修正
-		updated = modeUpdate_externalinput(jason_input["time"]["sec"], e_input, session_id)
+		updated = modeUpdate_externalinput(jason_input["time"], e_input, session_id)
 
 		# modeが修正された場合は，bodyを形成する
 		if updated
@@ -493,7 +493,7 @@ end
 				@hash_mode[session_id]["prev_substep"] = []
 				@hash_mode[session_id]["prev_estimation_level"] = nil
 			end
-			@hash_mode[session_id] = check_notification_FINISHED(@hash_recipe[session_id], @hash_mode[session_id], time)
+			@hash_mode[session_id] = check_notification_FINISHED(@hash_recipe[session_id], @hash_mode[session_id], time["sec"])
 			return true
 		when "recognizer"
 			if e_input["action"]["name"] == "put"
@@ -520,8 +520,10 @@ end
 		end
 		#p "playMedia in put : #{media_id}"
 		# put時間とtaken時間の取得
-		put_time = time
+		put_time = (time["sec"].to_s + time["usec"].to_s).to_i
 		taken_time = @hash_mode[session_id]["taken"][e_input["action"]["object"]["class"]][e_input["action"]["object"]["name"]]
+		@hash_mode[session_id]["prev_action"] = "put"
+		@hash_mode[session_id]["prev_action_time"] = put_time
 		#p "put time in 'put' : #{put_time}"
 		#p "taken time in 'put' : #{taken_time}"
 		# taken listからput objectのdelete
@@ -537,7 +539,7 @@ end
 				#p "put object relates to current."
 				#p "put time - taken time = #{put_time - taken_time}"
 				# 経過時間を用いた移動判定（注意！！混合は移動とはしたくない！！）
-				if (put_time - taken_time) > 1
+				if (put_time - taken_time) > 1000000
 					#p "put object is not moved, maybe cooked."
 					# 移動でなかった場合，終了判定（foodは用いない→トリガーがfoodだけのときは混合なので使うことにする）
 					#if e_input["action"]["object"]["class"] == "seasoning" || e_input["action"]["object"]["class"] == "utensil"
@@ -555,7 +557,7 @@ end
 							if media_id == nil
 								return false
 							end
-							@hash_mode[session_id] = check_notification_FINISHED(@hash_recipe[session_id], @hash_mode[session_id], time)
+							@hash_mode[session_id] = check_notification_FINISHED(@hash_recipe[session_id], @hash_mode[session_id], time["sec"])
 							return true
 						end
 					end
@@ -575,7 +577,6 @@ end
 								end
 								# recommend next substep
 								if @hash_recipe[session_id]["substep"][@hash_mode[session_id]["current_substep"]]["Extrafood_mixing"]
-									p "test!!!!"
 									@hash_mode[session_id] = check_isFinished(@hash_recipe[session_id], @hash_mode[session_id], @hash_mode[session_id]["current_substep"], true)
 								else
 									@hash_mode[session_id] = check_isFinished(@hash_recipe[session_id], @hash_mode[session_id], @hash_mode[session_id]["current_substep"])
@@ -587,7 +588,7 @@ end
 								# estimation levelの更新
 								@hash_mode[session_id]["prev_estimation_level"] = @hash_mode[session_id]["current_estimation_level"]
 								@hash_mode[session_id]["current_estimation_level"] = "recommend"
-								@hash_mode[session_id] = check_notification_FINISHED(@hash_recipe[session_id], @hash_mode[session_id], time)
+								@hash_mode[session_id] = check_notification_FINISHED(@hash_recipe[session_id], @hash_mode[session_id], time["sec"])
 								return true
 							end
 						end
@@ -599,7 +600,7 @@ end
 						if media_id == nil
 							return false
 						end
-						@hash_mode[session_id] = check_notification_FINISHED(@hash_recipe[session_id], @hash_mode[session_id], time)
+						@hash_mode[session_id] = check_notification_FINISHED(@hash_recipe[session_id], @hash_mode[session_id], time["sec"])
 						return true
 					end
 					#else
@@ -612,25 +613,19 @@ end
 					#	return true
 					#end
 				else
+					# 把持->解放（現在）が虚偽的動作だったので，状態を二つ戻す
+					# 一つ前のmode（虚偽的把持）をsubmodeに移し，その前のmodeを読み込む
 					array_mode = Dir::entries("records/#{session_id}/mode").sort
-					#								array_mode.each{|v|
-					#									p v
-					#								}
 					array_recipe = Dir::entries("records/#{session_id}/recipe").sort
-					#								array_recipe.each{|v|
-					#									p v
-					#								}
 					`mv records/#{session_id}/mode/#{array_mode[array_mode.size-2]} records/#{session_id}/mode/submode/`
 					open("records/#{session_id}/mode/#{array_mode[array_mode.size-3]}", "r"){|io|
 						@hash_mode[session_id] = JSON.load(io)
 					}
-					#								`mv records/#{session_id}/mode/#{array_mode[array_mode.size-2]} records/#{session_id}/mode/submode/`
 					`mv records/#{session_id}/mode/#{array_mode[array_mode.size-3]} records/#{session_id}/mode/submode/`
 					`mv records/#{session_id}/recipe/#{array_recipe[array_recipe.size-2]} records/#{session_id}/recipe/subrecipe/`
 					open("records/#{session_id}/recipe/#{array_recipe[array_recipe.size-3]}", "r"){|io|
 						@hash_recipe[session_id] = JSON.load(io)
 					}
-					#								`mv records/#{session_id}/recipe/#{array_recipe[array_recipe.size-2]} records/#{session_id}/recipe/subrecipe/`
 					`mv records/#{session_id}/recipe/#{array_recipe[array_recipe.size-3]} records/#{session_id}/recipe/subrecipe/`
 					return true
 				end
@@ -670,7 +665,7 @@ end
 					@hash_mode[session_id] = go2next(@hash_recipe[session_id], @hash_mode[session_id])
 					# estimation levelの更新．移動であったsubstepのestimationを上書きする．
 					@hash_mode[session_id]["current_estimation_level"] = "recommend"
-					@hash_mode[session_id] = check_notification_FINISHED(@hash_recipe[session_id], @hash_mode[session_id], time)
+					@hash_mode[session_id] = check_notification_FINISHED(@hash_recipe[session_id], @hash_mode[session_id], time["sec"])
 					return true
 				end
 				# estimation levelの更新．移動であったsubstepのestimationを上書きする．
@@ -753,7 +748,7 @@ end
 						}
 					}
 				end
-				@hash_mode[session_id] = check_notification_FINISHED(@hash_recipe[session_id], @hash_mode[session_id], time)
+				@hash_mode[session_id] = check_notification_FINISHED(@hash_recipe[session_id], @hash_mode[session_id], time["sec"])
 				return true
 			end
 			#p "put object does not relate to current."
@@ -763,13 +758,40 @@ end
 		if media_id == nil
 			return false
 		end
-		@hash_mode[session_id] = check_notification_FINISHED(@hash_recipe[session_id], @hash_mode[session_id], time)
+		@hash_mode[session_id] = check_notification_FINISHED(@hash_recipe[session_id], @hash_mode[session_id], time["sec"])
 		return true
 	end
 
 	def grabbed(time, e_input, session_id)
 		# takenされた物体のnameとtimeを取得
-		@hash_mode[session_id]["taken"][e_input["action"]["object"]["class"]][e_input["action"]["object"]["name"]] = time
+		taken_time = (time["sec"].to_s + time["usec"].to_s).to_i
+		@hash_mode[session_id]["taken"][e_input["action"]["object"]["class"]][e_input["action"]["object"]["name"]] = taken_time
+		if @hash_mode[session_id]["prev_action"] == "taken" && (taken_time - @hash_mode[session_id]["prev_action_time"]) < 500000
+			# 把持->把持（現在）が高速で行われたので，同時に把持されたと解釈．
+			# 現在のtaken_listは変更せずに，他の状態をひとつ前に戻し，推定のやり直し．
+			current_taken_list = @hash_mode[session_id]["taken"]
+			array_mode = Dir::entries("records/#{session_id}/mode").sort
+			p array_mode
+			array_recipe = Dir::entries("records/#{session_id}/recipe").sort
+			p array_recipe
+			`mv records/#{session_id}/mode/#{array_mode[array_mode.size-2]} records/#{session_id}/mode/submode/`
+			open("records/#{session_id}/mode/#{array_mode[array_mode.size-3]}", "r"){|io|
+				@hash_mode[session_id] = JSON.load(io)
+			}
+			`mv records/#{session_id}/mode/#{array_mode[array_mode.size-3]} records/#{session_id}/mode/submode/`
+			`mv records/#{session_id}/recipe/#{array_recipe[array_recipe.size-2]} records/#{session_id}/recipe/subrecipe/`
+			open("records/#{session_id}/recipe/#{array_recipe[array_recipe.size-3]}", "r"){|io|
+				@hash_recipe[session_id] = JSON.load(io)
+			}
+			`mv records/#{session_id}/recipe/#{array_recipe[array_recipe.size-3]} records/#{session_id}/recipe/subrecipe/`
+			p @hash_mode[session_id]["taken"]
+			p current_taken_list
+			@hash_mode[session_id]["taken"] = current_taken_list
+			# 以降では直前の動作の時間を比較に使いたい
+			taken_time = @hash_mode[session_id]["prev_action_time"]
+		end
+		@hash_mode[session_id]["prev_action"] = "taken"
+		@hash_mode[session_id]["prev_action_time"] = taken_time
 		# メディアの探索
 		media_id, timing = searchPlayMedia(@hash_recipe[session_id], @hash_mode[session_id], e_input["action"])
 		unless media_id == nil
@@ -817,10 +839,7 @@ end
 						@hash_recipe[session_id] = sortSubstep(@hash_recipe[session_id], @hash_mode[session_id], @hash_mode[session_id]["current_substep"])
 						prev_substep = @hash_recipe[session_id]["substep"][@hash_mode[session_id]["current_substep"]]["prev_substep"]
 					end
-					if @hash_recipe[session_id]["substep"][@hash_mode[session_id]["current_substep"]]["Extrafood_mixing"]
-						p "!!test!!"
-					else
-						p "test"
+					unless @hash_recipe[session_id]["substep"][@hash_mode[session_id]["current_substep"]]["Extrafood_mixing"]
 						@hash_mode[session_id] = check_isFinished(@hash_recipe[session_id], @hash_mode[session_id], prev_substep)
 					end
 				end
@@ -837,7 +856,7 @@ end
 			else
 				# levelはprobablyなので，finishedにしたり，メディアを再生したりしない．
 			end
-			@hash_mode[session_id] = check_notification_FINISHED(@hash_recipe[session_id], @hash_mode[session_id], time)
+			@hash_mode[session_id] = check_notification_FINISHED(@hash_recipe[session_id], @hash_mode[session_id], time["sec"])
 			return true
 		end
 		unless next_substep == nil
@@ -977,14 +996,14 @@ end
 				# current levelがpobablyなのでメディアの再生なし．一つ前のsubstepのfinishedもなし．
 				@hash_mode[session_id] = jump(@hash_recipe[session_id], @hash_mode[session_id], next_substep)
 			end
-			@hash_mode[session_id] = check_notification_FINISHED(@hash_recipe[session_id], @hash_mode[session_id], time)
+			@hash_mode[session_id] = check_notification_FINISHED(@hash_recipe[session_id], @hash_mode[session_id], time["sec"])
 			return true
 		end
 		# next_substep==nilならば，substepに対しては何もしない
 		if media_id == nil
 			return false
 		end
-		@hash_mode[session_id] = check_notification_FINISHED(@hash_recipe[session_id], @hash_mode[session_id], time)
+		@hash_mode[session_id] = check_notification_FINISHED(@hash_recipe[session_id], @hash_mode[session_id], time["sec"])
 		return true
 	end
 end
