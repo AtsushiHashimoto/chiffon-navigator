@@ -69,7 +69,7 @@ def initialize_mode(hash_recipe)
 	hash_mode["current_step"] = current_step
 	hash_mode["current_substep"] = current_substep
 	# stepとsubstepを適切にABLEにする．
-	hash_mode = updateABLE(hash_recipe, hash_mode, current_step, current_substep)
+	hash_mode = updateABLE(hash_recipe, hash_mode, false, current_step, current_substep)
 	if hash_mode["substep"][current_substep]["ABLE?"]
 		hash_mode = controlMedia(hash_recipe, hash_mode, "all", "START", current_substep)
 	end

@@ -87,13 +87,14 @@ def controlMedia(hash_recipe, hash_mode, media_array, play_mode, *id_array)
 	return hash_mode
 end
 
-def updateABLE(hash_recipe, hash_mode, *current)
+def updateABLE(hash_recipe, hash_mode, recommend, *current)
 	current_step = nil
 	current_substep = nil
 	unless current == []
 		current_step = current[0]
 		current_substep = current[1]
 	end
+	parentflag = false
 	hash_mode["step"].each{|step_id, value|
 		if !value["is_finished?"]
 			if hash_recipe["step"][step_id]["parent"].empty?
@@ -106,6 +107,7 @@ def updateABLE(hash_recipe, hash_mode, *current)
 					elsif parent_id == current_step
 						if hash_recipe["substep"][current_substep]["next_substep"] == nil
 							flag = true
+							parentflag = true
 						else
 							flag = false
 							break
@@ -136,7 +138,10 @@ def updateABLE(hash_recipe, hash_mode, *current)
 					if hash_mode["step"][step_id]["ABLE?"]
 						hash_mode["substep"][substep_id]["ABLE?"] = true
 						# ableはcan_be_searched=trueにする．
-						hash_mode["substep"][substep_id]["can_be_searched?"] = true
+						if recommend == true && parentflag == true
+						else
+							hash_mode["substep"][substep_id]["can_be_searched?"] = true
+						end
 						if step_id == current_step && substep_id == current_substep
 							if hash_recipe["substep"][substep_id]["next_substep"] != nil
 								next_substep = hash_recipe["substep"][substep_id]["next_substep"]
@@ -232,7 +237,7 @@ end
 
 # id先に移動するだけ
 # ableの設定はここでやる．
-def jump(hash_recipe, hash_mode, next_substep)
+def jump(hash_recipe, hash_mode, next_substep, *recommend)
 	next_step = hash_recipe["substep"][next_substep]["parent_step"]
 	current_step = hash_mode["current_step"]
 	current_substep = hash_mode["current_substep"]
@@ -246,13 +251,21 @@ def jump(hash_recipe, hash_mode, next_substep)
 	hash_mode["substep"][next_substep]["CURRENT?"] = true
 	hash_mode["shown"] = next_substep
 
-	hash_mode = updateABLE(hash_recipe, hash_mode, next_step, next_substep)
+	unless recommend == []
+		if recommend[0] == true
+			hash_mode = updateABLE(hash_recipe, hash_mode, true, next_step, next_substep)
+		else
+			hash_mode = updateABLE(hash_recipe, hash_mode, next_step, next_substep)
+		end
+	else
+		hash_mode = updateABLE(hash_recipe, hash_mode, next_step, next_substep)
+	end
 	return hash_mode
 end
 
 # 次のsubstepを探し，jumpで移動．
 # 次のsubstepが無かったら何もしない
-def go2next(hash_recipe, hash_mode)
+def go2next(hash_recipe, hash_mode, *recommend)
 	current_step = hash_mode["current_step"]
 	current_substep = hash_mode["current_substep"]
 
@@ -260,7 +273,15 @@ def go2next(hash_recipe, hash_mode)
 	# 調味料の混合のことも考え，stepがabelか否かは気にしない
 	hash_recipe["step"][current_step]["substep"].each{|substep_id|
 		if hash_mode["substep"][substep_id]["ABLE?"]
-			hash_mode = jump(hash_recipe, hash_mode, substep_id)
+			unless recommend == []
+				if recommend[0] == true
+					hash_mode = jump(hash_recipe, hash_mode, substep_id, true)
+				else
+					hash_mode = jump(hash_recipe, hash_mode, substep_id)
+				end
+			else
+				hash_mode = jump(hash_recipe, hash_mode, substep_id)
+			end
 			return hash_mode
 		end
 	}
@@ -270,7 +291,15 @@ def go2next(hash_recipe, hash_mode)
 		if chain_step == current_step && hash_mode["step"][step_id]["ABLE?"]
 			hash_recipe["step"][step_id]["substep"].each{|substep_id|
 				unless hash_mode["substep"][substep_id]["is_finished?"]
-					hash_mode = jump(hash_recipe, hash_mode, substep_id)
+					unless recommend == []
+						if recommend[0] == true
+							hash_mode = jump(hash_recipe, hash_mode, substep_id, true)
+						else
+							hash_mode = jump(hash_recipe, hash_mode, substep_id)
+						end
+					else
+						hash_mode = jump(hash_recipe, hash_mode, substep_id)
+					end
 					return hash_mode
 				end
 			}
@@ -284,7 +313,15 @@ def go2next(hash_recipe, hash_mode)
 			if hash_mode["step"][value[1]]["ABLE?"]
 				hash_recipe["step"][value[1]]["substep"].each{|substep_id|
 					unless  hash_mode["substep"][substep_id]["is_finished?"]
-						hash_mode = jump(hash_recipe, hash_mode, substep_id)
+						unless recommend == []
+							if recommend[0] == true
+								hash_mode = jump(hash_recipe, hash_mode, substep_id, true)
+							else
+								hash_mode = jump(hash_recipe, hash_mode, substep_id)
+							end
+						else
+							hash_mode = jump(hash_recipe, hash_mode, substep_id)
+						end
 						return hash_mode
 					end
 				}
@@ -306,7 +343,15 @@ def go2next(hash_recipe, hash_mode)
 						if !hash_mode["step"][step_id]["is_finished?"] && hash_mode["step"][step_id]["ABLE?"]
 							hash_recipe["step"][step_id]["substep"].each{|substep_id|
 								unless hash_mode["substep"][substep_id]["is_finished?"]
-									hash_mode = jump(hash_recipe, hash_mode, substep_id)
+									unless recommend == []
+										if recommend[0] == true
+											hash_mode = jump(hash_recipe, hash_mode, substep_id, true)
+										else
+											hash_mode = jump(hash_recipe, hash_mode, substep_id)
+										end
+									else
+										hash_mode = jump(hash_recipe, hash_mode, substep_id)
+									end
 									return hash_mode
 								end
 							}
@@ -320,7 +365,15 @@ def go2next(hash_recipe, hash_mode)
 		if hash_mode["step"][value[1]]["ABLE?"]
 			hash_recipe["step"][value[1]]["substep"].each{|substep_id|
 				unless hash_mode["substep"][substep_id]["is_finished?"]
-					hash_mode = jump(hash_recipe, hash_mode, substep_id)
+					unless recommend == []
+						if recommend[0] == true
+							hash_mode = jump(hash_recipe, hash_mode, substep_id, true)
+						else
+							hash_mode = jump(hash_recipe, hash_mode, substep_id)
+						end
+					else
+						hash_mode = jump(hash_recipe, hash_mode, substep_id)
+					end
 					return hash_mode
 				end
 			}
@@ -357,27 +410,27 @@ def check(hash_recipe, hash_mode, id, *bigStick)
 		hash_mode = check_isFinished(hash_recipe, hash_mode, id)
 	end
 
-	hash_mode = updateABLE(hash_recipe, hash_mode)
+	hash_mode = updateABLE(hash_recipe, hash_mode, false)
 	current_step = hash_mode["current_step"]
 	current_substep = hash_mode["current_substep"]
 	if hash_mode["substep"][current_substep]["is_finished?"]
-		hash_mode = go2next(hash_recipe, hash_mode)
+		hash_mode = go2next(hash_recipe, hash_mode, true)
 		hash_mode = controlMedia(hash_recipe, hash_mode, ["audio", "video", "notification"], "START")
 	else
-		hash_mode = updateABLE(hash_recipe, hash_mode, current_step, current_substep)
+		hash_mode = updateABLE(hash_recipe, hash_mode, false, current_step, current_substep)
 	end
 	return hash_mode
 end
 
 def uncheck(hash_recipe, hash_mode, id)
 	hash_mode = uncheck_isFinished(hash_recipe, hash_mode, id)
-	hash_mode = updateABLE(hash_recipe, hash_mode)
+	hash_mode = updateABLE(hash_recipe, hash_mode, false)
 	current_step = hash_mode["current_step"]
 	current_substep = hash_mode["current_substep"]
 	if hash_mode["substep"][current_substep]["ABLE?"]
-		hash_mode = updateABLE(hash_recipe, hash_mode, current_step, current_substep)
+		hash_mode = updateABLE(hash_recipe, hash_mode, false, current_step, current_substep)
 	else
-		hash_mode = go2next(hash_recipe, hash_mode)
+		hash_mode = go2next(hash_recipe, hash_mode, true)
 		hash_mode = controlMedia(hash_recipe, hash_mode, ["audio", "video", "notification"], "START")
 	end
 	return hash_mode

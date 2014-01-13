@@ -256,6 +256,7 @@ end
 				highest_substep.push(substep_id)
 			end
 		}
+		p rank
 		if highest_point > 90
 			# ほとんど一致
 			next_substep = hash_recipe["substep"][hash_mode["current_substep"]]["next_substep"]
@@ -406,7 +407,7 @@ end
 		when "order"
 			if e_input["action"]["name"] == "next"
 				@hash_mode[session_id] = check_isFinished(@hash_recipe[session_id], @hash_mode[session_id], @hash_mode[session_id]["current_substep"])
-				@hash_mode[session_id] = updateABLE(@hash_recipe[session_id], @hash_mode[session_id])
+				@hash_mode[session_id] = updateABLE(@hash_recipe[session_id], @hash_mode[session_id], false)
 				@hash_mode[session_id] = go2next(@hash_recipe[session_id], @hash_mode[session_id])
 				@hash_mode[session_id] = controlMedia(@hash_recipe[session_id], @hash_mode[session_id], "all", "START", @hash_mode[session_id]["current_substep"])
 				@hash_mode[session_id]["current_estimation_level"] = "explicitly"
@@ -535,9 +536,9 @@ end
 								else
 									@hash_mode[session_id] = check_isFinished(@hash_recipe[session_id], @hash_mode[session_id], @hash_mode[session_id]["current_substep"])
 								end
-								@hash_mode[session_id] = updateABLE(@hash_recipe[session_id], @hash_mode[session_id])
+								@hash_mode[session_id] = updateABLE(@hash_recipe[session_id], @hash_mode[session_id], false)
 								# current substepをis_finished=trueにした場合は，next substepを提示した方が自然
-								@hash_mode[session_id] = go2next(@hash_recipe[session_id], @hash_mode[session_id])
+								@hash_mode[session_id] = go2next(@hash_recipe[session_id], @hash_mode[session_id], true)
 								# メディアは再生しない
 								# estimation levelの更新
 								@hash_mode[session_id]["prev_estimation_level"] = @hash_mode[session_id]["current_estimation_level"]
@@ -615,7 +616,7 @@ end
 					#p "next substep is nil, so use next function(recommend)."
 					# メディアを再生していれば停止しておく
 					@hash_mode[session_id] = controlMedia(@hash_recipe[session_id], @hash_mode[session_id], "all", "STOP", @hash_mode[session_id]["current_substep"])
-					@hash_mode[session_id] = updateABLE(@hash_recipe[session_id], @hash_mode[session_id])
+					@hash_mode[session_id] = updateABLE(@hash_recipe[session_id], @hash_mode[session_id], false)
 					@hash_mode[session_id] = go2next(@hash_recipe[session_id], @hash_mode[session_id])
 					# estimation levelの更新．移動であったsubstepのestimationを上書きする．
 					@hash_mode[session_id]["current_estimation_level"] = "recommend"
@@ -793,7 +794,7 @@ end
 						@hash_mode[session_id] = check_isFinished(@hash_recipe[session_id], @hash_mode[session_id], prev_substep)
 					end
 				end
-				@hash_mode[session_id] = updateABLE(@hash_recipe[session_id], @hash_mode[session_id], @hash_mode[session_id]["current_step"], @hash_mode[session_id]["current_substep"])
+				@hash_mode[session_id] = updateABLE(@hash_recipe[session_id], @hash_mode[session_id], false, @hash_mode[session_id]["current_step"], @hash_mode[session_id]["current_substep"])
 				@hash_mode[session_id] = controlMedia(@hash_recipe[session_id], @hash_mode[session_id], "all", "START", @hash_mode[session_id]["current_substep"])
 				# can_be_searchedの更新
 				# current stepのparent stepにおけるsubstep群を，can_be_searched=falseにする
