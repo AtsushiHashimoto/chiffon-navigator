@@ -3,11 +3,6 @@ egg:food
 leek:food
 lettuce:food
 ginger:food
-step01:food
-step02:food
-step03:food
-step04:food
-step05:food
 step06:food
 step07:food
 step08:food
@@ -21,8 +16,8 @@ water:seasoning
 soySauce:seasoning
 chickenStock:seasoning
 starch:seasoning
-sesameOil:seasoning
-oil:seasoning
+sesameOil:food
+oil:food
 saltPepper:seasoning
 ricePaddle:utensil
 fork:utensil
@@ -32,6 +27,8 @@ tbsp:utensil
 tsp:utensil
 paddle:utensil
 ladle:utensil
+oven:utensil
+range:utensil
 chineseCabage:food
 radish:food
 carrot:food

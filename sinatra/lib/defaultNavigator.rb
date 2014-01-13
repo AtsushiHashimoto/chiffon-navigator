@@ -309,7 +309,7 @@ end
 			current_step = hash_mode["current_step"]
 			explicitly_substep_array.each{|substep_id|
 				step_id = hash_recipe["substep"][substep_id]["parent_step"]
-				if step_id == current_step
+				if step_id == current_step && !hash_mode["substep"][substep_id]["is_finished"]
 					#p "exp array include current step."
 					return substep_id, "explicitly"
 				end
@@ -320,7 +320,6 @@ end
 					return substep_id, "explicitly"
 				end
 			}
-			return explicitly_substep_array[0], "explicitly"
 		end
 		unless probably_substep_array.empty?
 			next_substep = hash_recipe["substep"][hash_mode["current_substep"]]["next_substep"]
@@ -330,9 +329,13 @@ end
 					return substep_id, "explicitly"
 				end
 			}
+			# parent関係でつながるsubstepを探索（currentは無視）
 			current_step = hash_recipe["substep"][hash_mode["current_substep"]]["parent_step"]
 			probably_substep_array.each{|substep_id|
 				if hash_mode["substep"][substep_id]["is_finished?"]
+					next
+				end
+				if substep_id == hash_mode["current_substep"]
 					next
 				end
 				next_step = hash_recipe["substep"][substep_id]["parent_step"]
@@ -362,7 +365,11 @@ end
 				end
 			}
 		end
-		return nil, nil
+		# finishedなsubstepは，最後に仕方なしで提示．explicitlyでないと提示しない．
+		unless explicitly_substep_array.empty?
+			return explicitly_substep_array[0], "explicitly"
+		end
+	return nil, nil
 	end
 
 	def searchPlayMedia(hash_recipe, hash_mode, action)
