@@ -257,14 +257,13 @@ def go2next(hash_recipe, hash_mode)
 	current_substep = hash_mode["current_substep"]
 
 	next_substep = nil
-	if hash_mode["step"][current_step]["ABLE?"]
-		hash_recipe["step"][current_step]["substep"].each{|substep_id|
-			unless hash_mode["substep"][substep_id]["is_finished?"]
-				hash_mode = jump(hash_recipe, hash_mode, substep_id)
-				return hash_mode
-			end
-		}
-	end
+	# 調味料の混合のことも考え，stepがabelか否かは気にしない
+	hash_recipe["step"][current_step]["substep"].each{|substep_id|
+		if hash_mode["substep"][substep_id]["ABLE?"]
+			hash_mode = jump(hash_recipe, hash_mode, substep_id)
+			return hash_mode
+		end
+	}
 	# chainなstepの探索
 	hash_recipe["step"].each{|step_id, value|
 		chain_step = hash_recipe["step"][step_id]["chain"][0]
