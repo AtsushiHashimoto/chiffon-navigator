@@ -567,7 +567,7 @@ def uncheck_isFinished(hash_recipe, hash_mode, id)
 					end
 				}
 			}
-			if hash_recipe["step"][parent_step]["is_finished?"]
+			if hash_mode["step"][parent_step]["is_finished?"]
 				hash_mode["step"][parent_step]["is_finished?"] = false
 			end
 		end
