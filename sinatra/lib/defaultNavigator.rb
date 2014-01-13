@@ -246,13 +246,12 @@ end
 		rank.sort!{|v1, v2|
 			v2[0] <=> v1[0]
 		}
-		p rank
 		i = 0
 		highest_point = -100
 		highest_substep = []
 		rank.each{|point, substep_id|
 			next if hash_mode["substep"][substep_id]["is_finished?"]
-			if point > highest_point
+			if point >= highest_point
 				highest_point = point
 				highest_substep.push(substep_id)
 			end
@@ -516,7 +515,7 @@ end
 							return true
 						end
 					end
-					# seasoningまたはutensilを用いて終了判定
+					# 終了判定
 					if currentSubstep_isFinished?(@hash_recipe[session_id], @hash_mode[session_id]["current_substep"], e_input["action"]["object"])
 						#p "current substep is finished by putting object #{e_input["action"]["object"]["name"]}."
 						# estimation levelがexplicitlyのとき，current substepをfinishする
