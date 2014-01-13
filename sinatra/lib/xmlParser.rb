@@ -143,6 +143,7 @@ def get_substep(doc, hash_recipe, step_id, substep_id, object_class_hash)
 	hash_recipe["substep"][substep_id]["food_mixing"] = false
 	hash_recipe["substep"][substep_id]["Extrafood_mixing"] = false
 	unless doc.xpath("//substep[@id=\"#{substep_id}\"]/trigger")[0] == nil
+		hash_recipe["substep"][substep_id]["vote"] = {}
 		doc.xpath("//substep[@id=\"#{substep_id}\"]/trigger").each{|trigger|
 			# timing
 			timing = nil
@@ -160,8 +161,30 @@ def get_substep(doc, hash_recipe, step_id, substep_id, object_class_hash)
 			end
 			# ref
 			ref1 = {"taken"=>{"food"=>[], "seasoning"=>[], "utensil"=>[]}, "put"=>{"food"=>[], "seasoning"=>[], "utensil"=>[]}, "other"=>[]}
+			utensil_num = 0
+			utensil_array = []
+			food_name = nil
+			seasoning_name = nil
+			food_flag = false
+			water_flag = false
+			seasoning_flag = false
+			utensil_flag = false
 			trigger["ref"].split(" ").each{|value|
 				if object_class_hash.key?(value)
+					if object_class_hash[value] == "food"
+						food_flag = true
+						food_name = value
+					elsif object_class_hash[value] == "seasoning"
+						seasoning_flag = true
+						if value == "water"
+							water_flag = true
+						end
+						seasoning_name = value
+					elsif object_class_hash[value] == "utensil"
+						utensil_flag = true
+						utensil_array.push(value)
+						utensil_num = utensil_num + 1
+					end
 					ref1["taken"][object_class_hash[value]].push(value)
 					if object_class_hash[value] != "food"
 						ref2 = {"taken"=>{"food"=>[], "seasoning"=>[], "utensil"=>[]}, "put"=>{"food"=>[], "seasoning"=>[], "utensil"=>[]}, "other"=>[]}
@@ -171,6 +194,34 @@ def get_substep(doc, hash_recipe, step_id, substep_id, object_class_hash)
 				else
 					ref1["other"].push(value)
 				end
+			}
+			total = 0
+			food_vote = 75
+			if food_flag && !seasoning_flag && !utensil_flag
+				food_vote = 100
+			end
+			unless food_name == nil
+				hash_recipe["substep"][substep_id]["vote"][food_name] = food_vote
+				total = food_vote
+			end
+			seasoning_vote = 95
+			if seasoning_flag && !food_flag && !utensil_flag
+				seasoning_vote = 100
+			end
+			unless seasoning_name == nil
+				hash_recipe["substep"][substep_id]["vote"][seasoning_name] = seasoning_vote
+				total = seasoning_vote
+			end
+			if food_flag && water_flag
+				utensil_num = utensil_num + 1
+				hash_recipe["substep"][substep_id]["vote"]["water"] = (100 - total) / utensil_num
+			elsif seasoning_flag && water_flag
+				utensil_array.push("water")
+				utensil_num = utensil_num + 1
+				total = 0
+			end
+			utensil_array.each{|v|
+				hash_recipe["substep"][substep_id]["vote"][v] = (100 - total) / utensil_num
 			}
 
 			if ref1["taken"]["utensil"].empty? && ref1["taken"]["seasoning"].empty? && ref1["taken"]["food"].size == 1

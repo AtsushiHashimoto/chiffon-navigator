@@ -205,6 +205,7 @@ end
 	def searchNextSubstep(hash_recipe, hash_mode, object)
 		explicitly_substep_array = []
 		probably_substep_array = []
+		rank = []
 		hash_recipe["substep"].each{|substep_id, value|
 			level = "recommend"
 			#p "substep id : #{substep_id}"
@@ -212,126 +213,75 @@ end
 			#p "substep is finished? : #{hash_mode["substep"][substep_id]["is_finished?"]}"
 			#p "substep can be searched? : #{hash_mode["substep"][substep_id]["can_be_searched?"]}"
 			if hash_mode["substep"][substep_id]["can_be_searched?"]
-				value["trigger"].each{|trigger|
-					level_temp = "recommend"
-					if trigger["timing"] == "start"
-						trigger["ref"]["taken"]["food"].each{|ref|
-							unless hash_mode["taken"]["food"].key?(ref)
-								if level_temp == "explicitly"
-									level_temp = "probably"
-								elsif level_temp == "probably"
-									# ありえない
-								elsif level_temp == "not match"
-									# ありえない
-								elsif level_temp == "recommend"
-									level_temp = "not match"
-								end
-								break
-							end
-							level_temp = "explicitly"
-						}
-						#print "level_temp food : #{level_temp}, "
-						trigger["ref"]["taken"]["seasoning"].each{|ref|
-							unless hash_mode["taken"]["seasoning"].key?(ref)
-								if level_temp == "explicitly"
-									level_temp = "probably"
-								elsif level_temp == "probably"
-									# 何もしない
-								elsif level_temp == "not match"
-									# 何もしない
-								elsif level_temp == "recommend"
-									level_temp = "not match"
-								end
-								break
-							end
-							if ref == "water"
-								if level_temp == "not match"
-									level_temp = "probably"
-								elsif level_temp == "recommend"
-									level_temp = "explicitly"
-								end
-							else
-								level_temp = "explicitly_seasoning"
-							end
-						}
-						if level_temp == "explicitly_seasoning"
-							level = "explicitly"
-							break
-						end
-						#print "level_temp seasoning : #{level_temp}, "
-						trigger["ref"]["taken"]["utensil"].each{|ref|
-							unless hash_mode["taken"]["utensil"].key?(ref)
-								if level_temp == "explicitly"
-									level_temp = "probably"
-								elsif level_temp == "probably"
-									# 何もしない
-								elsif level_temp == "not match"
-									# 何もしない
-								elsif level_temp == "recommend"
-									level_temp = "not match"
-								end
-								break
-							end
-							if level_temp == "not match"
-								level_temp = "probably"
-							elsif level_temp == "recommend"
-								level_temp = "explicitly"
-							end
-						}
-						#print "level_temp utensil : #{level_temp}\n"
-						if level_temp == "explicitly"
-							level = level_temp
-							break
-						elsif level_temp == "probably"
-							level = level_temp
-						end
+				point = 0
+				mismatch = 0
+				hash_mode["taken"]["food"].each{|key, value|
+					if hash_recipe["substep"][substep_id]["vote"].key?(key)
+						point = point + hash_recipe["substep"][substep_id]["vote"][key]
+					else
+						mismatch = mismatch + 1
 					end
 				}
-			end
-			#p "level : #{level}"
-			if level == "explicitly"
-				explicitly_substep_array.push(substep_id)
-			elsif level == "probably"
-				probably_substep_array.push(substep_id)
+				hash_mode["taken"]["seasoning"].each{|key, value|
+					if hash_recipe["substep"][substep_id]["vote"].key?(key)
+						point = point + hash_recipe["substep"][substep_id]["vote"][key]
+					else
+						mismatch = mismatch + 1
+					end
+				}
+				hash_mode["taken"]["utensil"].each{|key, value|
+					if hash_recipe["substep"][substep_id]["vote"].key?(key)
+						point = point + hash_recipe["substep"][substep_id]["vote"][key]
+					else
+						mismatch = mismatch + 1
+					end
+				}
+				if point > 100
+					point = 100
+				end
+				point = point - (mismatch * 4)
+				rank.push([point, substep_id])
 			end
 		}
-		#p "explicitly array : #{explicitly_substep_array}"
-		#p "probably array : #{probably_substep_array}"
-		unless explicitly_substep_array.empty?
-			# return next substep ob current substep
-			if explicitly_substep_array.include?(hash_recipe["substep"][hash_mode["current_substep"]]["next_substep"])
-				return hash_recipe["substep"][hash_mode["current_substep"]]["next_substep"], "explicitly"
+		rank.sort!{|v1, v2|
+			v2[0] <=> v1[0]
+		}
+		p rank
+		i = 0
+		highest_point = -100
+		highest_substep = []
+		rank.each{|point, substep_id|
+			next if hash_mode["substep"][substep_id]["is_finished?"]
+			if point > highest_point
+				highest_point = point
+				highest_substep.push(substep_id)
 			end
-			if explicitly_substep_array.include?(hash_mode["current_substep"])
-				#p "exp array include current substep."
-				return hash_mode["current_substep"], "explicitly"
-			end
-			current_step = hash_mode["current_step"]
-			explicitly_substep_array.each{|substep_id|
-				step_id = hash_recipe["substep"][substep_id]["parent_step"]
-				if step_id == current_step && !hash_mode["substep"][substep_id]["is_finished"]
-					#p "exp array include current step."
-					return substep_id, "explicitly"
-				end
-			}
-			#p "return exp array[0]"
-			explicitly_substep_array.each{|substep_id|
-				unless hash_mode["substep"][substep_id]["is_finished?"]
-					return substep_id, "explicitly"
-				end
-			}
-		end
-		unless probably_substep_array.empty?
+		}
+		if highest_point > 90
+			# ほとんど一致
 			next_substep = hash_recipe["substep"][hash_mode["current_substep"]]["next_substep"]
-			probably_substep_array.each{|substep_id|
-				if substep_id == next_substep && (hash_mode["current_estimation_level"] == "explicitly" || hash_mode["current_estimation_level"] == "probably")
-					#p "prob array include next substep of current substep"
+			if highest_substep.include?(next_substep)
+				return next_substep, "explicitly"
+			elsif highest_substep.include?(hash_mode["current_substep"])
+				return hash_mode["current_substep"], "explicitly"
+			else
+				current_step = hash_mode["current_step"]
+				highest_substep.each{|substep_id|
+				step_id = hash_recipe["substep"][substep_id]["parent_step"]
+				if step_id == current_step
 					return substep_id, "explicitly"
 				end
 			}
-			# parent関係でつながるsubstepを探索（currentは無視）
+			end
+			return highest_substep[0],"explicitly"
+		elsif highest_point > 70
+			# 食材は一致している．
+			next_substep = hash_recipe["substep"][hash_mode["current_substep"]]["next_substep"]
+			if highest_substep.include?(next_substep) && (hash_mode["current_estimation_level"] == "explicitly" || hash_mode["current_estimation_level"] == "probably")
+				return next_substep, "explicitly"
+			end
 			current_step = hash_recipe["substep"][hash_mode["current_substep"]]["parent_step"]
-			probably_substep_array.each{|substep_id|
+			highest_substep.each{|substep_id|
 				if hash_mode["substep"][substep_id]["is_finished?"]
 					next
 				end
@@ -354,22 +304,20 @@ end
 					return substep_id, "explicitly"
 				end
 			}
-			if probably_substep_array.include?(hash_mode["current_substep"])
-				#p "prob array include current substep."
+			if highest_substep.include?(hash_mode["current_substep"])
 				return hash_mode["current_substep"], "explicitly"
 			end
-			#p "return prob array[0]"
-			probably_substep_array.each{|substep_id|
-				unless hash_mode["substep"][substep_id]["is_finished?"]
-					return substep_id, "probably"
-				end
-			}
+			return highest_substep[0], "probably"
+		elsif highest_point > 20
+			# なにか物体が一致している
 		end
-		# finishedなsubstepは，最後に仕方なしで提示．explicitlyでないと提示しない．
-		unless explicitly_substep_array.empty?
-			return explicitly_substep_array[0], "explicitly"
-		end
-	return nil, nil
+		rank.each{|point, substep_id|
+			# 終了済みのsubstepを提示
+			if point > 90
+				return substep_id, "explicitly"
+			end
+		}
+		return nil, nil
 	end
 
 	def searchPlayMedia(hash_recipe, hash_mode, action)
@@ -778,9 +726,7 @@ end
 			# 現在のtaken_listは変更せずに，他の状態をひとつ前に戻し，推定のやり直し．
 			current_taken_list = @hash_mode[session_id]["taken"]
 			array_mode = Dir::entries("records/#{session_id}/mode").sort
-			p array_mode
 			array_recipe = Dir::entries("records/#{session_id}/recipe").sort
-			p array_recipe
 			`mv records/#{session_id}/mode/#{array_mode[array_mode.size-2]} records/#{session_id}/mode/submode/`
 			open("records/#{session_id}/mode/#{array_mode[array_mode.size-3]}", "r"){|io|
 				@hash_mode[session_id] = JSON.load(io)
@@ -791,8 +737,6 @@ end
 				@hash_recipe[session_id] = JSON.load(io)
 			}
 			`mv records/#{session_id}/recipe/#{array_recipe[array_recipe.size-3]} records/#{session_id}/recipe/subrecipe/`
-			p @hash_mode[session_id]["taken"]
-			p current_taken_list
 			@hash_mode[session_id]["taken"] = current_taken_list
 			# 以降では直前の動作の時間を比較に使いたい
 			taken_time = @hash_mode[session_id]["prev_action_time"]
