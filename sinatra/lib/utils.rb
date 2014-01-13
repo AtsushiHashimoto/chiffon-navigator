@@ -401,7 +401,6 @@ def check_notification_FINISHED(hash_recipe, hash_mode, time)
 end
 
 def check_isFinished(hash_recipe, hash_mode, id, *extra_mixing)
-	media = ["audio", "video", "notification"]
 	if hash_recipe["step"].key?(id)
 		unless hash_mode["step"][id]["is_finished?"]
 			hash_mode["step"][id]["is_finished?"] = true
@@ -410,7 +409,8 @@ def check_isFinished(hash_recipe, hash_mode, id, *extra_mixing)
 				hash_mode["substep"][substep_id]["is_finished?"] = true
 				# is_finished=trueなsubstepはcan_be_searched=trueにする
 				hash_mode["substep"][substep_id]["can_be_searched?"] = true
-				hash_mode = controlMedia(hash_recipe, hash_mode, media, "STOP", substep_id)
+				# step越しのcheckの場合はnotificationもSTOP
+				hash_mode = controlMedia(hash_recipe, hash_mode, "all", "STOP", substep_id)
 			}
 			hash_recipe["step"][id]["parent"].each{|parent_id|
 				hash_mode = check_isFinished(hash_recipe, hash_mode, parent_id)
@@ -439,7 +439,8 @@ def check_isFinished(hash_recipe, hash_mode, id, *extra_mixing)
 						hash_mode["substep"][substep_id]["is_finished?"] = true
 						# is_finished=trueなsubstepはcan_be_searched=trueにする
 						hash_mode["substep"][substep_id]["can_be_searched?"] = true
-						hash_mode = controlMedia(hash_recipe, hash_mode, media, "STOP", substep_id)
+						# substepに対するcheckの場合はnotificationは維持
+						hash_mode = controlMedia(hash_recipe, hash_mode, ["audio", "video"], "STOP", substep_id)
 						if substep_id == id
 							break
 						end
@@ -457,7 +458,8 @@ def check_isFinished(hash_recipe, hash_mode, id, *extra_mixing)
 					hash_mode["substep"][substep_id]["is_finished?"] = true
 					# is_finished=trueなsubstepはcan_be_searched=trueにする
 					hash_mode["substep"][substep_id]["can_be_searched?"] = true
-					hash_mode = controlMedia(hash_recipe, hash_mode, media, "STOP", substep_id)
+					# substepに対するcheckの場合はnotificationは維持
+					hash_mode = controlMedia(hash_recipe, hash_mode, ["audio", "video"], "STOP", substep_id)
 					if substep_id == id
 						break
 					end
