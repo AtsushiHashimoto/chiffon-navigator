@@ -410,7 +410,7 @@ def check_isFinished(hash_recipe, hash_mode, id, *extra_mixing)
 				hash_mode["substep"][substep_id]["is_finished?"] = true
 				# is_finished=trueなsubstepはcan_be_searched=trueにする
 				hash_mode["substep"][substep_id]["can_be_searched?"] = true
-				hash_mode = controlMedia(hash_recipe, hash_mode, "STOP", substep_id)
+				hash_mode = controlMedia(hash_recipe, hash_mode, media, "STOP", substep_id)
 			}
 			hash_recipe["step"][id]["parent"].each{|parent_id|
 				hash_mode = check_isFinished(hash_recipe, hash_mode, parent_id)
@@ -421,8 +421,6 @@ def check_isFinished(hash_recipe, hash_mode, id, *extra_mixing)
 			parent_step = hash_recipe["substep"][id]["parent_step"]
 			if extra_mixing != []
 				if extra_mixing
-					p "!!!!test"
-					p id
 					hash_mode["substep"][id]["is_finished?"] = true
 					hash_mode["substep"][id]["can_be_searched?"] = true
 					flag = true
@@ -433,7 +431,6 @@ def check_isFinished(hash_recipe, hash_mode, id, *extra_mixing)
 						end
 					}
 					if flag
-						p "really?"
 						hash_mode["step"][parent_step]["is_finished?"] = true
 						hash_mode["step"][parent_step]["open?"] = false
 					end
@@ -442,7 +439,7 @@ def check_isFinished(hash_recipe, hash_mode, id, *extra_mixing)
 						hash_mode["substep"][substep_id]["is_finished?"] = true
 						# is_finished=trueなsubstepはcan_be_searched=trueにする
 						hash_mode["substep"][substep_id]["can_be_searched?"] = true
-						hash_mode = controlMedia(hash_recipe, hash_mode, "STOP", substep_id)
+						hash_mode = controlMedia(hash_recipe, hash_mode, media, "STOP", substep_id)
 						if substep_id == id
 							break
 						end
@@ -460,7 +457,7 @@ def check_isFinished(hash_recipe, hash_mode, id, *extra_mixing)
 					hash_mode["substep"][substep_id]["is_finished?"] = true
 					# is_finished=trueなsubstepはcan_be_searched=trueにする
 					hash_mode["substep"][substep_id]["can_be_searched?"] = true
-					hash_mode = controlMedia(hash_recipe, hash_mode, "STOP", substep_id)
+					hash_mode = controlMedia(hash_recipe, hash_mode, media, "STOP", substep_id)
 					if substep_id == id
 						break
 					end
