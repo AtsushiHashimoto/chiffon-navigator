@@ -256,10 +256,8 @@ end
 				highest_substep.push(substep_id)
 			end
 		}
-		p rank
 		if highest_point > 90
 			# ほとんど一致
-			p hash_mode["current_estimation_level"]
 			if highest_substep.include?(hash_mode["current_substep"]) && hash_mode["current_estimation_level"] == "recommend"
 				return hash_mode["current_substep"], "explicitly"
 			end
@@ -278,9 +276,11 @@ end
 			}
 			end
 			return highest_substep[0],"explicitly"
+		elsif rank[0][0] >= 99
+			# すでに終了したsubstepが100点をとった状態．
+			return rank[0][1], "explicitly"
 		elsif highest_point > 70
 			# 食材は一致している．
-			p hash_mode["current_estimation_level"]
 			if highest_substep.include?(hash_mode["current_substep"]) && hash_mode["current_estimation_level"] == "recommend"
 				return hash_mode["current_substep"], "explicitly"
 			end
@@ -361,7 +361,7 @@ end
 			return highest_substep[0], "probably"
 		end
 		rank.each{|point, substep_id|
-			# 終了済みのsubstepを提示
+			# 終了済みのsubstepを提示．90点以上なら提示
 			if point > 90
 				return substep_id, "explicitly"
 			end

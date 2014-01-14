@@ -214,7 +214,7 @@ def get_substep(doc, hash_recipe, step_id, substep_id, object_class_hash)
 			end
 			if food_flag && water_flag
 				utensil_num = utensil_num + 1
-				hash_recipe["substep"][substep_id]["vote"]["water"] = (100 - total) / utensil_num
+				hash_recipe["substep"][substep_id]["vote"]["water"] = 75 / utensil_num
 			elsif seasoning_flag && water_flag
 				utensil_array.push("water")
 				utensil_num = utensil_num + 1
