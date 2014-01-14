@@ -259,6 +259,10 @@ end
 		p rank
 		if highest_point > 90
 			# ほとんど一致
+			p hash_mode["current_estimation_level"]
+			if highest_substep.include?(hash_mode["current_substep"]) && hash_mode["current_estimation_level"] == "recommend"
+				return hash_mode["current_substep"], "explicitly"
+			end
 			next_substep = hash_recipe["substep"][hash_mode["current_substep"]]["next_substep"]
 			if highest_substep.include?(next_substep)
 				return next_substep, "explicitly"
@@ -276,7 +280,17 @@ end
 			return highest_substep[0],"explicitly"
 		elsif highest_point > 70
 			# 食材は一致している．
+			p hash_mode["current_estimation_level"]
+			if highest_substep.include?(hash_mode["current_substep"]) && hash_mode["current_estimation_level"] == "recommend"
+				return hash_mode["current_substep"], "explicitly"
+			end
 			next_substep = hash_recipe["substep"][hash_mode["current_substep"]]["next_substep"]
+			if highest_substep.include?(next_substep) && highest_substep.include?(hash_mode["current_substep"])
+				hash_mode["current_estimation_level"] == "recommend"
+				if hash_mode["current_estimation_level"] == "recommend"
+					return hash_mode["current_substep"], "explicitly"
+				end
+			end
 			if highest_substep.include?(next_substep) && (hash_mode["current_estimation_level"] == "explicitly" || hash_mode["current_estimation_level"] == "probably")
 				return next_substep, "explicitly"
 			end
@@ -308,8 +322,43 @@ end
 				return hash_mode["current_substep"], "explicitly"
 			end
 			return highest_substep[0], "probably"
-		elsif highest_point > 20
+		elsif highest_point > 0
 			# なにか物体が一致している
+			if highest_substep.include?(hash_mode["current_substep"]) && hash_mode["current_estimation_level"] == "recommend"
+				return hash_mode["current_substep"], "explicitly"
+			end
+			next_substep = hash_recipe["substep"][hash_mode["current_substep"]]["next_substep"]
+			if highest_substep.include?(next_substep)
+				return next_substep, "probably"
+			end
+			current_step = hash_recipe["substep"][hash_mode["current_substep"]]["parent_step"]
+			highest_substep.each{|substep_id|
+				if hash_mode["substep"][substep_id]["is_finished?"]
+					next
+				end
+				if substep_id == hash_mode["current_substep"]
+					next
+				end
+				next_step = hash_recipe["substep"][substep_id]["parent_step"]
+				flag = false
+				hash_recipe["step"][next_step]["parent"].each{|parent|
+					if parent == current_step
+						flag = true
+					elsif hash_mode["step"][parent]["is_finished?"]
+						flag = true
+					else
+						flag = false
+						break
+					end
+				}
+				if flag == true
+					return substep_id, "probably"
+				end
+			}
+			if highest_substep.include?(hash_mode["current_substep"])
+				return hash_mode["current_substep"], "probably"
+			end
+			return highest_substep[0], "probably"
 		end
 		rank.each{|point, substep_id|
 			# 終了済みのsubstepを提示
