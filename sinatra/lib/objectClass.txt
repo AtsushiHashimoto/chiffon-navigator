@@ -37,3 +37,4 @@ seaweedDashi:seasoning
 consomme:seasoning
 whiteDashi:seasoning
 kitchenPaper:utensil
+unknown:utensil

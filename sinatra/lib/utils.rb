@@ -255,10 +255,10 @@ def jump(hash_recipe, hash_mode, next_substep, *recommend)
 		if recommend[0] == true
 			hash_mode = updateABLE(hash_recipe, hash_mode, true, next_step, next_substep)
 		else
-			hash_mode = updateABLE(hash_recipe, hash_mode, next_step, next_substep)
+			hash_mode = updateABLE(hash_recipe, hash_mode, false, next_step, next_substep)
 		end
 	else
-		hash_mode = updateABLE(hash_recipe, hash_mode, next_step, next_substep)
+		hash_mode = updateABLE(hash_recipe, hash_mode, false, next_step, next_substep)
 	end
 	return hash_mode
 end
@@ -459,20 +459,28 @@ def check_isFinished(hash_recipe, hash_mode, id, *extra_mixing)
 			hash_mode["step"][id]["open?"] = false
 			hash_recipe["step"][id]["substep"].each{|substep_id|
 				hash_mode["substep"][substep_id]["is_finished?"] = true
-				# is_finished=trueなsubstepはcan_be_searched=trueにする
-				hash_mode["substep"][substep_id]["can_be_searched?"] = true
+				# チェックされるstepのparentなstepはcan_be_searched=falseにする．
+				# そのために，まずstep内のsubstpは全てcan_be_searche=falseにして，そのあとにtrueにする．
+				# そのとき，特殊な呼び出しをしたものは，trueにしない．
+				hash_mode["substep"][substep_id]["can_be_searched?"] = false
 				# step越しのcheckの場合はnotificationもSTOP
 				hash_mode = controlMedia(hash_recipe, hash_mode, "all", "STOP", substep_id)
 			}
+			if extra_mixing.size != 2
+				hash_recipe["step"][id]["substep"].each{|substep_id|
+					# can_be_searched=trueにする
+					hash_mode["substep"][substep_id]["can_be_searched?"] = true
+				}
+			end
 			hash_recipe["step"][id]["parent"].each{|parent_id|
-				hash_mode = check_isFinished(hash_recipe, hash_mode, parent_id)
+				hash_mode = check_isFinished(hash_recipe, hash_mode, parent_id, false, true)
 			}
 		end
 	elsif hash_recipe["substep"].key?(id)
 		unless hash_mode["substep"][id]["is_finished?"]
 			parent_step = hash_recipe["substep"][id]["parent_step"]
 			if extra_mixing != []
-				if extra_mixing
+				if extra_mixing[0]
 					hash_mode["substep"][id]["is_finished?"] = true
 					hash_mode["substep"][id]["can_be_searched?"] = true
 					flag = true
@@ -517,6 +525,7 @@ def check_isFinished(hash_recipe, hash_mode, id, *extra_mixing)
 					end
 				}
 				hash_recipe["step"][parent_step]["parent"].each{|parent_id|
+					# ここでチェックされるstepのsubstepはcan_be_searched=trueになる
 					hash_mode = check_isFinished(hash_recipe, hash_mode, parent_id)
 				}
 				if hash_recipe["substep"][id]["next_substep"] == nil

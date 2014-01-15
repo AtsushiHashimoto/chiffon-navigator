@@ -110,8 +110,10 @@ class NavigatorBase
 			if @hash_mode[session_id]["substep"][clicked_id]["ABLE?"]
 				# 遷移先のsubstepにおいて，prev_substepがis_finished?==falseであった場合，substepを並べ替えhash_recipeを更新．
 				prev_of_clicked = @hash_recipe[session_id]["substep"][clicked_id]["prev_substep"]
-				unless @hash_mode[session_id]["substep"][prev_of_clicked]["is_finished?"]
-					@hash_recipe[session_id] = sortSubstep(@hash_recipe[session_id], @hash_mode[session_id], clicked_id)
+				unless prev_of_clicked == nil
+					unless @hash_mode[session_id]["substep"][prev_of_clicked]["is_finished?"]
+						@hash_recipe[session_id] = sortSubstep(@hash_recipe[session_id], @hash_mode[session_id], clicked_id)
+					end
 				end
 				# substepをchangeする．遷移元のsubstepはinitialize．
 				@hash_mode[session_id] = controlMedia(@hash_recipe[session_id], @hash_mode[session_id], "all", "STOP", @hash_mode[session_id]["current_substep"])
