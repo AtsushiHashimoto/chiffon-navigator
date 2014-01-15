@@ -256,6 +256,7 @@ end
 				highest_substep.push(substep_id)
 			end
 		}
+		p rank
 		if highest_point > 90
 			# ほとんど一致
 			if highest_substep.include?(hash_mode["current_substep"]) && hash_mode["current_estimation_level"] == "recommend"
@@ -325,7 +326,7 @@ end
 		elsif highest_point > 0
 			# なにか物体が一致している
 			if highest_substep.include?(hash_mode["current_substep"]) && hash_mode["current_estimation_level"] == "recommend"
-				return hash_mode["current_substep"], "explicitly"
+				return hash_mode["current_substep"], "probably"
 			end
 			next_substep = hash_recipe["substep"][hash_mode["current_substep"]]["next_substep"]
 			if highest_substep.include?(next_substep)
@@ -357,6 +358,10 @@ end
 			}
 			if highest_substep.include?(hash_mode["current_substep"])
 				return hash_mode["current_substep"], "probably"
+			end
+			p hash_mode["taken"]
+			if hash_mode["taken"]["food"] == {} && hash_mode["taken"]["seasoning"].key?("water") && hash_mode["taken"]["utensil"] == {}
+				return nil, nil
 			end
 			return highest_substep[0], "probably"
 		end
