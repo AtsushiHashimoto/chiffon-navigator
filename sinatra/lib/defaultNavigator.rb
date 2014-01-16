@@ -206,7 +206,10 @@ end
 		explicitly_substep_array = []
 		probably_substep_array = []
 		rank = []
-		p hash_mode["taken"]
+		taken_list_copy = Marshal.load(Marshal.dump(hash_mode["taken"]))
+		if when_release.size == 2
+			hash_mode["taken"] = Marshal.load(Marshal.dump(when_release[1]))
+		end
 		hash_recipe["substep"].each{|substep_id, value|
 			level = "recommend"
 			#p "substep id : #{substep_id}"
@@ -247,6 +250,7 @@ end
 		rank.sort!{|v1, v2|
 			v2[0] <=> v1[0]
 		}
+		p rank
 		i = 0
 		highest_point = -100
 		highest_substep = []
@@ -258,7 +262,9 @@ end
 				end
 			end
 		}
-		p rank
+		if when_release.size == 2
+			hash_mode["taken"] = Marshal.load(Marshal.dump(taken_list_copy))
+		end
 		if highest_point >= 99
 			# 完全一致
 			if highest_substep.include?(hash_mode["current_substep"]) && hash_mode["current_estimation_level"] == "recommend"
@@ -649,9 +655,10 @@ end
 						if @hash_mode[session_id]["current_estimation_level"] == "explicitly" || @hash_mode[session_id]["taken"] == {"food"=>{}, "seasoning"=>{}, "utensil"=>{}}
 							if (@hash_mode[session_id]["current_estimation_level"] != "probably" || e_input["action"]["object"]["name"] != "water")
 								# prev_substepの更新
-								unless @hash_mode[session_id]["prev_substep"].last == @hash_mode[session_id]["currnet_substep"]
-									@hash_mode[session_id]["prev_substep"].push(@hash_mode[session_id]["currnet_substep"])
+								unless @hash_mode[session_id]["prev_substep"].last == @hash_mode[session_id]["current_substep"]
+									@hash_mode[session_id]["prev_substep"].push(@hash_mode[session_id]["current_substep"])
 								end
+								odd_prev_substep = @hash_mode[session_id]["current_substep"]
 								# recommend next substep
 								if @hash_recipe[session_id]["substep"][@hash_mode[session_id]["current_substep"]]["Extrafood_mixing"]
 									@hash_mode[session_id] = check_isFinished(@hash_recipe[session_id], @hash_mode[session_id], @hash_mode[session_id]["current_substep"], true)
@@ -672,8 +679,33 @@ end
 								# ここから下を新しく付け加えている！！！！
 								################################
 								# taken_listと比較してsubstepを探索
-								next_substep, level = searchNextSubstep(@hash_recipe[session_id], @hash_mode[session_id], true)
-								p next_substep
+								odd_taken = Marshal.load(Marshal.dump(@hash_mode[session_id]["taken"]))
+								@hash_recipe[session_id]["substep"][odd_prev_substep]["trigger"].each{|trigger|
+									if trigger["timing"] == "start"
+										unless trigger["ref"]["taken"]["food"] == []
+											trigger["ref"]["taken"]["food"].each{|food|
+												if odd_taken["food"].include?(food)
+													odd_taken["food"].delete(food)
+												end
+											}
+										end
+										unless trigger["ref"]["taken"]["seasoning"] == []
+											trigger["ref"]["taken"]["seasoning"].each{|seasoning|
+												if odd_taken["seasoning"].include?(seasoning)
+													odd_taken["seasoning"].delete(seasoning)
+												end
+											}
+										end
+										unless trigger["ref"]["taken"]["utensil"] == []
+											trigger["ref"]["taken"]["utensil"].each{|utensil|
+												if odd_taken["utensil"].include?(utensil)
+													odd_taken["utensil"].delete(utensil)
+												end
+											}
+										end
+									end
+								}
+								next_substep, level = searchNextSubstep(@hash_recipe[session_id], @hash_mode[session_id], true, odd_taken)
 								if @hash_mode[session_id]["current_substep"] == next_substep
 									# can_be_searchedの更新
 									if @hash_recipe[session_id]["substep"][@hash_mode[session_id]["current_substep"]]["next_substep"] == nil
@@ -939,6 +971,7 @@ end
 				# 移動であった場合，再度ユーザの挙動に合ったsubstepを探す（probablyかexplicitlyになる）．
 				# 移動だったsubstep(prev)はpushしない
 				next_substep = nil
+				p "hogeeeeeeeeee"
 				next_substep, level = searchNextSubstep(@hash_recipe[session_id], @hash_mode[session_id])
 				#p "next substep is #{next_substep}"
 				# 見つからなければnext（recommendになる）
