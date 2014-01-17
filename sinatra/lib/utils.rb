@@ -540,9 +540,10 @@ def check_isFinished(hash_recipe, hash_mode, id, *extra_mixing)
 						end
 					}
 					hash_recipe["step"][parent_step]["parent"].each{|parent_id|
-						hash_mode = check_isFinished(hash_recipe, hash_mode, parent_id)
+						hash_mode = check_isFinished(hash_recipe, hash_mode, parent_id, false, true)
 					}
 					if hash_recipe["substep"][id]["next_substep"] == nil
+						#hash_mode = check_isFinished(hash_recipe, hash_mode, parent_step, false, true)
 						hash_mode["step"][parent_step]["is_finished?"] = true
 						hash_mode["step"][parent_step]["open?"] = false
 					end
@@ -560,9 +561,10 @@ def check_isFinished(hash_recipe, hash_mode, id, *extra_mixing)
 				}
 				hash_recipe["step"][parent_step]["parent"].each{|parent_id|
 					# ここでチェックされるstepのsubstepはcan_be_searched=trueになる
-					hash_mode = check_isFinished(hash_recipe, hash_mode, parent_id)
+					hash_mode = check_isFinished(hash_recipe, hash_mode, parent_id, false, true)
 				}
 				if hash_recipe["substep"][id]["next_substep"] == nil
+					#hash_mode = check_isFinished(hash_recipe, hash_mode, parent_step, false, true)
 					hash_mode["step"][parent_step]["is_finished?"] = true
 					hash_mode["step"][parent_step]["open?"] = false
 				end

@@ -290,7 +290,15 @@ end
 				# すでに終了したsubstepが100点をとった状態．
 				# release時の探索では，これは提示しない．
 				# 次へ次へ進めたいので，過去の情報はできるだけ無視する．
-				return rank[0][1], "explicitly"
+				point_prev = 99
+				prev_sub = nil
+				rank.each{|point, substep_id|
+					if point_prev <= point
+						prev_sub = substep_id
+					else
+						return prev_sub, "explicitly"
+					end
+				}
 			end
 		elsif highest_point > 90
 			# ほとんど一致
