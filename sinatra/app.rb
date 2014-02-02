@@ -41,19 +41,16 @@ post '/navi/:algorithm' do |alg|
 		prescription = navigators[alg].counsel(json_data)
 	end
 
-#	validate(prescription)
-
-#	prescription = json_data # only for debug. remove it for developing counsel
 	return JSON.generate(prescription)
 end
 
-get '/navi/session/:algorithm' do |alg|
+get '/session_id/:username' do |username|
 	headers "Access-Control-Allow-Origin" => "*"
 	headers "Access-Control-Allow-Credentials" => "true"
 	session_array = Dir.entries("./records").sort!
 	delete_list = []
 	session_array.each do |value|
-		unless value =~ /^#{alg}-.*$/
+		unless value =~ /^#{username}-.*$/
 			delete_list.push(value)
 		end
 	end
