@@ -63,7 +63,7 @@ def controlMedia(hash_recipe, hash_mode, media_array, play_mode, *id_array)
 		return hash_mode
 	when "STOP"
 		# 全てのメディア，または与えられたsubstepのメディアを停止する
-		if id_array = []
+		if id_array == []
 			media_array.each{|media_name|
 				hash_mode[media_name].each{|media_id, value|
 					if value["PLAY_MODE"] == "PLAY"
