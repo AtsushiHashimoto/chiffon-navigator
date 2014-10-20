@@ -1,0 +1,6 @@
+%li.navi-step(data-order="#{@i}" id="navi-#{@step_id}")
+    %input.controller.check(id="#{@step_id}" name="check-name-#{@step_id}" type="checkbox" value="on" data-einput="#{render_external_input("check",{"target"=>@step_id})}")
+    %label.btn
+        %a.controller.navigate(href="/woz/navi_menu/#{@step_id}" data-einput="#{render_external_input("change",{"target"=>@step_id})}")= @step_navi_text
+    - if !@substeps.empty?
+        %ul= render_navi_substeps(@substeps)

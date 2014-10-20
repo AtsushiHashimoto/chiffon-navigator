@@ -1,0 +1,8 @@
+.basic_controller
+    =render_basic_controller(@recipe)
+.object_access_controller
+    =render_object_access_controller(@recipe)
+
+.history
+
+%a.hidden.woz-run(data-receiver_url="#{@receiver_url}" data-logger_url="#{@logger_url}" data-prescription_url="#{@prescription_url+"/"+@session_id}" data-notification_live_sec="#{settings.notification_live_sec}" data-session_id="#{@session_id}" href="/woz") init

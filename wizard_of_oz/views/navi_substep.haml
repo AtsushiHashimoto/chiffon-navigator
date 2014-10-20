@@ -1,0 +1,4 @@
+%li.navi-step.navi-substep(id="navi-#{@substep_id}")
+    %input.controller.check(id="#{@substep_id}" data-einput="#{render_external_input("check",{"target"=>@substep_id})}" name="check-name-#{@substep_id}" type="checkbox" value="on")
+    %label.btn
+        %a.controller.navigate(href="/woz/navi_menu/#{@substep_id}" data-einput="#{render_external_input("change",{"target"=>@substep_id})}")=@substep_navi_text

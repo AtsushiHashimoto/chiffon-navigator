@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+%html(dir="ltr" lang="ja")
+    %head
+        %title= @title
+        %meta(charset="#{settings.default_encoding}")
+        %meta(name="description" content="woz interface for chiffon")
+        %meta(name="author" contents="Atsushi HASHIMOTO")
+        = render_css("bootstrap.min")
+        = render_css("bootstrap-responsive")
+        = render_css("base")
+        = render_css("app")
+    %body
+        = render_js("jquery-1.8.3.min")
+        = render_js("js/bootstrap.min")
+        = render_js("noty/jquery.noty")
+        = render_js("noty/layouts/bottom")
+        = render_js("noty/themes/default")
+        = render_js("app")
+        #loading.hidden
+            %img(alt="now loading..." src="/woz/images/loading.gif")
+        .navbar.navbar-fixed-top.navbar-inverse
+            .navbar-inner
+                %a(class="brand" href="/woz/#{@user}/0") Go To Index
+                .naviModuleH
+                    %ul
+                        %li.btn01
+                            %a#btn-controller.btn.controller.navigate(href="/btn1" data-einput="#{render_external_input("channel",{"value"=>"OVERVIEW"})}") Basic
+                        %li.btn02
+                            %a#btn-controller.btn.controller.navigate(href="/btn2" data-einput="#{render_external_input("channel",{"value"=>"MATERIALS"})}") Object Access
+                        %li.btn03
+                            %a#btn-controller.btn.controller.navigate(href="/btn3" data-einput="#{render_external_input("channel",{"value"=>"GUIDE"})}") GUIDE
+        .container.clearfix
+            .switches
+                %h1 CHIFFON WOZ Controller
+                = haml :switches
+            #main
+                != yield
+            %footer#copyright.footer.clearboth © 2014 Kyoto University

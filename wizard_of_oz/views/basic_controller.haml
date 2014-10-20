@@ -1,0 +1,10 @@
+-#main_controller
+#guide
+    .row
+        %h2 Sent HTTP Requests
+        #detail.span8
+            #history
+                %ul
+    #navi.span4
+        .navi_area
+            %ul= render_navi_steps(@recipe.xpath('//step'))

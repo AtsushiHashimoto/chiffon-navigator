@@ -1,0 +1,17 @@
+%ul.std_menu1
+    %li.btn_undo
+        %a.controller#undo(data-einput="#{render_external_input("undo")}")Undo
+    %li.btn_redo
+        %a.controller#redo(data-einput="#{render_external_input("redo")}")Redo
+    %li.btn_next
+        %a.controller#next(data-einput="#{render_external_input("next")}")Next
+    .btn-group
+        %li.btn_jump
+            %a#jump(data-toggle="dropdown")Jump
+        %ul.dropdown-menu.jump-menu.pull-right(role="menu")
+            = render_select_jump(@recipe)
+    .btn-group
+        %li.btn_event
+            %a#event(data-toggle="dropdown")Event
+        %ul.dropdown-menu.event-menu.pull-right(role="menu")
+            = render_select_event(@recipe)

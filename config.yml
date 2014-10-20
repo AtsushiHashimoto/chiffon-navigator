@@ -1,0 +1,14 @@
+datetime_format: '%Y.%m.%d_%H.%M.%S_%6N '
+session_timeout: 3600
+start_channel: :GUIDE # :GUIDE, :MATERIALS, :OVERVIEW
+log_level: :debug # :info, :warn, :error, :debug, :fatal
+record_dir: 'records'
+error_log: 'log/error.log'
+recipe_file: 'recipe.xml'
+session_log: 'internal.log'
+progress_file: 'progress.json'
+progress_diff_file_template: 'progress_diff_INDEX.json'
+progress_diff_file_template_replace: 'INDEX'
+
+viewer_url: 'http://localhost:3000'
+notification_live_sec: '3'
