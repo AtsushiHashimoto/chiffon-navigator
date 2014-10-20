@@ -27,7 +27,7 @@
 		},
 		css: {
 			display: 'none',
-			background: "url('/images/noty_bk.png') repeat-x scroll left top",
+			background: "url('/woz/images/noty_bk.png') repeat-x scroll left top",
 			border: 'none',
 			padding: '30px',
 			fontSize:'20px',
