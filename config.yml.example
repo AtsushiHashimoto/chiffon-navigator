@@ -10,5 +10,5 @@ progress_file: 'progress.json'
 progress_diff_file_template: 'progress_diff_INDEX.json'
 progress_diff_file_template_replace: 'INDEX'
 
-viewer_url: 'http://localhost:3000'
+viewer_url: 'http://localhost:8080'
 notification_live_sec: '3'
