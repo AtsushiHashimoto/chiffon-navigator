@@ -45,7 +45,14 @@ class WOZ < Sinatra::Base
     end
 
     get '/woz/recipe/:session_id' do |session_id|
-        return File.open("#{settings.root}/#{settings.record_dir}/#{session_id}/recipe.xml","r").read.encode('ISO-8859-1','utf-8')
+				recipe = File.open("#{settings.root}/#{settings.record_dir}/#{session_id}/recipe.xml","r").read.encode('ISO-8859-1','utf-8')		
+				unless recipe.empty? then
+					return recipe
+				end
+				
+				status 404
+				headers
+				body "File Not Found"
     end
 
     get '/woz/:username/:num' do |username,num|
@@ -69,7 +76,13 @@ class WOZ < Sinatra::Base
         
         @user = $1
         
-        status,header,body = call env.merge("PATH_INFO" => "/woz/recipe/#{@session_id}").merge("REQUEST_METHOD" => "GET")
+				status = nil
+				iteration = 0
+				while 200 != status do
+					status,header,body = call env.merge("PATH_INFO" => "/woz/recipe/#{@session_id}").merge("REQUEST_METHOD" => "GET")
+					iteration = iteration + 1
+					return [404,"","File Not Found"] if iteration > 300
+				end
         @recipe = Nokogiri::XML(body[0])
 
         haml :index
