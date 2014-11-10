@@ -21,12 +21,13 @@ class Nokogiri::XML::Document
     end
     
     def max_order
-        return root['max_order'] if root.attributes.include?('max_order')
-        max_val = self.xpath('//substep').to_a.map{|v|
-            return v.attributes.include?('order') ? v['order'].to_i : 0
-        }.max
-        root['max_order'] = max_val
-        return max_val
+				return root['max_order'].to_i if root.attributes.include?('max_order')
+				array = self.xpath('//substep').to_a
+				temp = array.map{|v|
+					v.attributes.include?('order') ? v['order'].to_i : 0
+				}
+        root['max_order'] = temp.max
+        return temp.max
     end
         
     def add_parent2child_link
