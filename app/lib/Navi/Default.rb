@@ -35,7 +35,7 @@ module Navi
 ##########################
 
         def route(session_data,ex_input)
-            case ex_input[:action][:name]
+						case ex_input[:action][:name]
                 when "next" then
                     return self.next(session_data,ex_input)
                 when "prev", "undo" then
@@ -55,7 +55,7 @@ module Navi
                 when "channel" then
                     return self.channel(session_data,ex_input)
                 else
-                    log_error "Unknown action '{ex_input[:action][:name]}' is directed by external input."
+                    log_error "Unknown action for default algorithm: '#{ex_input[:action][:name]}' is directed by external input."
             end
             return result
         end
