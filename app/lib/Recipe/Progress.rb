@@ -5,6 +5,7 @@ module Recipe
 
 Progress = ProgressState
 class Progress
+		@@default_keys = [:recommended_order,:channel,:detail,:play,:notify,:iter_index,:state]
     def update!(change,delta)
         delta.after = change
         
@@ -31,6 +32,11 @@ class Progress
 
         # fill previous order as a recommended_order at this iteration.
         change[:recommended_order] = self[:recommended_order] if change[:recommended_order].empty? and !change[:state].empty?
+				
+				# custom state for each algorithm
+				for key in change.keys - @@default_keys do
+						self[key] = change[key].deep_dup
+				end
         
         if delta.before == delta.after then
             delta.clear
