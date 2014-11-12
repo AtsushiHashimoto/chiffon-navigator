@@ -1,5 +1,10 @@
 module Navi
     class ObjectAccess
+				@@epsilon = 0.04
+				@@score_ing = 0.75
+				@@score_seasoning = 0.95
+				@@sym = :ObjectAccess
+
         def initialize(app)
             @app = app
 				end
@@ -8,10 +13,8 @@ module Navi
 # ObjectAccess External Input
 ##########################
 				def route(session_data,ex_input)
-					sym = :ObjectAccess
-
-					unless session_data.include?(sym) then
-							session_data[sym] = self.init
+					unless session_data.include?(@@sym) then
+							session_data[@@sym] = self.init(session_data[:recipe])
 					end
 
 					update(session_data)
@@ -35,72 +38,213 @@ module Navi
 # ObjectAccess Initialize State
 ############################
 
-				def init
+				def init(recipe)
 						oa_data = Hash.new
 						oa_data[:ss_ready] = [] # narrow context
 						oa_data[:ss_targets] = [] # wide context
 						oa_data[:ss_done] = []
-						oa_data[:object_in_hand] = []
+						oa_data[:objects_in_hand] = []
 						oa_data[:timestamp] = ""
+						
+						# ingredient, seasonings, others(=tools)
+						objects = Hash.new
+						objects[:ingredients] = []
+						objects[:seasonings] = []
+					
+						materials = recipe.xpath("//object").to_a
+						for mat in materials do
+								next unless mat.attributes.include?('id')
+								obj_id, suffix = mat['id'].split('_')
+								if suffix=='seasoning' then
+										objects[:seasonings] << mat['id']
+								else
+										objects[:ingredients] << mat['id']
+								end
+						end
+						
+						steps = recipe.xpath("//step").to_a
+						objects[:mixture] = []
+						for step in steps do
+								next unless step.attributes.include?('id')
+								objects[:mixture] << step.id.to_s
+						end
+						
+						objects[:utensils] = []
+						events = recipe.xpath("//event").to_a
+						for event in events do
+								obj_id, suffix = event['id'].split('_')
+								if suffix=='utensil' then
+									objects[:utensils] << event['id']
+								end
+						end
+						oa_data[:objects] = objects
+						
+						# triggers
+						temp = recipe.xpath("//substep/trigger").to_a
+						
+						all_objects = objects.values.flatten.map{|v|v.to_s}
+						
+						triggers = temp.delete_if{|v|
+								objs = v['ref'].split(/\s+/)
+								!objs.subset_of?(all_objects)
+						}
+												
+						oa_data[:triggers] = triggers
 						return oa_data
 				end
-
+						
 ############################
 # Touch/Release process
 ############################
 
 				def touch(session_data,ex_input)
-					oa_data = session_data[@sym]
+					STDERR.puts "touch!"
+					oa_data = session_data[@@sym]
 					new_object = ex_input[:action][:target]
-					return do_nothing if oa_data[:object_in_hand].include?(new_object)
-					oa_data[:object_in_hand] << new_object
-					
-					return post_process(session_data,oa_data)
+
+
+					return do_nothing if oa_data[:objects_in_hand].include?(new_object)
+					oa_data[:objects_in_hand] << new_object
+					state, change = post_process(session_data,oa_data)
+					change[@@sym] = ActiveSupport::HashWithIndifferentAccess.new
+					change[@@sym][:objects_in_hand] = oa_data[:objects_in_hand]
+					return state,change
 				end
 				
 				def release(session_data,ex_input)
-					oa_data = session_data[@sym]
+					STDERR.puts "release!"
+					oa_data = session_data[@@sym]
 					gone_object = ex_input[:action][:target]
-					return do_nothing unless oa_data[:object_in_hand].include?(gone_object)
-					oa_data[:object_in_hand].delete(gone_object)
+					return do_nothing unless oa_data[:objects_in_hand].include?(gone_object)
+					STDERR.puts __LINE__
+					oa_data[:objects_in_hand].delete(gone_object)
+					STDERR.puts __LINE__
 					
 					# 終了判定をする
+					complete = true
 					
-					
-					return post_process(session_data,oa_data)
+					state, change = post_process(session_data,oa_data,complete)
+					change[@@sym] = ActiveSupport::HashWithIndifferentAccess.new
+					change[@@sym][:objects_in_hand] = oa_data[:objects_in_hand]
+					return state,change
 				end
 
 				def do_nothing
 					return "success", Recipe::StateChange.new
 				end
 				
-				def post_process(session_data,oa_data)
-						ss_highest_score = argmax_score(oa_data)
-						return do_nothing if ss_highest_score == @app.current_substep(recipe,session_data[:progress][:state])
-						ex_input = {:navigator=>'default',:action=>{:name=>'jump',:target=>ss_highest_score.id.to_s}}
-						return @app.navi_algorithms['default'].route(session_data,ex_input)
+				def post_process(session_data,oa_data,complete=false)
+						STDERR.puts "post_process!"
+						ss_current = nil
+						progress = session_data[:progress]
+						recipe = session_data[:recipe]
+
+						max_score, ss_highest_score = argmax_score(oa_data,:ss_forward,recipe, progress)
+						if max_score >= 1.0 then
+								ss_current = ss_highest_score
+						else
+							max_score2, ss_highest_score2 = argmax_score(oa_data,:ss_backward,recipe,progress)
+							if max_score2 >= 1.0 then
+								ss_current = ss_highest_score2								
+							elsif max_score >0 then
+								ss_current = ss_highest_score						
+							end
+						end
+						
+						return do_nothing if ss_highest_score == @app.current_substep(recipe,session_data[:progress][:state]).id
+						STDERR.puts __LINE__
+						
+						if ss_current then
+							STDERR.puts __LINE__
+							ex_input = {:navigator=>'default',:action=>{:name=>'jump',:target=>ss_current.to_s}}
+							return @app.navi_algorithms['default'].route(session_data,ex_input)
+						else
+							STDERR.puts __LINE__
+							# 手がかり無し
+							if complete then
+								ex_input = {:navigator=>'default',:action=>{:name=>'next'}}
+								return @app.navi_algorithms['default'].route(session_data,ex_input)
+							end
+							return do_nothing
+						end
 				end
 				
-				def argmax_score(oa_data)
+				def argmax_score(oa_data, target,recipe,progress)
+						target_substeps = oa_data[target]
+						obj_h = oa_data[:objects_in_hand]
+						max = -100
+						argmax = []
+						for trig in oa_data[:triggers] do
+								next unless target_substeps.include?(trig.parent.id)
+								score = calc_score(obj_h,trig['ref'].split(/\s+/),oa_data[:objects])
+#								STDERR.puts "#{score} for #{obj_h.join(" ")} (#{trig.parent.id})"
+								next if score < max
+								# score==maxなら追加，そうでなければ綺麗に更新
+								argmax = [] if score > max
+								max = score
+								argmax << trig.parent
+						end
 						
+						log_error "ERROR: maybe, there are no triggers?" if argmax.empty?
+						if argmax.size > 1 then
+							rorder = progress[:recommended_order]
+							default_order = recipe.max_order
+							argmax.sort!{|a,b|
+									a_step_id = a.parent.id.to_s
+									b_step_id = b.parent.id.to_s
+									result = false
+									if a_step_id == b_step_id then
+											result = a.order(default_order) <=> b.order(default_order)
+									else
+											result = rorder.index(a_step_id) <=> rorder.index(b_step_id)
+									end
+									result
+							}
+
+							argmax.reverse! if target == :ss_backward
+						end
+					
+						return max, argmax[0].id
+				end
+						
+				def calc_score(obj_h, obj_v, objects)
+						extra_obj = obj_h - obj_v
+						ing_v = obj_v & (objects[:ingredients]|objects[:mixture])
+						sea_v = obj_v & objects[:seasonings]
+						ute_v = obj_v & objects[:utensils]
+
+
+						# 井上くんのheuristicが変われば設計変更が必要
+						has_ing = (ing_v & obj_h).empty? ? 0:1
+						has_sea = (sea_v & obj_h).empty? ? 0:1
+						has_ute = ute_v & obj_h
+
+						score = 0
+						if ute_v.empty? then
+								score = score + 1.0 * has_ing
+								score = score + @@score_seasoning * has_sea
+						else
+								score = score + @@score_ing * has_ing
+								score = score + (1.0-@@score_ing) * (has_ute.size.to_f/ute_v.size.to_f)
+						end
+
+						score - extra_obj.size * @@epsilon
 				end
 
 ############################
 # Context Maintenance Funcs.
 ############################
 				def update(session_data)
-						sym = :ObjectAccess
-
 						recipe = session_data[:recipe]
 						progress = session_data[:progress]
 						ss_done = checkCompletion(recipe,progress)
 
-						session_data[sym][:ss_done] = ss_done
+						session_data[@@sym][:ss_done] = ss_done
 
 
 						ssready = getSSinReady(recipe,progress,ss_done)
-						session_data[sym][:ss_ready] = ssready
-						session_data[sym][:ss_forward],session_data[sym][:ss_backward] = expandContext(recipe,progress,ssready)
+						session_data[@@sym][:ss_ready] = ssready
+						session_data[@@sym][:ss_forward],session_data[@@sym][:ss_backward] = expandContext(recipe,progress,ssready)
 				end
 				
 				def checkCompletion(recipe,progress)
