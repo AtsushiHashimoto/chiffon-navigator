@@ -97,6 +97,25 @@ class Nokogiri::XML::Node
         raise "A node without '@id': #{self}" unless self.attributes.include?("id")
         self["id"].to_sym
     end
+		
+		def is_next?(id)
+				if self['name'] == 'step' then
+						return self.children.to_a.map{|v|v.id}.include?(id)
+				elsif self['name'] == 'substep' then
+						bros = self.parent.to_sub
+						default_order = recipe.max_order
+						my_order = bros.order(default_order)
+						array = []
+						for ss in bros do
+								next if my_order > ss.order(default_order)
+								next if ss.id == self.id
+								break if !array.empty? and my_order + 1 < ss.order(default_order)
+								array << ss.id
+						end
+						return array.include?(id)
+				end
+				return false
+		end
 end
 
 end
