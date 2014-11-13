@@ -15,12 +15,8 @@ module Navi
 # ObjectAccess External Input
 ##########################
 				def route(session_data,ex_input)
-					STDERR.puts __LINE__
-
 					session_data[:progress][@@sym],change = self.init(session_data)
-					STDERR.puts __LINE__
 					update(session_data)
-					STDERR.puts __LINE__
 				
 					case ex_input[:action][:name]
 						when 'touch'
@@ -44,18 +40,22 @@ module Navi
 				def init(session_data)
 						recipe = session_data[:recipe]
 						change = Recipe::StateChange.new
-						unless false and session_data[:progress].include?(@@sym) then
+						
+
+						unless session_data[:progress].include?(@@sym) then
 							oa_data = Hash.new
 							oa_data[:ss_ready] = [] # narrow context
 							oa_data[:ss_targets] = [] # wide context
 							oa_data[:ss_done] = []
 							oa_data[:objects_in_hand] = []
 							oa_data[:score] = -100
+							oa_data[:backup] = {}
 							
 							# ingredient, seasonings, others(=tools)
 							objects = Hash.new
 							objects[:ingredients] = []
 							objects[:seasonings] = []
+						
 						
 							materials = recipe.xpath("//object").to_a
 							for mat in materials do
@@ -83,31 +83,27 @@ module Navi
 										objects[:utensils] << event['id']
 									end
 							end
-							oa_data[:objects] = objects
-							change[@@sym] = oa_data
+							oa_data[:objects] = objects.deep_dup
+							change[@@sym] = oa_data.deep_dup
 						else
-							STDERR.puts __LINE__
-							STDERR.puts session_data[:progress].keys.join(" ")
 							oa_data = session_data[:progress][@@sym]
+							change[@@sym] = ActiveSupport::HashWithIndifferentAccess.new
 						end
 
-						STDERR.puts __LINE__
 							
 						# triggers
 						temp = recipe.xpath("//substep/trigger").to_a
-						STDERR.puts __LINE__
-						STDERR.puts oa_data.keys.join(" ")
 						all_objects = oa_data[:objects].values.flatten.map{|v|v.to_s}
-						STDERR.puts __LINE__
+
 
 						triggers = temp.delete_if{|v|
 								objs = v['ref'].split(/\s+/)
 								!objs.subset_of?(all_objects)
 						}
-						STDERR.puts __LINE__
 
 												
 						oa_data[:triggers] = triggers
+
 						return oa_data,change
 				end
 						
@@ -121,78 +117,68 @@ module Navi
 					new_object = ex_input[:action][:target]
 					timestamp = ex_input[:action][:timestamp]
 
-					STDERR.puts __LINE__
-					#					return do_nothing if oa_data[:objects_in_hand].include?(new_object)
+					return do_nothing if oa_data[:objects_in_hand].include?(new_object)
 
 
 					oa_data[:objects_in_hand] << new_object
 					oa_data[:objects_in_hand].uniq!
 					
-					STDERR.puts __LINE__
 
 					# save backup 
 					backup = session_data[:progress].deep_dup
-					STDERR.puts __LINE__
-					STDERR.puts backup.keys.join(" ")
-					STDERR.puts backup[@@sym].keys.join(" ")
-
-					backup[@@sym][:backup] = nil # avoid duplicate backup.
+					if backup[@@sym][:backup] then
+							backup[@@sym][:backup] = nil # avoid duplicate backup.
+					end
 					
 					prev_score = oa_data[:score]
-					STDERR.puts __LINE__
 
 					state, temp = post_process(session_data,oa_data,timestamp)
 					change.deep_merge!(temp)
-					STDERR.puts __LINE__
-					change[@@sym] = ActiveSupport::HashWithIndifferentAccess.new
-					change[@@sym][:backup] = ActiveSupport::HashWithIndifferentAccess.new
+
+					unless change[@@sym][:backup] then
+						change[@@sym][:backup] = ActiveSupport::HashWithIndifferentAccess.new
+					end
 					change[@@sym][:backup][new_object] = backup
 					change[@@sym][:timestamp] = timestamp if oa_data[:timestamp]==timestamp
 					change[@@sym][:score] = oa_data[:score] unless oa_data[:score]==prev_score 
 					change[@@sym][:objects_in_hand] = oa_data[:objects_in_hand]
-					STDERR.puts change[@@sym]
+					#					STDERR.puts change[@@sym]
 					return state,change
 				end
 				
 				def release(session_data,ex_input,change)
-					STDERR.puts "release!"
+#					STDERR.puts "release!"
 					oa_data = session_data[:progress][@@sym]
 					gone_object = ex_input[:action][:target]
 					timestamp = ex_input[:action][:timestamp]
 
-#					log_error "WARNING: #{gone_object} is not in the list of 'objects in hand.'" unless oa_data[:objects_in_hand].include?(gone_object)
+					log_error "WARNING: #{gone_object} is not in the list of 'objects in hand.'" unless oa_data[:objects_in_hand].include?(gone_object)
 					oa_data[:objects_in_hand].delete(gone_object)
-					STDERR.puts __LINE__
 					
 					# 終了判定をする
 					complete = checkCompletion(oa_data,timestamp)
-					STDERR.puts __LINE__
 
 					unless complete then
-						STDERR.puts __LINE__
-						# complete == nil, then turn back to the previous state.
-						STDERR.puts session_data[:progress][@@sym].keys.join(" ")
-						STDERR.puts session_data[:progress][@@sym][:backup].keys.join(" ")
+						# complete == nil, then turn back to the previous state.			
 						change.deep_merge!(session_data[:progress][@@sym][:backup][gone_object.to_sym])
-						STDERR.puts __LINE__
-						STDERR.puts change
+						STDERR.puts change[:detail]
+						change[@@sym][:backup].delete!(gone_object.to_sym)
+						
 						return "success",change
 					else
 						prev_score = oa_data[:score]
 						state, temp = post_process(session_data,oa_data,timestamp,complete)
 						change.deep_merge!(temp)
 					end
-					change[@@sym] = ActiveSupport::HashWithIndifferentAccess.new
 					change[@@sym][:timestamp] = timestamp if oa_data[:timestamp]==timestamp
 					change[@@sym][:score] = oa_data[:score] unless oa_data[:score]==prev_score 
 					change[@@sym][:objects_in_hand] = oa_data[:objects_in_hand]
-					STDERR.puts change[@@sym]
 
 					return state,change
 				end
 
 				def checkCompletion(oa_data,timestamp)					
-					#					log_error "ERROR: unexpected timestamp at #{__LINE__}" if !oa_data[:timestamp] or oa_data[:timestamp].empty?
+					log_error "WARNING: unexpected timestamp at #{__LINE__}" if !oa_data[:timestamp] or oa_data[:timestamp].empty?
 					if oa_data.include?(:timestamp) then
 						time_diff = Time.parse_my_timestamp(timestamp) - Time.parse_my_timestamp(oa_data[:timestamp])
 						# if elapsed time is too short, return nil
@@ -211,9 +197,7 @@ module Navi
 						ss_current = nil
 						progress = session_data[:progress]
 						recipe = session_data[:recipe]
-						STDERR.puts __LINE__
 						max_score, ss_highest_score = argmax_score(oa_data,:ss_forward,recipe, progress)
-						STDERR.puts __LINE__
 						if max_score >= 1.0 then
 							ss_current = ss_highest_score
 						else
@@ -231,7 +215,6 @@ module Navi
 								end
 							end
 						end
-						STDERR.puts __LINE__
 
 
 						# 変化がないなら過去最大のscoreを残す 
@@ -241,7 +224,6 @@ module Navi
 
 
 						return do_nothing(oa_data) if !(!!ss_current or complete)
-						STDERR.puts __LINE__
 						# 変化あり
 						oa_data[:timestamp] = timestamp
 						oa_data[:score] = max_score
@@ -265,30 +247,19 @@ module Navi
 						argmax = []
 
 						# when no substep has been done, argmax must be empty.
-						STDERR.puts __LINE__
 						return max,argmax if target_substeps.empty?
-						STDERR.puts __LINE__
 					
 						for trig in oa_data[:triggers] do
-								STDERR.puts __LINE__
-								STDERR.puts trig
-
-								STDERR.puts __LINE__
-								STDERR.puts trig.parent
-								STDERR.puts target_substeps.include?(trig.parent.id)
-
 								next unless target_substeps.include?(trig.parent.id)
-								STDERR.puts __LINE__
 
 								score = calc_score(obj_h,trig['ref'].split(/\s+/),oa_data[:objects])
-								STDERR.puts "#{score} for #{obj_h.join(" ")} (#{trig.parent.id})"
+#								STDERR.puts "#{score} for #{obj_h.join(" ")} (#{trig.parent.id})"
 								next if score < max
 								# score==maxなら追加，そうでなければ綺麗に更新
 								argmax = [] if score > max
 								max = score
 								argmax << trig.parent
 						end
-						STDERR.puts argmax.map{|v|v.id}.join(" ")
 						
 						log_error "ERROR: maybe, there are no triggers?" if argmax.empty?
 						if argmax.size > 1 then
