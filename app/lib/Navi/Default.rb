@@ -112,11 +112,13 @@ module Navi
             # check current substep to make it finished state.
             c_ss = @app.current_substep(recipe,ref_progress[:state])
             change = Recipe::StateChange.new
-            unless nil==c_ss then
-                change[:state] = @app.check_substep(c_ss,true,recipe, ref_states)
-                ref_progress.deep_merge!(change)
+						if !ex_input[:action].include?(:check) or ex_input[:action][:check] == "true" then
+							unless nil==c_ss then
+									change[:state] = @app.check_substep(c_ss,true,recipe, ref_states)
+									ref_progress.deep_merge!(change)
+							end
             end
-            
+						
             target_step = recipe.getByID(ex_input[:action][:target])
             target_substep = nil
             if 'substep' == target_step.name then
