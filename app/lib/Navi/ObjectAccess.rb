@@ -40,7 +40,7 @@ module Navi
 				def init(session_data)
 						recipe = session_data[:recipe]
 						change = Recipe::StateChange.new
-						
+
 
 						unless session_data[:progress].include?(@@sym) then
 							oa_data = Hash.new
@@ -117,7 +117,7 @@ module Navi
 					new_object = ex_input[:action][:target]
 					timestamp = ex_input[:action][:timestamp]
 
-					return do_nothing if oa_data[:objects_in_hand].include?(new_object)
+#return do_nothing if oa_data[:objects_in_hand].include?(new_object)
 
 
 					oa_data[:objects_in_hand] << new_object
@@ -129,7 +129,7 @@ module Navi
 					if backup[@@sym][:backup] then
 							backup[@@sym][:backup] = nil # avoid duplicate backup.
 					end
-					
+
 					prev_score = oa_data[:score]
 
 					state, temp = post_process(session_data,oa_data,timestamp)
@@ -138,7 +138,7 @@ module Navi
 					unless change[@@sym][:backup] then
 						change[@@sym][:backup] = ActiveSupport::HashWithIndifferentAccess.new
 					end
-					change[@@sym][:backup][new_object] = backup
+					change[@@sym][:backup][new_object.to_sym] = backup
 					change[@@sym][:timestamp] = timestamp if oa_data[:timestamp]==timestamp
 					change[@@sym][:score] = oa_data[:score] unless oa_data[:score]==prev_score 
 					change[@@sym][:objects_in_hand] = oa_data[:objects_in_hand]
@@ -147,22 +147,26 @@ module Navi
 				end
 				
 				def release(session_data,ex_input,change)
+
 #					STDERR.puts "release!"
 					oa_data = session_data[:progress][@@sym]
 					gone_object = ex_input[:action][:target]
 					timestamp = ex_input[:action][:timestamp]
 
-					log_error "WARNING: #{gone_object} is not in the list of 'objects in hand.'" unless oa_data[:objects_in_hand].include?(gone_object)
+#					@app.log_error("WARNING: #{gone_object} is not in the list of 'objects in hand.'") unless oa_data[:objects_in_hand].include?(gone_object)
 					oa_data[:objects_in_hand].delete(gone_object)
 					
 					# 終了判定をする
 					complete = checkCompletion(oa_data,timestamp)
 
 					unless complete then
-						# complete == nil, then turn back to the previous state.			
+						# complete == nil, then turn back to the previous state.	
+						STDERR.puts session_data[:progress][@@sym].include?(:backup)
+						STDERR.puts session_data[:progress][@@sym][:backup].keys.join(" ")
+						STDERR.puts session_data[:progress][@@sym][:backup].include?(gone_object.to_sym)
 						change.deep_merge!(session_data[:progress][@@sym][:backup][gone_object.to_sym])
 						STDERR.puts change[:detail]
-						change[@@sym][:backup].delete!(gone_object.to_sym)
+						STDERR.puts oa_data[:objects_in_hand]
 						
 						return "success",change
 					else
