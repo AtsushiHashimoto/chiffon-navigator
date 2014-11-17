@@ -61,7 +61,7 @@ class RecognizerSupport < Sinatra::Base
         return "\n#{objects.to_json}"
     end
 				
-		get '/recognizer/:model/:id' do |model,id|
+		get '/recognizer/model/:model/:id' do |model,id|
 				model_file = "#{settings.root}/#{settings.model_dir}/#{model}/#{id}.model"
 				if params[:type] == 'file' then
 						unless File.exist?(model_file) then
