@@ -8,6 +8,7 @@ require 'sinatra/config_file'
 require 'json'
 require 'nokogiri'
 require 'active_support/all'
+require 'haml'
 require "#{File.dirname(__FILE__)}/helpers.rb"
 
 class WOZ < Sinatra::Base
@@ -15,8 +16,6 @@ class WOZ < Sinatra::Base
 
 
     configure do
-        STDERR.puts File.dirname(__FILE__)
-        STDERR.puts File.exist?("#{File.dirname(__FILE__)}/helpers.rb")
         settings.root = "#{File.dirname(settings.root)}" # root
         # constant values
         set :MyConfFile, "config.yml"
