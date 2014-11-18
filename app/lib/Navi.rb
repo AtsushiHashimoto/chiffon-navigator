@@ -23,6 +23,8 @@ require 'Navi/Base.rb'
 # Navi Extension Modules
 require 'Navi/Default.rb'
 require 'Navi/ObjectAccess.rb'
+require 'Navi/ObjectAccessFuzzy.rb'
+
 
 # Recipe Class
 require 'Recipe/Recipe.rb'
@@ -43,7 +45,7 @@ class ChiffonNavigator < Sinatra::Base
     # session_data
     set :session_databank, {}
     set :navi_algorithms, {}
-
+		
     configure do
         settings.root = "#{File.dirname(File.dirname(settings.root))}" # root should not be /lib
 
@@ -60,7 +62,8 @@ class ChiffonNavigator < Sinatra::Base
         # set your Module to '/navi/:algorithm' and/or {"navigator":":algorithm",...} in external input
         # see also './lib/Navi/Default.rb'
         settings.navi_algorithms["default"] = Navi::Default.new(self)
-        settings.navi_algorithms["object_access"] = Navi::ObjectAccess.new(self)
+				settings.navi_algorithms["object_access"] = Navi::ObjectAccess.new(self)
+				settings.navi_algorithms["object_access_fuzzy"] = Navi::ObjectAccessFuzzy.new(self)
         ## add your algorithm module to 'navi_algorithm' here! ##
         settings.error_logger.datetime_format = settings.datetime_format
         settings.error_logger.level = Logger::ERROR
@@ -85,6 +88,7 @@ class ChiffonNavigator < Sinatra::Base
     post '/navi/:algorithm' do |alg|
         headers "Access-Control-Allow-Origin" => "*"
         headers "Access-Control-Allow-Credentials" => "true"
+				
         #        return "default_navigation\n"
         request.body.rewind
         body_read = request.body.read.encode('ISO-8859-1','utf-8')
