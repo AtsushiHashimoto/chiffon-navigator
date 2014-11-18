@@ -3,6 +3,10 @@ module Navi
         def initialize(app)
             @app = app
         end
+				def log_error(str)
+					raise str
+				end
+
     
 ##########################
 # Default Recommendation
