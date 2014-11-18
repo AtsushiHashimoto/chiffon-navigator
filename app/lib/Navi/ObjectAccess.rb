@@ -10,6 +10,10 @@ module Navi
         def initialize(app)
             @app = app
 				end
+				def log_error(str)
+					raise str
+				end
+
 		
 ##########################
 # ObjectAccess External Input
@@ -27,6 +31,8 @@ module Navi
 							return self.release(session_data,ex_input,change)
 						when 'put'
 							return self.release(session_data,ex_input,change)
+						when 'auto_detection'
+							return self.auto_detect(session_data,ex_input,change)
 						else
 							log_error "Unknown action for ObjectAccess algorithm: '#{ex_input[:action][:name]}' is directed by external input."
 					end						
@@ -159,27 +165,25 @@ module Navi
 					# 終了判定をする
 					complete = checkCompletion(oa_data,timestamp)
 
-					unless complete then
+					if nil == complete then
 						# complete == nil, then turn back to the previous state.	
-						STDERR.puts session_data[:progress][@@sym].include?(:backup)
-						STDERR.puts session_data[:progress][@@sym][:backup].keys.join(" ")
-						STDERR.puts session_data[:progress][@@sym][:backup].include?(gone_object.to_sym)
 						change.deep_merge!(session_data[:progress][@@sym][:backup][gone_object.to_sym])
-						STDERR.puts change[:detail]
-						STDERR.puts oa_data[:objects_in_hand]
-						
+						change[@@sym][:backup][gone_object.to_sym] = :clear
 						return "success",change
 					else
 						prev_score = oa_data[:score]
 						state, temp = post_process(session_data,oa_data,timestamp,complete)
 						change.deep_merge!(temp)
 					end
+					change[@@sym][:backup][gone_object.to_sym] = clear
 					change[@@sym][:timestamp] = timestamp if oa_data[:timestamp]==timestamp
 					change[@@sym][:score] = oa_data[:score] unless oa_data[:score]==prev_score 
 					change[@@sym][:objects_in_hand] = oa_data[:objects_in_hand]
 
 					return state,change
 				end
+						
+				
 
 				def checkCompletion(oa_data,timestamp)					
 					log_error "WARNING: unexpected timestamp at #{__LINE__}" if !oa_data[:timestamp] or oa_data[:timestamp].empty?
@@ -444,6 +448,97 @@ module Navi
 					end
 					temp
 				end
+					
+############################
+# Both touch and released objects are input at the same time.
+# from ObjectAccessFuzzy.
+############################
+					
+				def auto_detect(session_data,ex_input,change)
+					STDERR.puts "auto_detect!"
+					oa_data = session_data[:progress][@@sym]
+					gone_objects = ex_input[:action][:released].map{|v|v.to_s}
+					new_objects = ex_input[:action][:touched].map{|v|v.to_s}
+					timestamp = ex_input[:action][:timestamp]
+					
+					oa_data[:objects_in_hand] -= gone_objects
+					oa_data[:objects_in_hand] += new_objects
+					oa_data[:objects_in_hand].uniq!
+
+					STDERR.puts "+" + new_objects.join("/")
+					STDERR.puts "-" + gone_objects.join("/")
+					STDERR.puts "=" + oa_data[:objects_in_hand].join(" ")
+					
+					# save backup 
+					backup = session_data[:progress].deep_dup
+					if backup[@@sym][:backup] then
+						backup[@@sym][:backup] = nil # avoid duplicate backup.
+					end
+					
+					complete = false
+					unless gone_objects.empty? then
+						# 終了判定をする
+						complete = checkCompletion(oa_data,timestamp)
+					end
+					
+					STDERR.puts complete
+					
+					if nil == complete then
+						STDERR.puts __LINE__
+						if new_objects.empty? then
+							# complete == nil, then turn back to the previous state.
+							gone_object = getMostRecentTouched(session_data[:progress],gone_objects)
+							if gone_object then
+								change.deep_merge!(session_data[:progress][@@sym][:backup][gone_object.to_sym])
+								for gone_object in gone_objects do
+									change[@@sym][:backup][gone_object.to_sym] = :clear
+								end
+							end
+							return "success",change
+						end
+						# 新しく把持された物体があるなら，それに従って変更する
+						complete = false
+						STDERR.puts __LINE__
+					end
+
+					STDERR.puts __LINE__
+					prev_score = oa_data[:score]
+					state, temp = post_process(session_data,oa_data,timestamp,complete)
+					change.deep_merge!(temp)
+					change[@@sym][:backup] = Hash.new unless change[@@sym].include?(:backup)
+					for new_object in new_objects do
+							change[@@sym][:backup][new_object.to_sym] = backup
+					end
+					for gone_object in gone_objects do
+							change[@@sym][:backup][gone_object.to_sym] = :clear
+					end
+					change[@@sym][:timestamp] = timestamp if oa_data[:timestamp]==timestamp
+					change[@@sym][:score] = oa_data[:score] unless oa_data[:score]==prev_score 
+					change[@@sym][:objects_in_hand] = oa_data[:objects_in_hand]
+				
+					
+					return state,change
+				end
+				
+				def getMostRecentTouched(progress,objects)
+					oa_data = progress[@@sym]
+					time = Time.new
+					most_recent_obj = nil
+					for obj in objects do
+						next unless oa_data[:backup].include?(obj)
+						if oa_data[:backup][obj][@@sym].include?(:timestamp) then
+							curr_time = Time.parse_my_timestamp(oa_data[:backup][obj][@@sym][:timestamp])
+						else
+							curr_time = Time.new
+						end
+						next curr_time <= time
+						time = curr_time
+						most_recent_obj = obj						
+					end
+					STDERR.puts "most_recent_obj: #{most_recent_obj}"
+					return most_recent_obj
+				end
+
 				
 		end
 end
