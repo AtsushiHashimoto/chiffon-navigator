@@ -35,7 +35,12 @@ class Progress
 				
 				# custom state for each algorithm
 				for key in change.keys - @@default_keys do
-						self[key].deep_merge!(change[key])
+						if self.include?(key) then
+							self[key] = self[key].clear_by(change[key])
+							self[key].deep_merge!(change[key])
+						else
+							self[key] = change[key].deep_dup
+						end
 				end
         
         if delta.before == delta.after then
