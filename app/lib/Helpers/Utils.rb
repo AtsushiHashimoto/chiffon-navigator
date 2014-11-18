@@ -27,3 +27,18 @@ class Time
 			Time.utc($1.to_i,$2.to_i,$3.to_i,$4.to_i,$5.to_i,"#{$6}.#{$7}".to_r)
 		end
 end
+
+class Hash
+		def clear_by(other)
+				for key,val in self do
+					next unless other.include?(key)
+					if :clear==other[key] then
+						self.delete(key)
+						next
+					end
+					next unless val.kind_of?(Hash)
+					next unless other[key].kind_of?(Hash)
+					self[key] = val.clear_by(other[key])
+				end
+		end
+end
