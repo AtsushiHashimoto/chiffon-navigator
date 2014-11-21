@@ -147,6 +147,13 @@ class ChiffonNavigator < Sinatra::Base
             log_error "unknown algorithm '#{alg}' was designated." unless settings.navi_algorithms.include?(alg)
             session_logger.info json_data
 
+						if session_data.include?(:progress) and session_data[:progress].include?(:state)
+							prev_cur_ss = current_substep(session_data[:recipe],session_data[:progress][:state])
+						else
+							prev_cur_ss = nil
+						end
+
+
             # counseling
             case json_data["situation"]
                 when "NAVI_MENU" then
@@ -168,7 +175,13 @@ class ChiffonNavigator < Sinatra::Base
                 else
                 log_error("unknown situation '#{json_data['situation']}' is directed.")
             end
-
+						
+						cur_ss = current_substep(session_data[:recipe],change[:state])
+						if prev_cur_ss and cur_ss and prev_cur_ss.id!=cur_ss.id then
+								status, change = stop_all_medias(session_data[:recipe], session_data[:progress], prev_cur_ss, change)
+								#								STDERR.puts temp
+								#								change.deep_merge!(temp)
+						end
 
             # do not save delta when "undo" or "redo" has been input
             do_save_delta = (-1 == change[:iter_index]) ? true : false
