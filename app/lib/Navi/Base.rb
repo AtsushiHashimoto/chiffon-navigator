@@ -622,24 +622,26 @@ module Base
     # event == nil when checking recipe, substep or step's start/end.
     def register_notifies(notifies, latest_notify, timing, event=nil, force = false)
         change_notify = Hash.new
-    
+				
         for notify in notifies do
             delay = check_fired_triggers(notify.trigger,timing,event)
             
             next if delay.empty? # no trigger has fired.
             view_times = latest_notify[notify.id][:PLAY]
             next if 0 < view_times and !force
-            change_notify = notify_control(latest_notify,change_notify,notify,true,delay.min)
+            temp = notify_control(latest_notify,change_notify,notify,true,delay.min)
+						change_notify.deep_merge!(temp)
         end
         return change_notify
     end
     
     def notify_control(ref_notify, change_notify, notification_node, do_play, delay)
-        target = change_notify[notification_node.id]
+        target = ref_notify[notification_node.id].deep_dup
         target[:do_play] = do_play
-        target[:PLAY] = ref_notify[notification_node.id][:PLAY]+1
+        target[:PLAY] = target[:PLAY]+1
         target[:delay] << delay
-        return change_notify
+				
+				return {notification_node.id=>target}
     end
 
 ######### is_able? (for step/substep)

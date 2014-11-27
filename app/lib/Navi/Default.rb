@@ -203,7 +203,6 @@ module Navi
             media_candidates = recipe.triggerable_nodes(['audio','video'])
             
 
-            notification_candidates = recipe.triggerable_nodes(['notification'])
             
             
             change = nil
@@ -222,14 +221,10 @@ module Navi
                 end
             end
 
-
-
-            unless notification_candidates.empty? then
-                temp = event_inner(recipe,latest_progress,notification_candidates, events, timing, :event_notify)
-                change.deep_merge!(temp) unless temp.empty?
-            end
-
-
+						c_ss = @app.current_substep(recipe,latest_progress[:state])
+						noty_cands = c_ss.notifies + recipe.notifies
+						change_notify = @app.register_notifies(noty_cands,latest_progress[:notify],"start",events)
+						change[:notify].deep_merge!(change_notify);
 
             return "success", change
         end
