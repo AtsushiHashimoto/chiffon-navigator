@@ -1,0 +1,29 @@
+-#object_access_controller
+#guide_object_access
+    .row
+        %h2 Object Access Controller
+        .detail
+            %table
+                %tr
+                    %td(width="29%")
+                        %h3 Ingredients
+                        - @oa_objects = []
+                        - @oa_cols = 2
+                        - for object in @recipe.xpath('//object').sort_by{|v|v['name']}
+                            - next if object['id']=~ /object\d{3}/
+                            - @oa_objects << [object['id'],object['name']]
+                        = haml :object_access_table
+                    %td(width="29%")
+                        %h3 Cooking Utensils
+                        - @oa_objects = []
+                        - for object in @recipe.xpath('//event')
+                            - next unless object['id']=~ /.+_utensil/
+                            - @oa_objects << [object['id'], object['id'].sub('_utensil','')]
+                        = haml :object_access_table
+                    %td(width="42%")
+                        %h3 Intermediate Foods
+                        - @oa_objects = []
+                        - @oa_cols = 3
+                        - for step in @recipe.xpath('//step')
+                            - @oa_objects << [step.id, "Result of #{step.id}<br>#{step['navi_text']}"]
+                        = haml :object_access_table

@@ -116,6 +116,9 @@ background-color: transparent;
   background: url(/woz/images/btn_03_o.png) no-repeat;
 }
 
+#select_algorithm{
+	margin-top: 25px;
+}
 /* woz controllers
 ---------------------------------------------------------------------- */
 
@@ -308,7 +311,8 @@ input.btn-primary:hover{
 }
 #overview,
 #materials,
-#guide/*,
+#guide,
+#guide_object_access/*,
 #finished*/
 {
   background:#fff;
@@ -324,6 +328,7 @@ input.btn-primary:hover{
     line-height: 140%;
 }
 #guide,
+#guide_object_access,
 #finished{
   background: transparent;
   border:none;
@@ -331,7 +336,8 @@ input.btn-primary:hover{
 #finished h2,
 #overview h2,
 #materials h2,
-#guide h2{
+#guide h2,
+#guide_object_access h2{
   text-align: left;
   font-size: 24px;
   padding:5px 0 5px 60px;
@@ -384,7 +390,7 @@ input.btn-primary:hover{
     -moz-border-bottom-topright: 10px;
     -moz-border-bottom-topleft: 10px;
 }
-#detail{
+.detail{
   background:#fff;
   padding:20px;
   border:1px solid #b7d6e3;
@@ -879,3 +885,58 @@ small.logo img{
   margin-right: 15px;
 }
 
+/* object_access_controller */
+#guide_object_access .row{
+	width:100%;
+	height: 750px;
+	overflow:hidden;
+	float: left;
+	border:none;
+	margin-left:0;
+	border-bottom: 1px solid #b7d6e3;
+	border-radius: 0;            /* 草案 */
+	-webkit-border-radius: 0;    /* Safari,Google Chrome用 */
+	-moz-border-radius: 0;       /* Firefox用 */
+	border-radius: 0 0 10px 10px;           /* 草案 */
+	/* Safari,Google Chrome用 */
+	-webkit-border-bottom-right-radius: 10px;
+	-webkit-border-bottom-left-radius: 10px;
+	/* Firefox用 */
+	-moz-border-bottom-topright: 10px;
+	-moz-border-bottom-topleft: 10px;
+}
+
+
+#guide_object_access h2{
+	background: url(/woz/images/overview.png) no-repeat #bee1ef 15px 100%;
+}
+#guide_object_access td{
+	vertical-align: top;
+}
+.btn_object_access{
+	padding: 8px;
+	margin: 5px;
+	width: 150px;
+}
+
+#guide_object_access .oa_controller{
+	-webkit-border-radius: 10px;
+	-moz-border-radius: 10px;
+	border-radius: 10px;
+	border-style: outset;
+	border-bottom-width: 7px;
+	border-right-width: 6px;
+	border-top-width: 1px;
+	border-left-width: 2px;
+	border-color: #5706e3;
+	background-color: #bee1ef; 
+}
+#guide_object_access .oa_controller.in_hand{
+	border-color: #e30657;
+	border-style: inset;
+	border-bottom-width: 4px;
+	border-right-width: 4px;
+  border-top-width: 4px;
+	border-left-width: 4px;
+	background-color: #efe1be;
+}

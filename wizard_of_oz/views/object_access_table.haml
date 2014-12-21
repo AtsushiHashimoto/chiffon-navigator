@@ -1,0 +1,8 @@
+%table
+    - mid = (@oa_objects.size + @oa_cols -1)/@oa_cols
+    - width = (100/@oa_cols).to_i
+    %tr
+        - for k in 0...@oa_cols
+            %td{width=>"#{width}%"}
+                - for i in (k*mid)...[(k+1)*mid, @oa_objects.size].min
+                    %button.btn_object_access.oa_controller{:'data-target'=>@oa_objects[i][0]} #{@oa_objects[i][1]}

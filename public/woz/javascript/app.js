@@ -116,7 +116,7 @@ jQuery(function ($) {
        
     var update_callback = function(data,status){
         $.each(data,function(i,obj) {
-               console.log(obj);
+						//console.log(obj);
             if (obj.ChannelSwitch){
                console.log("update callback: ChannelSwitch");
             }
@@ -258,7 +258,7 @@ jQuery(function ($) {
             e.preventDefault();
             console.log(JSON.stringify($(this).data('einput')));
             send_sorcery($(this).data('einput'));
-    });
+    })
        
     $('a.select_controller').on('click',function(e){
          e.preventDefault();
@@ -282,6 +282,52 @@ jQuery(function ($) {
          $("ul.event-menu").dropdown("toggle");
          return false;
      });
+			 
+		// Algorithmの変更
+    $('#select_algorithm').change(function(){
+						$('.main_controller').each(function(){
+						    console.log("select_algorithm");
+								$(this).hide();
+						});
+						var controller = $(this).attr('value');
+						$("#"+controller).show();
+		});
+			 
+			 
+	  ////////////////////////////
+		//// object_access_controller
+		var two0num = function(num){
+			 return ('0' + num).slice(-2);
+		};
+	  var get_timestamp = function(datetime){
+			 var date = [datetime.getFullYear(), 
+									 two0num(datetime.getMonth()+1),
+									 two0num(datetime.getDate())].join('.');
+			 var time = [two0num(datetime.getHours()),
+									 two0num(datetime.getMinutes()),
+									 two0num(datetime.getSeconds()),
+									 ('0'+(datetime.getMilliseconds()*1000)).slice(-6)
+													 ].join('.');
+			 return [date,time].join('_')
+		};
+		$('.oa_controller').on('click',function(e){
+			 e.preventDefault();
+			 var tar = $(this).data('target');
+			 var act = 'touch';
+			 if($(this).hasClass('in_hand')){
+					act = 'release';
+				  $(this).removeClass('in_hand');
+			 }
+			 else{
+					$(this).addClass('in_hand');
+			 }
+			 var tstamp = get_timestamp(new Date());
+													 
+			 console.log(tar);
+			 var einput = {navigator:'object_access', action:{target:tar,name:act,timestamp:tstamp}};
+			 console.log(einput);
+			 send_sorcery(einput);			 
+													 });
 
     // 初期設定および動作
     $('.woz-run')

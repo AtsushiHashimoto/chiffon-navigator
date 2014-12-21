@@ -29,6 +29,11 @@
                             %a#btn-controller.btn.controller.navigate(href="/btn2" data-einput="#{render_external_input("channel",{"value"=>"MATERIALS"})}") Object Access
                         %li.btn03
                             %a#btn-controller.btn.controller.navigate(href="/btn3" data-einput="#{render_external_input("channel",{"value"=>"GUIDE"})}") GUIDE
+                    %ul
+                        %li
+                            %select#select_algorithm(name="algorithm")
+                                %option(value="basic_controller") Direct Manip.
+                                %option(value="object_access_controller") Object Access
         .container.clearfix
             .switches
                 %h1 CHIFFON WOZ Controller
