@@ -62,7 +62,7 @@ module Navi
 							objects[:ingredients] = []
 							objects[:seasonings] = []
 						
-						
+						  # 材料表の要素のIDが /.+_seasoning/ だったら調味料, それ以外は食材
 							materials = recipe.xpath("//object").to_a
 							for mat in materials do
 									next unless mat.attributes.include?('id')
@@ -80,8 +80,9 @@ module Navi
 									next unless step.attributes.include?('id')
 									objects[:mixture] << step.id.to_s
 							end
-							
+													
 							objects[:utensils] = []
+							# <event>のうち，IDが /.+_utensil/ なら道具
 							events = recipe.xpath("//event").to_a
 							for event in events do
 									obj_id, suffix = event['id'].split('_')
@@ -129,17 +130,21 @@ module Navi
 					oa_data[:objects_in_hand] << new_object
 					oa_data[:objects_in_hand].uniq!
 					
-
+					STDERR.puts "#{__LINE__} : #{Time.now}"
 					# save backup 
 					backup = session_data[:progress].deep_dup
 					if backup[@@sym][:backup] then
 							backup[@@sym][:backup] = nil # avoid duplicate backup.
 					end
 
+STDERR.puts "#{__LINE__} : #{Time.now}"
 					prev_score = oa_data[:score]
 
-					state, temp = post_process(session_data,oa_data,timestamp)
+STDERR.puts "#{__LINE__} : #{Time.now}"
+
+					state, temp = post_process(session_data,oa_data,timestamp,:touch, false)
 					change.deep_merge!(temp)
+STDERR.puts "#{__LINE__} : #{Time.now}"
 
 					unless change[@@sym][:backup] then
 						change[@@sym][:backup] = ActiveSupport::HashWithIndifferentAccess.new
@@ -149,6 +154,7 @@ module Navi
 					change[@@sym][:score] = oa_data[:score] unless oa_data[:score]==prev_score 
 					change[@@sym][:objects_in_hand] = oa_data[:objects_in_hand]
 					#					STDERR.puts change[@@sym]
+STDERR.puts "#{__LINE__} : #{Time.now}"
 					return state,change
 				end
 				
@@ -167,31 +173,42 @@ module Navi
 
 					if nil == complete then
 						# complete == nil, then turn back to the previous state.	
+						STDERR.puts "#{__LINE__} : #{Time.now}"
 						change.deep_merge!(session_data[:progress][@@sym][:backup][gone_object.to_sym])
-						change[@@sym][:backup][gone_object.to_sym] = :clear
+						STDERR.puts "#{__LINE__} : #{Time.now}"
+						change[@@sym][:backup][gone_object.to_sym] = :clear	if change[@@sym][:backup] and change[@@sym][:backup][gone_object.to_sym]
 						return "success",change
 					else
 						prev_score = oa_data[:score]
-						state, temp = post_process(session_data,oa_data,timestamp,complete)
+						state, temp = post_process(session_data,oa_data,timestamp,:release, complete)
 						change.deep_merge!(temp)
 					end
-					change[@@sym][:backup][gone_object.to_sym] = clear
+					STDERR.puts "#{__LINE__} : #{Time.now}"
+					if change[@@sym][:backup] and change[@@sym][:backup][gone_object.to_sym] then
+						change[@@sym][:backup][gone_object.to_sym] = :clear if change[@@sym][:backup] and change[@@sym][:backup][gone_object.to_sym]
+					end
+					STDERR.puts "#{__LINE__} : #{Time.now}"
 					change[@@sym][:timestamp] = timestamp if oa_data[:timestamp]==timestamp
 					change[@@sym][:score] = oa_data[:score] unless oa_data[:score]==prev_score 
 					change[@@sym][:objects_in_hand] = oa_data[:objects_in_hand]
 
+STDERR.puts "#{__LINE__} : #{Time.now}"
+					STDERR.puts state
+					STDERR.puts change
 					return state,change
 				end
 						
 				
 
-				def checkCompletion(oa_data,timestamp)					
-					log_error "WARNING: unexpected timestamp at #{__LINE__}" if !oa_data[:timestamp] or oa_data[:timestamp].empty?
-					if oa_data.include?(:timestamp) then
-						time_diff = Time.parse_my_timestamp(timestamp) - Time.parse_my_timestamp(oa_data[:timestamp])
-						# if elapsed time is too short, return nil
-						return nil if 1.0 > time_diff
-					end				
+				def checkCompletion(oa_data,timestamp)
+					if oa_data[:timestamp] then 
+						log_error "WARNING: unexpected timestamp at #{__LINE__}" if oa_data[:timestamp].empty?
+						if oa_data.include?(:timestamp) then
+							time_diff = Time.parse_my_timestamp(timestamp) - Time.parse_my_timestamp(oa_data[:timestamp])
+							# if elapsed time is too short, return nil
+							return nil if 1.0 > time_diff
+						end				
+					end
 					return true if oa_data[:score] > @@completion_thresh
 					return false
 				end
@@ -200,22 +217,25 @@ module Navi
 					return "success", Recipe::StateChange.new
 				end
 				
-				def post_process(session_data,oa_data,timestamp,complete=false)
+				def post_process(session_data,oa_data,timestamp,action,complete=false)
 						STDERR.puts "post_process!"
 						ss_current = nil
 						progress = session_data[:progress]
 						recipe = session_data[:recipe]
 						max_score, ss_highest_score = argmax_score(oa_data,:ss_forward,recipe, progress)
+						STDERR.puts "max score (forward): #{max_score}"
 						if max_score >= 1.0 then
 							ss_current = ss_highest_score
 						else
 							max_score2, ss_highest_score2 = argmax_score(oa_data,:ss_backward,recipe,progress)
+							STDERR.puts "max score (backward): #{max_score2}"
 							if max_score2 >= 1.0 then
 								max_score = max_score2
 								ss_current = ss_highest_score2								
-							elsif max_score >0 then
+							elsif action==:touch and max_score >0 then
 								ss_current = ss_highest_score
 								
+								STDERR.puts oa_data[:score]
 								if oa_data[:score] > @@completion_thresh2 then
 									# もし，ss_currentがrecommendationと同じものであれば
 									# completeをtrueにする
@@ -231,7 +251,7 @@ module Navi
 #						return do_nothing if ss_highest_score == @app.current_substep(recipe,session_data[:progress][:state]).id
 
 
-						return do_nothing(oa_data) if !(!!ss_current or complete)
+						return do_nothing if !(!!ss_current or complete)
 						# 変化あり
 						oa_data[:timestamp] = timestamp
 						oa_data[:score] = max_score
@@ -239,15 +259,17 @@ module Navi
 						if ss_current then
 							# 指定されたss_currentへ移動
 							ex_input = {:navigator=>'default',:action=>{:name=>'jump',:target=>ss_current.to_s,:check=>complete.to_s}}
+							STDERR.puts ex_input.to_json
 						else
 							# 手がかり無し⇢next関数により推薦された次の作業へ移動
-							ex_input = {:navigator=>'default',:action=>{:name=>'next'}}
+							ex_input = {:navigator=>'default',:action=>{:name=>'check', :target=>@app.current_substep(recipe,session_data[:progress][:state]).id, :value=>"true"}}
+							STDERR.puts ex_input.to_json
 						end
 						return @app.navi_algorithms['default'].route(session_data,ex_input)
 				end
 								
 				def argmax_score(oa_data, target,recipe,progress)
-#						STDERR.puts "argmax_score"
+						STDERR.puts "argmax_score"
 
 						target_substeps = oa_data[target]
 						obj_h = oa_data[:objects_in_hand]
@@ -269,7 +291,9 @@ module Navi
 								argmax << trig.parent
 						end
 						
+						
 						log_error "ERROR: maybe, there are no triggers?" if argmax.empty?
+
 						if argmax.size > 1 then
 							rorder = progress[:recommended_order]
 							default_order = recipe.max_order
@@ -278,9 +302,9 @@ module Navi
 									b_step_id = b.parent.id.to_s
 									result = false
 									if a_step_id == b_step_id then
-											result = a.order(default_order) <=> b.order(default_order)
+											result = (b.order(default_order) <=> a.order(default_order))
 									else
-											result = rorder.index(a_step_id) <=> rorder.index(b_step_id)
+											result = (rorder.index(b_step_id) <=> rorder.index(a_step_id))
 									end
 									result
 							}
@@ -305,10 +329,10 @@ module Navi
 
 						score = 0
 						if ute_v.empty? then
-								score = score + 1.0 * has_ing
-								score = score + @@score_seasoning * has_sea
+								score = score + [1.0 * has_ing, @@score_seasoning * has_sea].max
 						else
-								score = score + @@score_ing * has_ing
+								score = score + (@@score_ing * [has_ing, has_sea].max) 
+								
 								score = score + (1.0-@@score_ing) * (has_ute.size.to_f/ute_v.size.to_f)
 						end
 
@@ -456,6 +480,24 @@ module Navi
 					
 				def auto_detect(session_data,ex_input,change)
 					STDERR.puts "auto_detect!"
+					gone_objects = ex_input[:action][:released].map{|v|v.to_s}
+					new_objects = ex_input[:action][:touched].map{|v|v.to_s}
+					timestamp = ex_input[:action][:timestamp]	
+					
+					temp_ex_input = {:timestamp=>timestamp, :action=>{}}
+					for gone_obj in gone_objects do
+						temp_ex_input[:action][:target] = gone_obj
+						status, temp = release(session_data,temp_ex_input, change)
+						change.deep_merge!(temp)
+					end
+					for new_obj in new_objects do
+						temp_ex_input[:action][:target] = gone_obj
+						status, temp = touch(session_data,temp_ex_input, change)
+						change.deep_merge!(temp)
+					end
+					return status, change
+				end
+=begin
 					oa_data = session_data[:progress][@@sym]
 					gone_objects = ex_input[:action][:released].map{|v|v.to_s}
 					new_objects = ex_input[:action][:touched].map{|v|v.to_s}
@@ -519,7 +561,9 @@ module Navi
 					
 					return state,change
 				end
+=end
 				
+				# かなり挙動が怪しそう．バグある??
 				def getMostRecentTouched(progress,objects)
 					oa_data = progress[@@sym]
 					time = Time.new
@@ -531,14 +575,12 @@ module Navi
 						else
 							curr_time = Time.new
 						end
-						next curr_time <= time
+						next if curr_time <= time
 						time = curr_time
 						most_recent_obj = obj						
 					end
 					STDERR.puts "most_recent_obj: #{most_recent_obj}"
 					return most_recent_obj
 				end
-
-				
 		end
 end
