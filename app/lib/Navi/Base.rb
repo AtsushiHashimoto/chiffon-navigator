@@ -303,14 +303,14 @@ module Base
         default_order = recipe.max_order
         tar_order = substep.order(default_order)
         for ss in brothers do
-            my_order = ss.order(default_order)
-            if my_order==tar_order then
-                is_finished = ss==substep ? flag : ref_state[ss.id][:is_finished]
+            ss_order = ss.order(default_order)
+            if ss_order==tar_order then
+                is_finished = (ss==substep ? flag : ref_state[ss.id][:is_finished])
                 temp_hash[ss.id] = {:is_finished=>is_finished,:visual=>'ABLE'}
-            elsif my_order<tar_order then
-                temp_hash[ss.id] = {:is_finished=>true,:visual=>'ABLE'}
+            elsif ss_order<tar_order then
+                temp_hash[ss.id] = {:is_finished=>true,:visual=>'ABLE'} if flag
             else
-                temp_hash[ss.id] = {:is_finished=>false,:visual=>'OTHERS'}
+                temp_hash[ss.id] = {:is_finished=>false,:visual=>'OTHERS'} if !flag
             end
         end
 
@@ -334,7 +334,7 @@ module Base
         end
 
 
-        # change all parent step to 'finished' then flag == true
+        # change all parent step to 'finished' if flag == true
         if flag == true and step.attributes.include?("parent") and is_touched then
             parents = step["parent"].split(" ").map{|v| recipe.getByID(v.to_sym,"step")}
             for parent_step in parents do
