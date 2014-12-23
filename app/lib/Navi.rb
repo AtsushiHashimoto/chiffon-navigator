@@ -261,25 +261,13 @@ class ChiffonNavigator < Sinatra::Base
         headers "Access-Control-Allow-Origin" => "*"
         headers "Access-Control-Allow-Credentials" => "true"
 
-        begin
+				status,header,body = call env.merge("PATH_INFO" => "/navi/progress/#{session_id}").merge("REQUEST_METHOD" => "GET")
+				return [] if body[0].empty?
+				progress = JSON::parse(body[0],{:symbolize_names => true}).to_progress
 
-            status,header,body = call env.merge("PATH_INFO" => "/navi/progress/#{session_id}").merge("REQUEST_METHOD" => "GET")
-
-            progress = JSON::parse(body[0],{:symbolize_names => true}).to_progress
-
-            delta = Recipe::Delta.new
-            delta.after = progress
-            return JSON.generate(create_prescription(delta,progress))
-        rescue => ex
-            # エラー処理  ex.message
-            short_message = "'" + ex.message + "' at " + ex.backtrace[0]
-            message = ex.message + "\n" + ex.backtrace.join("\n")
-            settings.error_logger.error(message)
-            
-            prescription['status'] = 'internal error'
-            prescription['body'] = short_message
-            return prescription
-        end
+				delta = Recipe::Delta.new
+				delta.after = progress
+				return JSON.generate(create_prescription(delta,progress))
 
     end
 
