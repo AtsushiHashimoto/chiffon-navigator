@@ -1,0 +1,36 @@
+-#check with noise controller
+.guide_width10
+    .row
+        %h2 Check with Noise Controller
+        .detail
+            %table(width="100%")
+                - substeps = @recipe.xpath('//substep').to_a
+                - last_ss_id = substeps[-1].id
+                - for ss in substeps
+                    - row_class = "tr_odd"
+                    - if substeps.index(ss) % 2 == 0
+                        - row_class = "tr_even"
+                    %tr{:class=>row_class}
+                        %td.cwn_table_cell(width="20%")
+                            = ss.id
+                            %br
+                            = ss['navi_text']
+                        %td.cwn_table_cell(width="5%")
+                            %input.cwn_controller{:type=>'checkbox',:'data-target'=>ss.id,:'data-action_name'=>'check'}
+                        %td.cwn_table_cell(width="35%")
+                            - unless ss.id == last_ss_id
+                                %button.btn_check_with_noise.cwn_controller{:'data-target'=>ss.id,:'data-action_name'=>'set',:'noise'=>{'type'=>'slip'}} set slip noise
+                                slip to
+                                %select.cwn_select_direct{:id=>"cwn_slip_direct_#{ss.id}"}
+                                    %option forward
+                                    %option backward
+                                    %option anywhere
+                        %td.cwn_table_cell(width="40")
+                            - unless ss.id == last_ss_id
+                                %button.btn_check_with_noise.cwn_controller{:'data-target'=>ss.id,:'data-action_name'=>'set',:'noise'=>{'type'=>'jump'}} set jump noise
+                                jump to
+                                %select.cwn_select_direct{:id=>"cwn_jump_direct_#{ss.id}"}
+                                    %option forward
+                                    %option backward
+                                    %option anywhere
+                                %input.cwn_jump_delay{:type=>"text", :id=>"cwn_jump_deley_#{ss.id}", :value=>"-1.0"}

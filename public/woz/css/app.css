@@ -311,8 +311,8 @@ input.btn-primary:hover{
 }
 #overview,
 #materials,
-#guide,
-#guide_object_access/*,
+.guide_width8,
+.guide_width10/*,
 #finished*/
 {
   background:#fff;
@@ -327,8 +327,8 @@ input.btn-primary:hover{
   font-size: 20px;
     line-height: 140%;
 }
-#guide,
-#guide_object_access,
+.guide_width8,
+.guide_width10,
 #finished{
   background: transparent;
   border:none;
@@ -336,8 +336,8 @@ input.btn-primary:hover{
 #finished h2,
 #overview h2,
 #materials h2,
-#guide h2,
-#guide_object_access h2{
+.guide_width8 h2,
+.guide_width10 h2{
   text-align: left;
   font-size: 24px;
   padding:5px 0 5px 60px;
@@ -355,7 +355,7 @@ input.btn-primary:hover{
 #materials h2{
   background: url(/woz/images/materials.png) no-repeat #bee1ef 15px 50%;
 }
-#guide h2,
+.guide_width8 h2,
 #finished h2{
   background: url(/woz/images/overview.png) no-repeat #bee1ef 15px 50%;
 }
@@ -370,7 +370,7 @@ input.btn-primary:hover{
   height: 740px;
   overflow:auto;
 }
-#guide .row,
+.guide_width8 .row,
 #finished .row{
   width:860px;
   height: 750px;
@@ -399,7 +399,7 @@ input.btn-primary:hover{
 .span8{
   margin-left:0;
 }
-#guide .span8,
+.guide_width8 .span8,
 #finished .span8
 {
   width:817px;
@@ -886,10 +886,10 @@ small.logo img{
 }
 
 /* object_access_controller */
-#guide_object_access .row{
+.guide_width10 .row{
 	width:100%;
 	height: 750px;
-	overflow:hidden;
+	overflow:auto;
 	float: left;
 	border:none;
 	margin-left:0;
@@ -907,19 +907,21 @@ small.logo img{
 }
 
 
-#guide_object_access h2{
+.guide_width10 h2{
 	background: url(/woz/images/overview.png) no-repeat #bee1ef 15px 100%;
 }
-#guide_object_access td{
+.guide_width10 td{
 	vertical-align: top;
 }
-.btn_object_access{
+.btn_object_access,
+.btn_check_with_noise{
 	padding: 8px;
 	margin: 5px;
 	width: 150px;
 }
 
-#guide_object_access .oa_controller{
+.guide_width10 .oa_controller,
+.guide_width10 .btn_check_with_noise{
 	-webkit-border-radius: 10px;
 	-moz-border-radius: 10px;
 	border-radius: 10px;
@@ -931,7 +933,8 @@ small.logo img{
 	border-color: #5706e3;
 	background-color: #bee1ef; 
 }
-#guide_object_access .oa_controller.in_hand{
+.guide_width10 .oa_controller.in_hand,
+.guide_width10 .btn_check_with_noise.noise_on{
 	border-color: #e30657;
 	border-style: inset;
 	border-bottom-width: 4px;
@@ -939,4 +942,21 @@ small.logo img{
   border-top-width: 4px;
 	border-left-width: 4px;
 	background-color: #efe1be;
+}
+
+
+.guide_width10 td.cwn_table_cell{
+	padding-bottom: 10px;
+	padding-top: 10px;
+	vertical-align: middle;
+	text-align: center;
+}
+.tr_odd{
+	background-color: #bfbfbf;
+}
+select.cwn_select_direct{
+	width: 140px;
+}
+input.cwn_jump_delay{
+	width: 40px;
 }

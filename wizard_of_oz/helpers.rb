@@ -32,14 +32,6 @@ module Sinatra
             return hash.to_json
         end
         
-        def render_basic_controller(recipe)
-            haml :basic_controller
-        end
-
-        def render_object_access_controller(recipe)
-            haml :object_access_controller
-        end
-        
         def render_navi_steps(steps)
             html = ""
             steps = steps.to_a

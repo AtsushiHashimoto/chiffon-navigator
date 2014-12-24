@@ -24,6 +24,7 @@ require 'Navi/Base.rb'
 require 'Navi/Default.rb'
 require 'Navi/ObjectAccess.rb'
 require 'Navi/ObjectAccessFuzzy.rb'
+require 'Navi/CheckWithNoise.rb'
 
 
 # Recipe Class
@@ -64,7 +65,9 @@ class ChiffonNavigator < Sinatra::Base
         settings.navi_algorithms["default"] = Navi::Default.new(self)
 				settings.navi_algorithms["object_access"] = Navi::ObjectAccess.new(self)
 				settings.navi_algorithms["object_access_fuzzy"] = Navi::ObjectAccessFuzzy.new(self)
+				settings.navi_algorithms["check_with_noise"] = Navi::CheckWithNoise.new(self)
         ## add your algorithm module to 'navi_algorithm' here! ##
+	
         settings.error_logger.datetime_format = settings.datetime_format
         settings.error_logger.level = Logger::ERROR
     end

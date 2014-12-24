@@ -328,6 +328,32 @@ jQuery(function ($) {
 			 console.log(einput);
 			 send_sorcery(einput);			 
 													 });
+			 
+  	////////////////////////////
+		//// check_with_noise_controller
+		$('.cwn_controller').on('click', function(e){
+														
+														var tar = $(this).data('target');
+														var act = $(this).data('action_name');
+														var einput = {navigator:'check_with_noise', action:{name:act,target:tar}};
+														console.log(tar);
+														console.log(act);
+														console.log(einput);
+														if(act!='check'){
+															e.preventDefault();
+															if($(this).hasClass('noise_on')){
+																console.log("noise off!")
+																$(this).removeClass('noise_on');
+															}
+															else{
+																console.log("noise on!")
+																$(this).addClass('noise_on');
+//																einput['action']['noise'] = JSON.parse($(this).data('noise'));
+															}
+														}
+														console.log(einput);
+														send_sorcery(einput);
+														});
 
     // 初期設定および動作
     $('.woz-run')
