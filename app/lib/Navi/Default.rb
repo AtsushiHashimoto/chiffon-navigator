@@ -142,24 +142,24 @@ module Navi
             change[:state].deep_merge!(@app.check_substep(target_substep,false,recipe,ref_states))
             ref_progress.deep_merge!(change)
             
-            STDERR.puts target_substep.id
-						STDERR.puts __LINE__
-						STDERR.puts change[:state]['substep02_01']
-						STDERR.puts change[:state]['substep02_02']
+						#STDERR.puts target_substep.id
+						#STDERR.puts __LINE__
+						#STDERR.puts change[:state]['substep02_01']
+						#STDERR.puts change[:state]['substep02_02']
 
 						change[:recommended_order], temp = @app.update_recommended_order(recipe,ref_progress,self, target_step)
 						change[:state].deep_merge!(temp)
-						STDERR.puts __LINE__
-						STDERR.puts change[:state]['substep02_01']
-						STDERR.puts change[:state]['substep02_02']
+						#STDERR.puts __LINE__
+						#STDERR.puts change[:state]['substep02_01']
+						#STDERR.puts change[:state]['substep02_02']
 
             
 						#ref_progress.deep_merge!(change)
 						temp = @app.set_current_substep(recipe,ref_progress[:state],target_substep)
 						change[:state].deep_merge!(temp)
-						STDERR.puts __LINE__
-						STDERR.puts change[:state]['substep02_01']
-						STDERR.puts change[:state]['substep02_02']
+						#STDERR.puts __LINE__
+						#STDERR.puts change[:state]['substep02_01']
+						#STDERR.puts change[:state]['substep02_02']
 
             change[:detail] = target_substep['id']
             return "success",change
