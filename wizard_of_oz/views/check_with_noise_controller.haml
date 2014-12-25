@@ -19,7 +19,7 @@
                             %input.cwn_controller{:type=>'checkbox',:'data-target'=>ss.id,:'data-action_name'=>'check'}
                         %td.cwn_table_cell(width="35%")
                             - unless ss.id == last_ss_id
-                                %button.btn_check_with_noise.cwn_controller{:'data-target'=>ss.id,:'data-action_name'=>'set',:'noise'=>{'type'=>'slip'}} set slip noise
+                                %button.btn_check_with_noise.cwn_controller{:'data-target'=>ss.id,:'data-action_name'=>'set',:'data-noise_type'=>"slip"} set slip noise
                                 slip to
                                 %select.cwn_select_direct{:id=>"cwn_slip_direct_#{ss.id}"}
                                     %option forward
@@ -27,10 +27,10 @@
                                     %option anywhere
                         %td.cwn_table_cell(width="40")
                             - unless ss.id == last_ss_id
-                                %button.btn_check_with_noise.cwn_controller{:'data-target'=>ss.id,:'data-action_name'=>'set',:'noise'=>{'type'=>'jump'}} set jump noise
+                                %button.btn_check_with_noise.cwn_controller{:'data-target'=>ss.id,:'data-action_name'=>'set',:'data-noise_type'=>"jump"} set jump noise
                                 jump to
                                 %select.cwn_select_direct{:id=>"cwn_jump_direct_#{ss.id}"}
                                     %option forward
                                     %option backward
                                     %option anywhere
-                                %input.cwn_jump_delay{:type=>"text", :id=>"cwn_jump_deley_#{ss.id}", :value=>"-1.0"}
+                                %input.cwn_jump_delay{:type=>"text", :id=>"cwn_jump_delay_#{ss.id}", :value=>"-1.0"}

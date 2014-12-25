@@ -336,22 +336,52 @@ jQuery(function ($) {
 														var tar = $(this).data('target');
 														var act = $(this).data('action_name');
 														var einput = {navigator:'check_with_noise', action:{name:act,target:tar}};
-														console.log(tar);
-														console.log(act);
-														console.log(einput);
-														if(act!='check'){
+														if(act=='check'){
+															// eventのdefaut関数(checkをつけたり消したりする)が先に動くので，checked=trueならcheckが着いていないときにクリックしたことになる．
+															if(!$(this).prop('checked')){
+																einput['action']['value'] = false
+															}
+															// checkboxとprescriptionの同期はしていないYO
+														}
+														else{
 															e.preventDefault();
+															var noise_type = $(this).data('noise_type');
+															var id_key = 'cwn_' + noise_type;
+															var direc_elem = '#'+id_key+'_direct_'+tar;
+														  var direction = $(direc_elem).val();
+														
 															if($(this).hasClass('noise_on')){
 																console.log("noise off!")
+																einput['action']['noise'] = {'type':noise_type};
+														
 																$(this).removeClass('noise_on');
+																$(direc_elem).prop('disabled',false);
+																if(noise_type=='jump'){
+																	var delay_elem = '#'+id_key+'_delay_'+tar;
+																	$(delay_elem).prop('disabled',false);
+																}
 															}
 															else{
 																console.log("noise on!")
+																einput['action']['noise'] = {'type':noise_type, 'direction':direction};
+																if(noise_type=='jump'){
+																	var delay_elem = '#'+id_key+'_delay_'+tar;
+																	var delay = parseFloat($(delay_elem).val());
+																	if(delay <= 0){
+																		show_notify({
+																				type: 'error',
+																				text: 'delay is not set, or invalid.'
+																		});
+																		return;
+																	}
+																	einput['action']['noise']['delay'] = delay;
+																	$(delay_elem).prop('disabled',true);
+																}
 																$(this).addClass('noise_on');
-//																einput['action']['noise'] = JSON.parse($(this).data('noise'));
+																$(direc_elem).prop('disabled',true);
 															}
 														}
-														console.log(einput);
+														console.log(einput['action']['noise']);
 														send_sorcery(einput);
 														});
 
