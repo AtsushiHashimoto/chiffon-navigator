@@ -30,11 +30,14 @@ module Base
         # initialize progress
         change = Recipe::StateChange.new
         progress = session_data[:progress]
-        for step_id in recipe.xpath('//step').map{|v| v.id} do
-            session_data[:progress][:state][step_id][:is_opened] = false
+				
+        for step in recipe.xpath('//step') do
+            progress[:state][step.id][:is_opened] = false
+						progress[:state][step.id][:visual] = 'ABLE' if is_able?(recipe,progress[:state],step)
         end
-        for substep_id in recipe.xpath('//substep').map{|v| v.id} do
-            progress[:state][substep_id]
+        for substep in recipe.xpath('//substep') do
+            progress[:state][substep.id]
+						progress[:state][substep.id][:visual] = 'ABLE' if is_able?(recipe,progress[:state],substep)
         end
         
         for media_id in recipe.xpath('//audio').map{|v| v.id} + recipe.xpath('//video').map{|v| v.id}
@@ -43,7 +46,8 @@ module Base
         for noty_id in recipe.xpath('//notification').map{|v| v.id}
             progress[:notify][noty_id]
         end
-        
+				#STDERR.puts progress[:state]
+				change[:state] = progress[:state].deep_dup
 
         # make first change for rendering prescription.
         change[:channel] = settings.start_channel
