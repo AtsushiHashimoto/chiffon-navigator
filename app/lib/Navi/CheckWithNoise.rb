@@ -63,7 +63,7 @@ module Navi
 ############################
 				def check(session_data,ex_input,change)
 					STDERR.puts "check (with noise)!"
-					
+
 					cwn_data = session_data[:progress][@@sym]
 					substep_id = ex_input[:action][:target]
 
@@ -71,34 +71,35 @@ module Navi
 					state, temp = @app.navi_algorithms['default'].check(session_data,ex_input)
 					change.deep_merge!(temp)
 					
-					STDERR.puts "#{__FILE__} at line #{__LINE__}"					
 					if ex_input[:action].include?(:value) and ex_input[:action][:value]==false then
 						return state, change
 					end
-					STDERR.puts "#{__FILE__} at line #{__LINE__}"					
 					
 					STDERR.puts cwn_data
 					STDERR.puts cwn_data[:noise_reserve]
 					STDERR.puts cwn_data[:noise_reserve][substep_id.to_s]
 					
 					return state, change if is_empty_noise(cwn_data[:noise_reserve][substep_id])
-					
-					STDERR.puts "#{__FILE__} at line #{__LINE__}"					
+
+					# add noise
+					recipe = session_data[:recipe]
+					ref_progress = session_data[:progress]
+
+
 					noise_pat = cwn_data[:noise_reserve][substep_id]
 					STDERR.puts noise_pat
 					STDERR.puts noise_pat['slip']
 					if noise_pat.include?('slip') then
-						STDERR.puts "#{__FILE__} at line #{__LINE__}"
-						false_target = noise_pat[:slip][:false_target]
+						false_target = choose_false_target(ref_progress, recipe, noise_pat['slip'][:direction], substep_id)
+
 						ex_input['action'] = {'name'=>'jump','target'=>false_target,'check'=>'false'}
 						puts ex_input
 						state, temp = @app.navi_algorithms['default'].jump(session_data,ex_input)
 						change.deep_merge!(temp)
-						STDERR.puts "#{__FILE__} at line #{__LINE__}"					
 					end
 					
 					if noise_pat.include?('jump') then
-						false_target = noise_pat[:jump][:false_target]
+						false_target = choose_false_target(ref_progress, recipe, noise_pat['jump'][:direction], substep_id)
 						
 						ex_input['navigator'] = 'default'
 						ex_input['action'] = {'name'=>'jump','target'=>false_target,'check'=>'false'}
@@ -106,9 +107,11 @@ module Navi
 						STDERR.puts ex_input
 						STDERR.puts delay
 						
+						STDERR.puts session_data.keys
 						Process.fork{
 							sleep delay
-							url = URI.parse(URI.encode("http://localhost:3000/receiver?sessionid=guest-2014.12.25_11.28.52.711754&string=#{ex_input.to_json}"))
+							url = URI.parse(URI.encode("#{@app.settings.viewer_url}/receiver?sessionid=#{session_data[:id]}&string=#{ex_input.to_json}"))
+							STDERR.puts url
 							Net::HTTP.get_print url
 						}
 					end
@@ -118,8 +121,6 @@ module Navi
 				end
 				
 				def set_param(session_data,ex_input,change)
-					recipe = session_data[:recipe]
-					ref_progress = session_data[:progress]
 
 					substep_id = ex_input[:action][:target]
 					noise_reserve = session_data[:progress][@@sym][:noise_reserve][substep_id]
@@ -130,11 +131,10 @@ module Navi
 					noise_type = noise[:type]
 					
 					
-					STDERR.puts noise
+					#STDERR.puts noise
 					if noise.include?(:direction) then
-						false_target = choose_false_target(ref_progress, recipe, noise[:direct], substep_id)
-						noise_reserve[noise_type] = {:false_target=>false_target}
-					
+						noise_reserve[noise_type] = {:direction=>noise[:direction]}
+						
 						
 						if noise_type == 'jump' then
 							noise_reserve[noise_type][:delay] = noise[:delay].to_f					
@@ -150,16 +150,36 @@ module Navi
 				
 				
 				def choose_false_target(ref_progress, recipe, direction, right_tar)
-					'substep03_02'
+					ref_states = ref_progress[:state]
+					substeps = recipe.xpath('//substep')
+					cands = []
+					
+					for ss in substeps do
+						next if ss.id == right_tar
+						#STDERR.puts ss.id
+						#STDERR.puts ref_states[ss.id]
+						#STDERR.puts ""
+						next if ref_states[ss.id][:visual] == :ABLE
+
+						case direction
+							when 'forward' then
+								cands << ss.id unless ref_states[ss.id][:is_finished]
+							when 'backward' then
+								cands << ss.id if ref_states[ss.id][:is_finished]
+							when 'anywhere' then
+								cands << ss.id
+							else
+								log_error("unknown direction '#{direction}' is set to external input.")
+						end
+					end
+					res = cands.sample
+					STDERR.puts "SELECTED: #{res}"
+					return res
 				end
 				
 				def is_empty_noise(noise)
-					STDERR.puts "#{__FILE__} at line #{__LINE__}"					
-					STDERR.puts noise
 					return true unless noise
-					STDERR.puts "#{__FILE__} at line #{__LINE__}"					
 					return true if noise.empty?
-					STDERR.puts "#{__FILE__} at line #{__LINE__}"	
 					flag = true
 					for noise_type, data in noise do
 						flag = false if !data.empty?
