@@ -192,8 +192,8 @@ module Base
         is_log_only_operation = PLAY_LOG_ONLY_OPERATIONS.include?(operation)
         unless is_log_only_operation then
             # operation == :PLAY
-						STDERR.puts change_play[:do_play]
-						STDERR.puts operation
+						#STDERR.puts change_play[:do_play]
+						#STDERR.puts operation
 						
             case operation
                 when :PLAY then
@@ -201,7 +201,7 @@ module Base
                 else # :PAUSE or :END_TO_PLAY
                     change_play[:do_play] = false
             end
-						STDERR.puts change_play[:do_play]
+						#STDERR.puts change_play[:do_play]
             media = recipe.getByID(id)
             delay = media.attributes.include?("delay") ? media["delay"] : "0" if nil == delay
             change_play[:delay] << delay
@@ -213,13 +213,13 @@ module Base
 		
 		def stop_all_medias(recipe,ref_progress, substep, change)
 			#			substep = recipe.getByID(substep.to_sym) if substep.kind_of?(Symbol) or substep.kind_of?(String)
-			STDERR.puts __LINE__
+			#STDERR.puts __LINE__
 			for media in substep.children.to_a do
 					next unless ['video','audio'].include?(media.name)
 					id = media.id
-					STDERR.puts id
+					#STDERR.puts id
 					state, temp = play_control(recipe, ref_progress, :PAUSE, id, 0)
-					STDERR.puts temp[:play][id]
+					S#TDERR.puts temp[:play][id]
 					change[:play][id] = temp[:play][id]
 			end
 			state = "success" if !state
