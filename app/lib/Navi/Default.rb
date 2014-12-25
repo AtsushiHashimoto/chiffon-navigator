@@ -113,14 +113,16 @@ module Navi
             ref_states = ref_progress[:state]
             
             # check current substep to make it finished state.
-            c_ss = @app.current_substep(recipe,ref_progress[:state])
+						c_ss = @app.current_substep(recipe,ref_progress[:state])
+						
             change = Recipe::StateChange.new
 						if !ex_input[:action].include?(:check) or ex_input[:action][:check] == "true" then
 							unless nil==c_ss then
 									change[:state] = @app.check_substep(c_ss,true,recipe, ref_states)
 									ref_progress.deep_merge!(change)
-							end
-            end
+							end						
+						end
+
 						
             target_step = recipe.getByID(ex_input[:action][:target])
             target_substep = nil
@@ -133,6 +135,7 @@ module Navi
                 target_substep = target_step.to_sub.sort_by{|v|v.order(default_order)}.last if nil == target_substep
             end
 
+
 						if !ex_input[:action].include?(:check) or ex_input[:action][:check] == "true" then
 							unless ref_states[target_substep.id][:is_finished] then
 									change[:state].deep_merge!(@app.check_substep(target_substep,true, recipe,ref_states))
@@ -141,6 +144,8 @@ module Navi
             end
             change[:state].deep_merge!(@app.check_substep(target_substep,false,recipe,ref_states))
             ref_progress.deep_merge!(change)
+						
+
             
 						#STDERR.puts target_substep.id
 						#STDERR.puts __LINE__
@@ -149,6 +154,8 @@ module Navi
 
 						change[:recommended_order], temp = @app.update_recommended_order(recipe,ref_progress,self, target_step)
 						change[:state].deep_merge!(temp)
+						
+
 						#STDERR.puts __LINE__
 						#STDERR.puts change[:state]['substep02_01']
 						#STDERR.puts change[:state]['substep02_02']
@@ -156,7 +163,11 @@ module Navi
             
 						#ref_progress.deep_merge!(change)
 						temp = @app.set_current_substep(recipe,ref_progress[:state],target_substep)
+						temp2 = @app.set_current_substep(recipe,change[:state],target_substep)
+						temp.deep_merge!(temp2)
 						change[:state].deep_merge!(temp)
+						
+
 						#STDERR.puts __LINE__
 						#STDERR.puts change[:state]['substep02_01']
 						#STDERR.puts change[:state]['substep02_02']
