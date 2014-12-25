@@ -1,3 +1,5 @@
+require 'net/http'
+
 module Navi
     class CheckWithNoise
 				@@sym = :Noise
@@ -81,18 +83,34 @@ module Navi
 					
 					return state, change if is_empty_noise(cwn_data[:noise_reserve][substep_id])
 					
-					STDERR.puts "#{__FILE_} at line #{__LINE__}"					
+					STDERR.puts "#{__FILE__} at line #{__LINE__}"					
 					noise_pat = cwn_data[:noise_reserve][substep_id]
 					STDERR.puts noise_pat
 					STDERR.puts noise_pat['slip']
 					if noise_pat.include?('slip') then
-						STDERR.puts "#{__FILE__} at line #{__LINE__}"					
+						STDERR.puts "#{__FILE__} at line #{__LINE__}"
 						false_target = noise_pat[:slip][:false_target]
 						ex_input['action'] = {'name'=>'jump','target'=>false_target,'check'=>'false'}
 						puts ex_input
 						state, temp = @app.navi_algorithms['default'].jump(session_data,ex_input)
 						change.deep_merge!(temp)
 						STDERR.puts "#{__FILE__} at line #{__LINE__}"					
+					end
+					
+					if noise_pat.include?('jump') then
+						false_target = noise_pat[:jump][:false_target]
+						
+						ex_input['navigator'] = 'default'
+						ex_input['action'] = {'name'=>'jump','target'=>false_target,'check'=>'false'}
+						delay = noise_pat['jump']['delay'].to_f
+						STDERR.puts ex_input
+						STDERR.puts delay
+						
+						Process.fork{
+							sleep delay
+							url = URI.parse(URI.encode("http://localhost:3000/receiver?sessionid=guest-2014.12.25_11.28.52.711754&string=#{ex_input.to_json}"))
+							Net::HTTP.get_print url
+						}
 					end
 
 					
