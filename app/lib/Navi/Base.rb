@@ -219,7 +219,7 @@ module Base
 					id = media.id
 					#STDERR.puts id
 					state, temp = play_control(recipe, ref_progress, :PAUSE, id, 0)
-					S#TDERR.puts temp[:play][id]
+					#STDERR.puts temp[:play][id]
 					change[:play][id] = temp[:play][id]
 			end
 			state = "success" if !state
