@@ -112,7 +112,6 @@ module Base
 
     def navi_menu(session_data, change=nil)
         change = Recipe::StateChange.new if nil==change
-								
         id = session_data[:json_data]["operation_contents"].to_sym
         recipe = session_data[:recipe]
         node = recipe.getByID(id)
@@ -124,14 +123,12 @@ module Base
             ref_state = ref_progress[:state]
             parent_is_open = ref_state[parent_id][:is_opened]
             unless parent_is_open then
-                temp = navimenu_step(recipe,ref_progress,parent_id,change)
-								change.deep_merge(temp)
+                change = navimenu_step(recipe,ref_progress,parent_id,change)
             end
 
             change[:detail] = id.to_s
         else
-            temp = navimenu_step(recipe,ref_progress,id,change)
-						change.deep_merge!(temp)
+            change = navimenu_step(recipe,ref_progress,id,change)
         end
         return "success", change
     end
