@@ -34,6 +34,7 @@ class Hash
 					next unless other.include?(key)
 					if :clear==other[key] then
 						self.delete(key)
+						other.delete(key)
 						next
 					end
 					next unless val.kind_of?(Hash)
