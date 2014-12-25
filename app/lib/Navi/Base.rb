@@ -123,12 +123,14 @@ module Base
             ref_state = ref_progress[:state]
             parent_is_open = ref_state[parent_id][:is_opened]
             unless parent_is_open then
-                change = navimenu_step(recipe,ref_progress,parent_id,change)
+                temp = navimenu_step(recipe,ref_progress,parent_id,change)
+								change.deep_merge!(temp)
             end
 
             change[:detail] = id.to_s
         else
-            change = navimenu_step(recipe,ref_progress,id,change)
+            temp = navimenu_step(recipe,ref_progress,id,change)
+						change.deep_merge!(temp)
         end
         return "success", change
     end
