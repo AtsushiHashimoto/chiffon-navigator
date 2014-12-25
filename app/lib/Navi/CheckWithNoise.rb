@@ -75,9 +75,9 @@ module Navi
 						return state, change
 					end
 					
-					STDERR.puts cwn_data
-					STDERR.puts cwn_data[:noise_reserve]
-					STDERR.puts cwn_data[:noise_reserve][substep_id.to_s]
+					#STDERR.puts cwn_data
+					#STDERR.puts cwn_data[:noise_reserve]
+					#STDERR.puts cwn_data[:noise_reserve][substep_id.to_s]
 					
 					return state, change if is_empty_noise(cwn_data[:noise_reserve][substep_id])
 
@@ -87,12 +87,12 @@ module Navi
 
 
 					noise_pat = cwn_data[:noise_reserve][substep_id]
-					STDERR.puts noise_pat
-					STDERR.puts noise_pat['slip']
+					#STDERR.puts noise_pat
+					#STDERR.puts noise_pat['slip']
 					if noise_pat.include?('slip') then
 						false_target = choose_false_target(ref_progress, recipe, noise_pat['slip'][:direction], substep_id)
 
-						ex_input['action'] = {'name'=>'jump','target'=>false_target,'check'=>'false'}
+						ex_input['action'] = {'name'=>'jump','target'=>false_target,'check'=>'true'}
 						puts ex_input
 						state, temp = @app.navi_algorithms['default'].jump(session_data,ex_input)
 						change.deep_merge!(temp)
@@ -102,16 +102,15 @@ module Navi
 						false_target = choose_false_target(ref_progress, recipe, noise_pat['jump'][:direction], substep_id)
 						
 						ex_input['navigator'] = 'default'
-						ex_input['action'] = {'name'=>'jump','target'=>false_target,'check'=>'false'}
+						ex_input['action'] = {'name'=>'jump','target'=>false_target,'check'=>'true'}
 						delay = noise_pat['jump']['delay'].to_f
-						STDERR.puts ex_input
-						STDERR.puts delay
+						#STDERR.puts ex_input
+						#STDERR.puts delay
 						
-						STDERR.puts session_data.keys
 						Process.fork{
 							sleep delay
 							url = URI.parse(URI.encode("#{@app.settings.viewer_url}/receiver?sessionid=#{session_data[:id]}&string=#{ex_input.to_json}"))
-							STDERR.puts url
+							#STDERR.puts url
 							Net::HTTP.get_print url
 						}
 					end
@@ -153,19 +152,24 @@ module Navi
 					ref_states = ref_progress[:state]
 					substeps = recipe.xpath('//substep')
 					cands = []
-					
 					for ss in substeps do
-						next if ss.id == right_tar
-						#STDERR.puts ss.id
-						#STDERR.puts ref_states[ss.id]
-						#STDERR.puts ""
-						next if ref_states[ss.id][:visual] == :ABLE
+						next if ss.id == right_tar.to_sym
+						next if direction!='able' and ref_states[ss.id][:visual] == :ABLE
+						next if direction=='able' and ref_states[ss.id][:visual] != :ABLE
 
 						case direction
 							when 'forward' then
+								next if ref_states[ss.id][:visual] == :ABLE
 								cands << ss.id unless ref_states[ss.id][:is_finished]
 							when 'backward' then
+								next if ref_states[ss.id][:visual] == :ABLE
 								cands << ss.id if ref_states[ss.id][:is_finished]
+							when 'not_able' then
+								next if ref_states[ss.id][:visual] == :ABLE
+								cands << ss.id
+							when 'able' then
+								next if ref_states[ss.id][:visual] != :ABLE
+								cands << ss.id 
 							when 'anywhere' then
 								cands << ss.id
 							else
@@ -174,6 +178,22 @@ module Navi
 					end
 					res = cands.sample
 					STDERR.puts "SELECTED: #{res}"
+					if !res then
+						case direction
+							when 'forward' then
+								res = choose_false_target(ref_progress, recipe, 'able', right_tar)
+							when 'backward' then
+								res = right_tar
+							when 'not_able' then
+								res = choose_false_target(ref_progress, recipe, 'able', right_tar)
+							when 'able' then
+								res = right_tar
+							when 'anywhere' then
+								log_error("no substeps without '#{right_tar}'?")
+							else
+							log_error("unknown direction '#{direction}' is set to external input.")
+						end												
+					end
 					return res
 				end
 				
