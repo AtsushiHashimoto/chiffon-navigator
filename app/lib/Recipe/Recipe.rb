@@ -99,9 +99,9 @@ class Nokogiri::XML::Node
     end
 		
 		def is_next?(id)
-				if self['name'] == 'step' then
+				if self.name == 'step' then
 						return self.children.to_a.map{|v|v.id}.include?(id)
-				elsif self['name'] == 'substep' then
+				elsif self.name == 'substep' then
 						bros = self.parent.to_sub
 						default_order = recipe.max_order
 						my_order = bros.order(default_order)
@@ -115,6 +115,16 @@ class Nokogiri::XML::Node
 						return array.include?(id)
 				end
 				return false
+		end
+				
+		def next_substep(default_order)
+			raise "function next_substep only takes substep as its argument." if self.name != 'substep'
+			bros = self.parent.to_sub
+			my_order = self.order(default_order)
+			bros = bros.to_a.sort_by{|v| v.order(default_order)}
+			idx = bros.index(self)
+			return nil if idx == bros.size-1
+			return bros[idx+1]
 		end
 end
 
