@@ -267,7 +267,8 @@ jQuery(function ($) {
             "navigator": $(this).data("navigator"),
                 "action" : {
                     "name" : $(this).data("action"),
-                    "target" : $(this).data("target")
+                    "target" : $(this).data("target"),
+										"check" : "false"
                 }
           };
           send_sorcery(einput);
