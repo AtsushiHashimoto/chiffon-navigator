@@ -90,7 +90,9 @@ module Navi
 					#STDERR.puts noise_pat
 					#STDERR.puts noise_pat['slip']
 					if noise_pat.include?('slip') and noise_pat['slip'] != :clear then
-						false_target = choose_false_target(ref_progress, recipe, noise_pat['slip'][:direction], substep_id)
+						ss = recipe.getByID(substep_id)						
+						next_ss = ss.next_substep(recipe.max_order)
+						false_target = choose_false_target(ref_progress, recipe, noise_pat['slip'][:direction], substep_id, next_ss)
 
 						ex_input['action'] = {'name'=>'jump','target'=>false_target,'check'=>'true'}
 						puts ex_input
@@ -99,7 +101,9 @@ module Navi
 					end
 					
 					if noise_pat.include?('jump') and noise_pat['jump']  != :clear then
-						false_target = choose_false_target(ref_progress, recipe, noise_pat['jump'][:direction], substep_id)
+						ss = recipe.getByID(substep_id)						
+						next_ss = ss.next_substep(recipe.max_order)
+						false_target = choose_false_target(ref_progress, recipe, noise_pat['jump'][:direction], substep_id, next_ss)
 						
 						ex_input['navigator'] = 'default'
 						ex_input['action'] = {'name'=>'jump','target'=>false_target,'check'=>'true'}
@@ -152,12 +156,13 @@ module Navi
 				end
 				
 				
-				def choose_false_target(ref_progress, recipe, direction, right_tar)
+				def choose_false_target(ref_progress, recipe, direction, right_tar, next_ss)
 					ref_states = ref_progress[:state]
 					substeps = recipe.xpath('//substep')
 					cands = []
 					for ss in substeps do
 						next if ss.id == right_tar.to_sym
+						next if direction!='able' and next_ss and ss.id == next_ss.id
 						next if direction!='able' and ref_states[ss.id][:visual] == 'ABLE'
 						next if direction=='able' and ref_states[ss.id][:visual] != 'ABLE'
 						STDERR.puts ref_states[ss.id][:visual]
