@@ -162,23 +162,21 @@ module Navi
 					cands = []
 					for ss in substeps do
 						next if ss.id == right_tar.to_sym
-						next if direction!='able' and next_ss and ss.id == next_ss.id
-						next if direction!='able' and ref_states[ss.id][:visual] == 'ABLE'
-						next if direction=='able' and ref_states[ss.id][:visual] != 'ABLE'
-						STDERR.puts ref_states[ss.id][:visual]
 
 						case direction
 							when 'forward' then
-								next if ref_states[ss.id][:visual] == :ABLE
+								next if next_ss and ss.id == next_ss.id
+								next if ref_states[ss.id][:visual] == 'ABLE'
 								cands << ss.id unless ref_states[ss.id][:is_finished]
 							when 'backward' then
-								next if ref_states[ss.id][:visual] == :ABLE
+								next if ref_states[ss.id][:visual] == 'CURRENT'
+								next unless ref_states[ss.id][:is_finished]
 								cands << ss.id if ref_states[ss.id][:is_finished]
 							when 'not_able' then
 								next if ref_states[ss.id][:visual] == :ABLE
 								cands << ss.id
 							when 'able' then
-								next if ref_states[ss.id][:visual] != :ABLE
+								next unless ref_states[ss.id][:visual] == :ABLE
 								cands << ss.id 
 							when 'anywhere' then
 								cands << ss.id
