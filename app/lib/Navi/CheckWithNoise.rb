@@ -160,9 +160,9 @@ module Navi
 					ref_states = ref_progress[:state]
 					substeps = recipe.xpath('//substep')
 					cands = []
+					
 					for ss in substeps do
 						next if ss.id == right_tar.to_sym
-
 						case direction
 							when 'forward' then
 								next if next_ss and ss.id == next_ss.id
@@ -173,10 +173,10 @@ module Navi
 								next unless ref_states[ss.id][:is_finished]
 								cands << ss.id if ref_states[ss.id][:is_finished]
 							when 'not_able' then
-								next if ref_states[ss.id][:visual] == :ABLE
+								next if ref_states[ss.id][:visual] == 'ABLE' or (next_ss and ss.id == next_ss.id)
 								cands << ss.id
 							when 'able' then
-								next unless ref_states[ss.id][:visual] == :ABLE
+								next unless (ref_states[ss.id][:visual] == 'ABLE') or (next_ss and ss.id == next_ss.id)
 								cands << ss.id 
 							when 'anywhere' then
 								cands << ss.id
