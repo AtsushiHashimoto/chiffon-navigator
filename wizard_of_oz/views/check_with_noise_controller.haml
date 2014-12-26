@@ -23,6 +23,8 @@
                                 %option forward
                                 %option backward
                                 %option anywhere
+                                %option able
+                                %option not_able
                         %td.cwn_table_cell(width="40")
                             %button.btn_check_with_noise.cwn_controller{:'data-target'=>ss.id,:'data-action_name'=>'set',:'data-noise_type'=>"jump"} set jump noise
                             jump to
@@ -30,4 +32,6 @@
                                 %option forward
                                 %option backward
                                 %option anywhere
+                                %option able
+                                %option not_able
                             %input.cwn_jump_delay{:type=>"text", :id=>"cwn_jump_delay_#{ss.id}", :value=>"-1.0"}
