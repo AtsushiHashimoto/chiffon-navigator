@@ -89,7 +89,7 @@ module Navi
 					noise_pat = cwn_data[:noise_reserve][substep_id]
 					#STDERR.puts noise_pat
 					#STDERR.puts noise_pat['slip']
-					if noise_pat.include?('slip') and noise_pat['slip'] != :clear then
+					if noise_pat.include?('slip') and noise_pat['slip'] != :__clear__ then
 						ss = recipe.getByID(substep_id)						
 						next_ss = ss.next_substep(recipe.max_order)
 						false_target = choose_false_target(ref_progress, recipe, noise_pat['slip'][:direction], substep_id, next_ss)
@@ -100,7 +100,7 @@ module Navi
 						change.deep_merge!(temp)
 					end
 					
-					if noise_pat.include?('jump') and noise_pat['jump']  != :clear then
+					if noise_pat.include?('jump') and noise_pat['jump']  != :__clear__ then
 						ss = recipe.getByID(substep_id)						
 						next_ss = ss.next_substep(recipe.max_order)
 						false_target = choose_false_target(ref_progress, recipe, noise_pat['jump'][:direction], substep_id, next_ss)
@@ -149,7 +149,7 @@ module Navi
 						STDERR.puts "clear"
 						if cwn_data[:noise_reserve].include?(substep_id) and cwn_data[:noise_reserve][substep_id].include?(noise_type) then
 							change[@@sym][:noise_reserve][substep_id] = {} unless change[@@sym][:noise_reserve].include?(substep_id)
-							change[@@sym][:noise_reserve][substep_id][noise_type] = :clear 		
+							change[@@sym][:noise_reserve][substep_id][noise_type] = :__clear__ 		
 						end
 					end
 					return "sucess", change 
