@@ -41,8 +41,8 @@ class Hash
 						diff[0][k] = (nil==ak or ak.empty?) ? :__clear__ : ak
 						diff[1][k] = (nil==bk or bk.empty?) ? :__clear__ : bk
 					else
-						STDERR.puts "clear a[#{k}]? : #{a[k]}" if a[k]==nil
-						STDERR.puts "clear b[#{k}]? : #{b[k]}" if b[k]==nil
+						#STDERR.puts "clear a[#{k}]? : #{a[k]}" if a[k]==nil
+						#STDERR.puts "clear b[#{k}]? : #{b[k]}" if b[k]==nil
 						diff[0][k] = a[k]==nil ? :__clear__ : a[k]
 						diff[1][k] = b[k]==nil ? :__clear__ : b[k]
 					end
@@ -78,21 +78,9 @@ class Hash
 				_other =  other.remove_empty_elem
 				_other = _other.remove_clear_flag
 			end
-			if self.include?(:ObjectAccess) then
-				STDERR.puts "self[:ObjectAccess][:backup]"
-				STDERR.puts self[:ObjectAccess][:backup]
-			end
-			if _other.include?(:ObjectAccess) then
-				STDERR.puts "_other[:ObjectAccess][:backup]"
-				STDERR.puts _other[:ObjectAccess][:backup]
-			end
 
 			self.deep_merge!(_other)
 			merged = self.deep_merge!(_other)
-			if self.include?(:ObjectAccess) then
-				STDERR.puts "merged[:ObjectAccess][:backup]"
-				STDERR.puts merged[:ObjectAccess][:backup]
-			end
 		end
 		
 
@@ -101,37 +89,22 @@ class Hash
 			return buf.clear_by(other)
 		end
 		def clear_by!(other)
-			check_list = ["ObjectAccess","backup","1"]
 			if other==:__clear__ or other=='__clear__'
 				self.clear
 				return
 			end					
 			
-			for key,val in self do
-				if key.kind_of?(Numeric) or check_list.include?(key) then
-						STDERR.puts "clear_by!"
-						STDERR.puts [key,val].join(": ")
-				end
-				
+			for key,val in self do				
 				if key.respond_to?(:to_sym) then
 					oth_val = other[key.to_sym]
 				else						
 					oth_val = other[key]
 				end
-				if check_list.include?(key) then
-					STDERR.puts oth_val
-					STDERR.puts "..."
-				end
 
 				next if nil==oth_val
 				if :__clear__==oth_val or '__clear__'==oth_val then
 					self.reject!{|k,v| k==key}
-					STDERR.puts "clear self[#{key}]: #{val} .============="
 					next
-				end
-				if check_list.include?(key) then
-					STDERR.puts "val: #{val}"
-					STDERR.puts "other[key]: #{oth_val}"
 				end
 				next unless val.respond_to?(:clear_by!)
 				next unless oth_val.kind_of?(Hash)
