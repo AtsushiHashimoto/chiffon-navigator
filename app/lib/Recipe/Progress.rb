@@ -14,8 +14,8 @@ class Progress
 			prev_progress= self.deep_dup
 			delta.after = change
 			iter_index_prev = self[:iter_index]
-			STDERR.puts change[:ObjectAccess]
-			STDERR.puts self[:ObjectAccess]
+			#STDERR.puts change[:ObjectAccess]
+			#STDERR.puts self[:ObjectAccess]
 			
 			self.deep_merge_with_clear_flag!(change,true)
 
