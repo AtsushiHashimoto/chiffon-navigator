@@ -5,6 +5,9 @@ module Navi
 				@@score_seasoning = 0.95
 				@@completion_thresh = 0.875 # (1+@@score_ing)/2
 				@@completion_thresh2 = 0.75
+				@@shortest_touch = 1.0
+				@@explicitly = 'explicitly'
+				@@probably = 'probably'
 				@@sym = :ObjectAccess
 
         def initialize(app)
@@ -133,7 +136,6 @@ module Navi
 					oa_data[:objects_in_hand] << new_object
 					oa_data[:objects_in_hand].uniq!
 					
-					STDERR.puts "#{__LINE__} : #{Time.now}"
 					
 					if do_backup then
 						# save backup					
@@ -150,7 +152,6 @@ module Navi
 					change[@@sym][:score] = oa_data[:score] unless oa_data[:score]==prev_score 
 					change[@@sym][:objects_in_hand] = oa_data[:objects_in_hand]
 					#					STDERR.puts change[@@sym]
-STDERR.puts "#{__LINE__} : #{Time.now}"
 					return state,change
 				end
 				
@@ -172,8 +173,10 @@ STDERR.puts "#{__LINE__} : #{Time.now}"
 					end
 					
 					# 終了判定
-					is_completed = oa_data[:score] > @@completion_thresh
-					
+					is_completed, changed_iter_index = check_completion(oa_data, gone_object,timestamp)
+					unless nil == changed_iter_index then
+						return @app.algorithms['default'].prev(session_data,changed_iter_index-1)
+					end
 					if do_backup then
 						iter_index = session_data[:progress][:iter_index]
 						change[@@sym][:backup][iter_index.to_s] = {:timestamp=>timestamp, :released=>[gone_object]}
@@ -184,14 +187,10 @@ STDERR.puts "#{__LINE__} : #{Time.now}"
 					state, temp = post_process(session_data,oa_data,timestamp,:release, is_completed)
 						change.deep_merge!(temp)
 
-					STDERR.puts "#{__LINE__} : #{Time.now}"
 					change[@@sym][:timestamp] = timestamp if oa_data[:timestamp]==timestamp
 					change[@@sym][:score] = oa_data[:score] unless oa_data[:score]==prev_score 
 					change[@@sym][:objects_in_hand] = oa_data[:objects_in_hand]
 
-					STDERR.puts "#{__LINE__} : #{Time.now}"
-					STDERR.puts state
-					STDERR.puts change
 					return state,change
 				end
 						
@@ -200,12 +199,12 @@ STDERR.puts "#{__LINE__} : #{Time.now}"
 				end
 				
 				def isTouchValid?(gone_object,timestamp,backup)
-					indices = backup.keys.map{|v|v.to_i}.sort.reverse
+					indices = backup.keys.map{|v|v.to_s.to_i}.sort.reverse					
 					for iter_index in indices do
-						record = backup[iter_index.to_s]
+						record = backup[iter_index.to_s.to_sym]
 						next if nil == record[:touched] or !record[:touched].include?(gone_object)
 						time_diff = getTimeDiff(timestamp, record[:timestamp])
-						return iter_index if 1.0 > time_diff
+						return iter_index if @@shortest_touch > time_diff
 						return nil
 					end
 					return nil
@@ -223,11 +222,12 @@ STDERR.puts "#{__LINE__} : #{Time.now}"
 					if (nil == record[:touched] or record[:touched].empty?) and (nil == record[:released] or record[:released].empty?) then
 							STDERR.puts "delete touch history."
 							backup = backup.delete(touched_iter_index.to_s)
+							pa_data[:backup] = backup
 					end
 					
 					history = oa_data[:backup].find_if{|key,record|key.to_i >= touched_iter_index}
 					STDERR.puts history
-					
+
 					# 把持の直前の時点まで状態を戻す
 					state,change = @app.navi_algorithms['default'].prev(session_data,touched_iter_index-1)
 					return state,change
@@ -249,17 +249,19 @@ STDERR.puts "#{__LINE__} : #{Time.now}"
 					return "success", Recipe::StateChange.new
 				end
 				
-				def post_process(session_data,oa_data,timestamp,action,complete=false)
-						STDERR.puts "post_process!"
+				def post_process(session_data,oa_data,timestamp,action,complete)
+						STDERR.puts "post_process! (action: #{action})"
+						STDERR.puts "COMPLETE!" if complete
+#						STDERR.puts action.class
 						ss_current = nil
 						progress = session_data[:progress]
 						recipe = session_data[:recipe]
-						max_score, ss_highest_score = argmax_score(oa_data,:ss_forward,recipe, progress)
+						max_score, ss_highest_score, fired_trigger = argmax_score(oa_data,:ss_forward,recipe, progress)
 						STDERR.puts "max score (forward): #{max_score}"
 						if max_score >= 1.0 then
 							ss_current = ss_highest_score
 						else
-							max_score2, ss_highest_score2 = argmax_score(oa_data,:ss_backward,recipe,progress)
+							max_score2, ss_highest_score2, fired_trigger = argmax_score(oa_data,:ss_backward,recipe,progress)
 							STDERR.puts "max score (backward): #{max_score2}"
 							if max_score2 >= 1.0 then
 								max_score = max_score2
@@ -270,34 +272,71 @@ STDERR.puts "#{__LINE__} : #{Time.now}"
 								STDERR.puts oa_data[:score]
 								if oa_data[:score] > @@completion_thresh2 then
 									# もし，ss_currentがrecommendationと同じものであれば
-									# completeをtrueにする
-									complete = true if @app.current_substep(recipe,session_data[:progress][:state]).is_next?(ss_current, recipe.max_order)
+									# × completeをtrueにする
+									# ○ confidenceをexplicitlyにする
+									c_ss = @app.current_substep(recipe,session_data[:progress][:state])
+									next_ss = c_ss.next_substep(recipe.max_order)
+									STDERR.puts c_ss.id
+									STDERR.puts next_ss.id
+									STDERR.puts ss_current
+									
+									log_error("c_ss.next_substepと選択される次のsubstepが一致!!")
+									oa_data[:confidence_support] = true
+									#	complete = true if c_ss.is_next?(ss_current, recipe.max_order)
 								end
 							end
 						end
 
 
 						# 変化がないなら過去最大のscoreを残す 
-						oa_data[:score] = [oa_data[:score], max_score].max
+						STDERR.puts [max_score,oa_data[:score]].join(" > ")
+						if oa_data[:score] <= max_score then
+							oa_data[:score] = max_score
+							if max_score >= @@completion_thresh then
+								oa_data[:confidence] = @@explicitly 
+							elsif max_score < @@completion_thresh2 then
+								oa_data[:confidence] = @@probably
+							elsif oa_data[:confidence_support] == true then
+								oa_data[:confidence] = @@explicitly
+							else
+								oa_data[:confidence] = @@probably
+							end
+							STDERR.puts "confidence: #{oa_data[:confidence]}"
+						end
 
-#						return do_nothing if ss_highest_score == @app.current_substep(recipe,session_data[:progress][:state]).id
+						#if !(!!ss_current or complete)
+						if ss_current==nil and !complete then
+							return do_nothing 
+						end 
 
-
-						return do_nothing if !(!!ss_current or complete)
 						# 変化あり
 						oa_data[:timestamp] = timestamp
-						oa_data[:score] = max_score
+						oa_data[:changed_iter_index] = progress[:iter_index]
+						oa_data[:confidence_support] = false
+						
+						
+						# 井上論文に書いてない処理(解放による終了判定で別のものを表示するときは，scoreを0(推薦)とする)
+						if action == :release and complete then
+							oa_data[:score] = 0
+							oa_data[:confidence] = @@probably
+							ss_current = nil
+						else
+							oa_data[:score] = max_score
+						end
+						oa_data[:related_objects] = fired_trigger['ref'].split(/\s+/) if fired_trigger
+						
+						ex_input = {:navigator=>'default',:action=>{:name=>'check', :target=>@app.current_substep(recipe,session_data[:progress][:state]).id, :value=>complete}}
+						state, change = @app.navi_algorithms['default'].check(session_data,ex_input)
 						
 						if ss_current then
 							# 指定されたss_currentへ移動
-							ex_input = {:navigator=>'default',:action=>{:name=>'jump',:target=>ss_current.to_s,:check=>complete.to_s}}
-							STDERR.puts ex_input.to_json
-						else
-							# 手がかり無し⇢next関数により推薦された次の作業へ移動
-							ex_input = {:navigator=>'default',:action=>{:name=>'check', :target=>@app.current_substep(recipe,session_data[:progress][:state]).id, :value=>"true"}}
-							STDERR.puts ex_input.to_json
+							ex_input = {:navigator=>'default',:action=>{:name=>'jump',:target=>ss_current.to_s,:check=>'false'}}
+							states, temp = @app.navi_algorithms['default'].jump(session_data,ex_input)
+							change.deep_merge!(temp)
+						#else
+						## 手がかり無し⇢next関数により推薦された次の作業へ移動
 						end
-						return @app.navi_algorithms['default'].route(session_data,ex_input)
+						return state,change
 				end
 								
 				def argmax_score(oa_data, target,recipe,progress)
@@ -320,7 +359,7 @@ STDERR.puts "#{__LINE__} : #{Time.now}"
 								# score==maxなら追加，そうでなければ綺麗に更新
 								argmax = [] if score > max
 								max = score
-								argmax << trig.parent
+								argmax << trig
 						end
 						
 						
@@ -330,11 +369,11 @@ STDERR.puts "#{__LINE__} : #{Time.now}"
 							rorder = progress[:recommended_order]
 							default_order = recipe.max_order
 							argmax.sort!{|a,b|
-									a_step_id = a.parent.id.to_s
-									b_step_id = b.parent.id.to_s
+									a_step_id = a.parent.parent.id.to_s
+									b_step_id = b.parent.parent.id.to_s
 									result = false
 									if a_step_id == b_step_id then
-											result = (b.order(default_order) <=> a.order(default_order))
+											result = (b.parent.order(default_order) <=> a.parent.order(default_order))
 									else
 											result = (rorder.index(b_step_id) <=> rorder.index(a_step_id))
 									end
@@ -344,7 +383,7 @@ STDERR.puts "#{__LINE__} : #{Time.now}"
 							argmax.reverse! if target == :ss_backward
 						end
 					
-						return max, argmax[0].id
+						return max, argmax[0].parent.id,argmax[0]
 				end
 						
 				def calc_score(obj_h, obj_v, objects)
@@ -369,6 +408,27 @@ STDERR.puts "#{__LINE__} : #{Time.now}"
 						end
 
 						score - extra_obj.size * @@epsilon
+				end
+				
+				
+				def check_completion(oa_data, gone_object, timestamp)
+					STDERR.puts "check_completion"
+					STDERR.puts __LINE__
+					if oa_data[:related_objects] then
+						return false unless oa_data[:related_objects].include?(gone_object)
+					end
+					STDERR.puts __LINE__
+					return false, oa_data[:changed_iter_index].to_s.to_i if getTimeDiff(timestamp, oa_data[:timestamp]) < @@shortest_touch
+					STDERR.puts __LINE__
+					return false if oa_data[:related_objects].size > 1 and oa_data[:objects][:ingredients].include?(gone_object)
+					STDERR.puts __LINE__
+					STDERR.puts oa_data[:confidence]
+					return true if oa_data[:confidence] == @@explicitly
+					STDERR.puts __LINE__
+					
+					return false
+					
+					#oa_data[:score] > @@completion_thresh					
 				end
 
 ############################
