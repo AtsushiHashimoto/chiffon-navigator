@@ -28,18 +28,159 @@ class Time
 		end
 end
 
+
 class Hash
+		def deep_diff(b)
+			a = self
+			#STDERR.puts (a.keys | b.keys).join("/")
+			(a.keys | b.keys).inject([{},{}]) do |diff, k|
+				if k==nil
+				elsif a[k] != b[k]
+					if a[k].respond_to?(:deep_diff) and b[k].respond_to?(:deep_diff)
+						ak, bk = a[k].deep_diff(b[k])
+						diff[0][k] = (nil==ak or ak.empty?) ? :__clear__ : ak
+						diff[1][k] = (nil==bk or bk.empty?) ? :__clear__ : bk
+					else
+						STDERR.puts "clear a[#{k}]? : #{a[k]}" if a[k]==nil
+						STDERR.puts "clear b[#{k}]? : #{b[k]}" if b[k]==nil
+						diff[0][k] = a[k]==nil ? :__clear__ : a[k]
+						diff[1][k] = b[k]==nil ? :__clear__ : b[k]
+					end
+				end
+				diff
+			end
+		end
+		
+		def delete_nil_key!
+			for key,val in self do
+				self.delete(key) if key == nil
+				next unless val.respond_to?(:delete_nil_key!)
+				val.delete_nil_key!
+			end
+			self
+		end
+				
+		def delete_nil!
+			for key,val in self do
+				self.delete(key) if val == nil
+				next unless val.respond_to?(:delete_nil!)
+				val.delete_nil!
+			end
+		self
+		end
+			
+		def deep_merge_with_clear_flag!(other, do_remove_flag=true)
+			self.clear_by!(other)
+			if do_remove_flag then
+				other.remove_empty_elem!
+				_other = other.remove_clear_flag!
+			else
+				_other =  other.remove_empty_elem
+				_other = _other.remove_clear_flag
+			end
+			if self.include?(:ObjectAccess) then
+				STDERR.puts "self[:ObjectAccess][:backup]"
+				STDERR.puts self[:ObjectAccess][:backup]
+			end
+			if _other.include?(:ObjectAccess) then
+				STDERR.puts "_other[:ObjectAccess][:backup]"
+				STDERR.puts _other[:ObjectAccess][:backup]
+			end
+
+			self.deep_merge!(_other)
+			merged = self.deep_merge!(_other)
+			if self.include?(:ObjectAccess) then
+				STDERR.puts "merged[:ObjectAccess][:backup]"
+				STDERR.puts merged[:ObjectAccess][:backup]
+			end
+		end
+		
+
 		def clear_by(other)
-				for key,val in self do
-					next unless other.include?(key)
-					if :clear==other[key] then
-						self.delete(key)
-						other.delete(key)
+			buf = self.deep_dup
+			return buf.clear_by(other)
+		end
+		def clear_by!(other)
+			check_list = ["ObjectAccess","backup","1"]
+			if other==:__clear__ or other=='__clear__'
+				self.clear
+				return
+			end					
+			
+			for key,val in self do
+				if key.kind_of?(Numeric) or check_list.include?(key) then
+						STDERR.puts "clear_by!"
+						STDERR.puts [key,val].join(": ")
+				end
+				
+				if key.respond_to?(:to_sym) then
+					oth_val = other[key.to_sym]
+				else						
+					oth_val = other[key]
+				end
+				if check_list.include?(key) then
+					STDERR.puts oth_val
+					STDERR.puts "..."
+				end
+
+				next if nil==oth_val
+				if :__clear__==oth_val or '__clear__'==oth_val then
+					self.reject!{|k,v| k==key}
+					STDERR.puts "clear self[#{key}]: #{val} .============="
+					next
+				end
+				if check_list.include?(key) then
+					STDERR.puts "val: #{val}"
+					STDERR.puts "other[key]: #{oth_val}"
+				end
+				next unless val.respond_to?(:clear_by!)
+				next unless oth_val.kind_of?(Hash)
+				self[key] = val.clear_by!(oth_val)
+			end
+			self
+		end
+				
+		def remove_empty_elem
+			buf = self.deep_dup
+			buf.remove_empty_elem!
+		end
+		def remove_empty_elem!
+			for key, elem in self do
+				next unless elem.respond_to?(:empty?)
+				next unless elem.empty?
+				self.delete(key)				
+			end
+		end
+				
+		def remove_clear_flag
+			buf = self.deep_dup
+			buf.remove_clear_flag!
+		end
+		def remove_clear_flag!
+			for key,val in self do
+				self.reject!{|k,val| k==key} if val == :__clear__ or val == '__clear__'
+				next unless val.respond_to?(:remove_clear_flag!)
+				val.remove_clear_flag!
+			end
+			self
+		end
+			
+		def set_clear_flag(other)
+			buf = self.deep_dup
+			buf.remove_clear_flag(other)
+		end
+		def set_clear_flag!(other)
+				for key,val in other do
+					my_val = self[key.to_s]
+					my_val = self[key.to_sym] unless my_val
+					if nil == my_val
+						self[key] = :__clear__
 						next
 					end
 					next unless val.kind_of?(Hash)
-					next unless other[key].kind_of?(Hash)
-					self[key] = val.clear_by(other[key])
+					next unless my_val.kind_of?(Hash)
+					my_val.set_clear_flag!(val)
 				end
+				self
 		end
 end

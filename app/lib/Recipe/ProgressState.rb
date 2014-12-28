@@ -24,10 +24,12 @@ module Recipe
             self[:channel] = ""
 
             # state (:visual=>:OTHERS|:CURRENT|:ABLE, :is_finished=>bool)
-            self[:state] = ActiveSupport::HashWithIndifferentAccess.new{|hash,key| hash[key] = {:visual=>"OTHERS",:is_finished=>false}}
+						self[:state] = ActiveSupport::HashWithIndifferentAccess.new # {|hash,key| hash[key] = {:visual=>"OTHERS",:is_finished=>false}}
             
             # audio/video playing history(:views) and :delay to render Play (and Chancel)
-            self[:play] = ActiveSupport::HashWithIndifferentAccess.new{
+						self[:play] = ActiveSupport::HashWithIndifferentAccess.new
+=begin
+						{
                 |hash,key| hash[key] = {
                     :do_play=>false,
                     :delay=>[],
@@ -40,14 +42,47 @@ module Recipe
                     :VOLUME=>[],
                 }
             }
+=end
+																																				
 
             # to render Notify (and Chancel)
-            self[:notify] = ActiveSupport::HashWithIndifferentAccess.new{|hash,key| hash[key] = {
+            self[:notify] = ActiveSupport::HashWithIndifferentAccess.new
+=begin
+						 {|hash,key| hash[key] = {
                 :delay=>[],
                 :do_play=>false,
                 :PLAY=>0}
             }
+=end
         end
+				def init_state(key)
+					return if self[:state][key]
+					self[:state][key] = {:visual=>"OTHERS",:is_finished=>false}
+				end
+				def init_play(key)
+					return if self[:play][key]
+					self[:play][key] = {
+						:do_play=>false,
+						:delay=>[],
+						:PLAY=>0,
+						:PAUSE=>[],
+						:JUMP=>[],
+						:TO_THE_END=>0,
+						:FULL_SCREEN=>[],
+						:MUTE=>[],
+						:VOLUME=>[],
+					}
+				end
+				def init_notify(key)
+					return if self[:notify][key]
+					self[:notify][key] = {
+						:delay=>[],
+						:do_play=>false,
+						:PLAY=>0
+					}
+
+				end
+
     end
     StateChange = ProgressState # alias for ProgressState
 end

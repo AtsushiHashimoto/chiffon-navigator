@@ -7,8 +7,39 @@ Progress = ProgressState
 class Progress
 		@@default_keys = [:recommended_order,:channel,:detail,:play,:notify,:iter_index,:state]
     def update!(change,delta)
+			#=begin
+			change.delete_nil!
+			change.delete_nil_key!
+			
+			prev_progress= self.deep_dup
+			delta.after = change
+			iter_index_prev = self[:iter_index]
+			STDERR.puts change[:ObjectAccess]
+			STDERR.puts self[:ObjectAccess]
+			
+			self.deep_merge_with_clear_flag!(change,true)
+
+			self.delete_nil!
+			self.delete_nil_key!
+			#			STDERR.puts self
+			
+			
+			
+			delta.before, temp= prev_progress.deep_diff(self)
+			
+			if delta.before == delta.after then
+				delta.clear
+			else
+				# update iteration index unless any index is specified in 'change.'
+				change[:iter_index] = iter_index_prev + 1 if change[:iter_index] < 0
+				delta.before[:iter_index] = iter_index_prev
+				self[:iter_index] = change[:iter_index]
+			end
+			#=end			
+=begin			
+				change.delete_nil_key!
         delta.after = change
-        
+				prev_progress = self.deep_dup
         for key in [:recommended_order,:channel,:detail] do
             next if change[key].empty?
             delta.before[key] = self[key]
@@ -24,6 +55,7 @@ class Progress
         end
         for key,val in change[:state] do
             next if key==nil # deep_dup caused an errorly elem. ignore it.
+						next if key.empty?
             raise "Unknown ID '#{key}' is directed in state change." unless self[:state].include?(key)
             delta.before[:state][key] = self[:state][key].deep_dup
             #            STDERR.puts "#{key}: #{val}"
@@ -35,8 +67,13 @@ class Progress
 				
 				# custom state for each algorithm
 				for key in change.keys - @@default_keys do
-						if self.include?(key) then
+						if self.include?(key) and self[key]!=nil then
 							self[key] = self[key].clear_by(change[key])
+							next if change[key].to_s == '__clear__'
+							change[key].remove_clear_flag!
+							STDERR.puts change[key]
+
+							next if self[key]==nil
 							self[key].deep_merge!(change[key])
 						else
 							self[key] = change[key].deep_dup
@@ -51,7 +88,10 @@ class Progress
             delta.before[:iter_index] = self[:iter_index]
             self[:iter_index] = change[:iter_index]
         end
-    end
+				# set flag for the values firstly appeared at this iteration.
+				delta.before.set_clear_flag!(prev_progress)
+=end
+		end
 end
 
 end

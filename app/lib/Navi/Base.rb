@@ -31,30 +31,39 @@ module Base
         change = Recipe::StateChange.new
         progress = session_data[:progress]
 				
+				STDERR.puts "#{__FILE__}: at #{__LINE__}"
         for step in recipe.xpath('//step') do
-            progress[:state][step.id][:is_opened] = false
+            progress.init_state(step.id)
+						progress[:state][step.id][:is_opened] = false
 						progress[:state][step.id][:visual] = 'ABLE' if is_able?(recipe,progress[:state],step)
         end
+				STDERR.puts "#{__FILE__}: at #{__LINE__}"
         for substep in recipe.xpath('//substep') do
-            progress[:state][substep.id]
+						progress.init_state(substep.id)
 						progress[:state][substep.id][:visual] = 'ABLE' if is_able?(recipe,progress[:state],substep)
         end
+				STDERR.puts "#{__FILE__}: at #{__LINE__}"
         
         for media_id in recipe.xpath('//audio').map{|v| v.id} + recipe.xpath('//video').map{|v| v.id}
-            progress[:play][media_id]
+            progress.init_play(media_id)
         end
+				STDERR.puts "#{__FILE__}: at #{__LINE__}"
         for noty_id in recipe.xpath('//notification').map{|v| v.id}
-            progress[:notify][noty_id]
+						progress.init_notify(noty_id)
         end
+				STDERR.puts "#{__FILE__}: at #{__LINE__}"
 				#STDERR.puts progress[:state]
 				change[:state] = progress[:state].deep_dup
+				STDERR.puts "#{__FILE__}: at #{__LINE__}"
 
         # make first change for rendering prescription.
         change[:channel] = settings.start_channel
         
         # call a recommend function from the Module directed by "ession_data[:alg]"
+				STDERR.puts "#{__FILE__}: at #{__LINE__}"
+
         change[:recommended_order], temp_hash = update_recommended_order(recipe,progress,session_data[:alg])
-        
+        STDERR.puts "#{__FILE__}: at #{__LINE__}"
         log_error "#{__FILE__}: at #{__LINE__}, nil is set to progress[:state]" if progress[:state].include?(nil)
 
         #        session_data[:logger].debug change[:recommended_order]
@@ -208,9 +217,12 @@ module Base
             delay = media.attributes.include?("delay") ? media["delay"] : "0" if nil == delay
             change_play[:delay] << delay
         end
-        change[:play][id].deep_merge!(change_play)
-        
-        return "success", change
+				if change[:play][id] then
+					change[:play][id].my_deep_merge!(change_play)
+				else
+					change[:play][id] = change_play
+				end
+				return "success", change
     end
 		
 		def stop_all_medias(recipe,ref_progress, substep, change)
@@ -410,20 +422,19 @@ module Base
         subscription = []
         
         # CHANNEL
-        subscription << render_channel(delta.after[:channel]) unless delta.after[:channel].empty?
+        subscription << render_channel(delta.after[:channel]) unless delta.after[:channel]==nil or delta.after[:channel].empty?
 
         # DETAIL_DRAW
-        subscription << render_detaildraw(delta.after[:detail]) unless delta.after[:detail].empty?
+				subscription << render_detaildraw(delta.after[:detail]) unless delta.after[:detail]== nil or delta.after[:detail].empty?
 
         # NAVI_DRAW
-        subscription << render_navidraw(progress[:recommended_order],progress[:state]) unless delta.after[:state].empty? and delta.after[:recommended_order].empty?
+				subscription << render_navidraw(progress[:recommended_order],progress[:state]) if (delta.after[:state]!=nil and !delta.after[:state].empty?) or (delta.after[:recommended_order] != nil and !delta.after[:recommended_order].empty?)
         
         # PLAY
-        subscription += render_media("Play",delta.after[:play]) unless delta.after[:play].empty?
+				subscription << render_media("Play",delta.after[:play]) unless delta.after[:play]==nil or delta.after[:play].empty?
 
         # NOTIFY
-        subscription += render_media("Notify",delta.after[:notify]) unless delta.after[:notify].empty?
-        
+        subscription += render_media("Notify",delta.after[:notify]) unless delta.after[:notify]==nil or delta.after[:notify].empty?
         return subscription
     end
 
@@ -446,6 +457,8 @@ module Base
     def render_media(media_type,change_play)
         subscription = []
         for id,hash in change_play do
+						next if hash==nil
+						#						STDERR.puts hash
             if hash[:do_play] then
                 subscription << {media_type=>{"id"=>id,"delay"=> hash[:delay].last}}
             else

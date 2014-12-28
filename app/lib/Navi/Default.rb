@@ -43,7 +43,7 @@ module Navi
                 when "next" then
                     return self.next(session_data,ex_input)
                 when "prev", "undo" then
-                    return self.prev(session_data,ex_input)
+                    return self._prev(session_data,ex_input)
                 when "redo" then
                     return self.redo(session_data,ex_input)
                 when "jump" then
@@ -78,17 +78,45 @@ module Navi
         end
     
 
-        def prev(session_data,ex_input)
+        def _prev(session_data,ex_input)
+					if ex_input['action'].include?('index') then
+						tar_index = ex_input['action']['index'].to_i
+					else
+						tar_index = nil
+					end
+					prev(session_data,tar_index)
+				end
+				
+				def prev(session_data,tar_index=nil)
             # ex_input : {“navigator”:”default”,”mode”:”order”,”action”:{“name”:”prev”}}
+						STDERR.puts "Default::prev"
             iter_index = session_data[:progress][:iter_index].to_i
-
-            return "Undo failed. No more operation history.", Recipe::StateChange.new if 0==iter_index
-
-            delta_file = @app.generate_progress_diff_filename(session_data[:session_dir],iter_index)
-            delta = Recipe::Delta.new
-            @app.log_error "The delta file is not found." unless File.exist?(delta_file)
-            delta.parse(File.open(delta_file,"r").read)
-            return "success", delta.before
+						
+						if nil == tar_index then
+							tar_index = iter_index-1
+						end
+						
+						change = Recipe::StateChange.new
+						
+						while tar_index < iter_index do
+							STDERR.puts iter_index
+							break if 0>=iter_index
+							
+							delta_file = @app.generate_progress_diff_filename(session_data[:session_dir],iter_index)
+							@app.log_error "The delta file is not found." unless File.exist?(delta_file)
+							delta = Recipe::Delta.new
+							delta.parse(File.open(delta_file,"r").read)
+							
+							#STDERR.puts delta_file
+							#STDERR.puts "delta.before"
+							#STDERR.puts delta.before
+							change.deep_merge!(delta.before)
+							#STDERR.puts "change"
+							#STDERR.puts change
+							iter_index = change[:iter_index].to_i
+						end
+						#STDERR.puts "prev end"
+            return "success", change
         end
         
         def redo(session_data,ex_input)
