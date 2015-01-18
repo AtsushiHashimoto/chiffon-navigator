@@ -60,7 +60,7 @@ class ChiffonNavigator < Sinatra::Base
 
         set :error_logger, Logger.new("#{settings.root}/#{settings.error_log}")
         enable :logging
-        # set your Module to '/navi/:algorithm' and/or {"navigator":":algorithm",...} in external input
+        # set your Module to {"navigator":":algorithm",...} in external input
         # see also './lib/Navi/Default.rb'
         settings.navi_algorithms["default"] = Navi::Default.new(self)
 				settings.navi_algorithms["object_access"] = Navi::ObjectAccess.new(self)
@@ -111,6 +111,9 @@ class ChiffonNavigator < Sinatra::Base
                 session_data = settings.session_databank[session_id]
 
                 session_data[:json_data] = json_data
+								
+								# actually, parameter alg is not used
+								# this is reserved for chiffon-viewer version 2 (different prescription format.)
                 session_data[:alg] = settings.navi_algorithms[alg]
 
                 session_dir = session_data[:session_dir]
