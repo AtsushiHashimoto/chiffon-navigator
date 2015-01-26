@@ -431,7 +431,7 @@ module Base
 				subscription << render_navidraw(progress[:recommended_order],progress[:state]) if (delta.after[:state]!=nil and !delta.after[:state].empty?) or (delta.after[:recommended_order] != nil and !delta.after[:recommended_order].empty?)
         
         # PLAY
-				subscription << render_media("Play",delta.after[:play]) unless delta.after[:play]==nil or delta.after[:play].empty?
+				subscription += render_media("Play",delta.after[:play]) unless delta.after[:play]==nil or delta.after[:play].empty?
 
         # NOTIFY
         subscription += render_media("Notify",delta.after[:notify]) unless delta.after[:notify]==nil or delta.after[:notify].empty?
