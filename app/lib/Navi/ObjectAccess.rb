@@ -6,6 +6,7 @@ module Navi
 		@@completion_thresh = 0.875 # (1+@@score_ing)/2
 		@@completion_thresh2 = 0.75
 		@@shortest_touch = 1.0
+
 		@@explicitly = 'explicitly'
 		@@probably = 'probably'
 		@@sym = :ObjectAccess
@@ -19,11 +20,14 @@ module Navi
 
 		@prev_time
 		def print_time(line_num)
+=begin
+			@prev_time = Time.now unless @prev_time
 			t = Time.now
 			STDERR.puts ""
 			STDERR.puts "#{__FILE__} at line #{line_num}: #{t-@prev_time}sec."
 			STDERR.puts ""
 			@prev_time = t
+=end
 		end
 
 
@@ -33,6 +37,7 @@ module Navi
 		def route(session_data,ex_input)
 			session_data[:progress][@@sym],change = self.init(session_data)
 			update(session_data)
+
 
 			case ex_input[:action][:name]
 				when 'touch'
@@ -70,6 +75,7 @@ module Navi
 				oa_data[:score] = -100
 
 				oa_data[:backup] = ActiveSupport::HashWithIndifferentAccess.new
+				oa_data[:played_media] = []
 
 
 				# ingredient, seasonings, others(=tools)
@@ -129,9 +135,15 @@ module Navi
 				objs = v['ref'].split(/\s+/)
 				!objs.subset_of?(all_objects)
 			}
+			trigger_array = []
+			for trig in triggers do
+				ss = trig.parent.id
+				ref = trig['ref'].split(/\s+/)
+				trigger_array << [ss,ref]
+				#STDERR.puts "#{ss}: #{ref.join(",")}"
+			end
 
-
-			oa_data[:triggers] = triggers
+			oa_data[:triggers] = trigger_array
 
 			return oa_data,change
 		end
@@ -158,17 +170,27 @@ module Navi
 				# save backup
 				iter_index = session_data[:progress][:iter_index]
 				change[@@sym][:backup][iter_index.to_s] = {:timestamp=>timestamp, :touched=>[new_object]}
-				STDERR.puts change[@@sym][:backup][iter_index.to_s]
+				#STDERR.puts change[@@sym][:backup][iter_index.to_s]
 			end
 
 			prev_score = oa_data[:score]
 			state, temp = post_process(session_data,oa_data,timestamp,:touch, false)
 			change.deep_merge!(temp)
 
+			c_ss = @app.current_substep(session_data[:recipe],change[:state])
+			c_ss = @app.current_substep(session_data[:recipe],session_data[:progress][:state]) unless c_ss
+			temp = play_media(c_ss.id.to_s,session_data,oa_data)
+			if temp then
+				STDERR.puts temp
+				change.deep_merge!(temp)
+			end
+			change[@@sym][:played_media] = oa_data[:played_media]
+
+
 			change[@@sym][:timestamp] = timestamp if oa_data[:timestamp]==timestamp
 			change[@@sym][:score] = oa_data[:score] unless oa_data[:score]==prev_score
 			change[@@sym][:objects_in_hand] = oa_data[:objects_in_hand]
-#					STDERR.puts change[@@sym]
+			#	STDERR.puts change[@@sym]
 			print_time(__LINE__)
 			return state,change
 		end
@@ -191,19 +213,29 @@ module Navi
 			end
 
 # 終了判定
+
 			is_completed, changed_iter_index = check_completion(oa_data, gone_object,timestamp)
 			unless nil == changed_iter_index then
-				return @app.algorithms['default'].prev(session_data,changed_iter_index-1)
+				return @app.settings.navi_algorithms['default'].prev(session_data,changed_iter_index-1)
 			end
 			if do_backup then
 				iter_index = session_data[:progress][:iter_index]
 				change[@@sym][:backup][iter_index.to_s] = {:timestamp=>timestamp, :released=>[gone_object]}
-				STDERR.puts change[@@sym][:backup][iter_index.to_s]
+				#STDERR.puts change[@@sym][:backup][iter_index.to_s]
 			end
 
 			prev_score = oa_data[:score]
-			state, temp = post_process(session_data,oa_data,timestamp,:release, is_completed)
+			state, temp, ss_current = post_process(session_data,oa_data,timestamp,:release, is_completed)
 			change.deep_merge!(temp)
+
+			c_ss = @app.current_substep(session_data[:recipe],change[:state])
+			c_ss = @app.current_substep(session_data[:recipe],session_data[:progress][:state]) unless c_ss
+			temp = play_media(c_ss.id.to_s,session_data,oa_data,[gone_object])
+			if temp then
+				STDERR.puts temp
+				change.deep_merge!(temp)
+			end
+			change[@@sym][:played_media] = oa_data[:played_media]
 
 			change[@@sym][:timestamp] = timestamp if oa_data[:timestamp]==timestamp
 			change[@@sym][:score] = oa_data[:score] unless oa_data[:score]==prev_score
@@ -240,12 +272,10 @@ module Navi
 			# progressのbackupから消えているか確認
 			if (nil == record[:touched] or record[:touched].empty?) and (nil == record[:released] or record[:released].empty?) then
 				STDERR.puts "delete touch history."
-				backup = backup.delete(touched_iter_index.to_s)
-				pa_data[:backup] = backup
+				backup.delete(touched_iter_index.to_s)
+				oa_data[:backup] = backup
 			end
-
-			history = oa_data[:backup].find_if{|key,record|key.to_i >= touched_iter_index}
-			STDERR.puts history
+			history = oa_data[:backup].select{|key,record|key.to_i >= touched_iter_index}
 
 			# 把持の直前の時点まで状態を戻す
 			state,change = @app.navi_algorithms['default'].prev(session_data,touched_iter_index-1)
@@ -296,20 +326,18 @@ module Navi
 						# ○ confidenceをexplicitlyにする
 						c_ss = @app.current_substep(recipe,session_data[:progress][:state])
 						next_ss = c_ss.next_substep(recipe.max_order)
-						STDERR.puts c_ss.id
-						STDERR.puts next_ss.id
-						STDERR.puts ss_current
 
-						log_error("c_ss.next_substepと選択される次のsubstepが一致!!")
-						oa_data[:confidence_support] = true
+						# log_error("c_ss.next_substepと選択される次のsubstepが一致!!")
+						oa_data[:confidence_support] = true	if ss_current == next_ss
+
 						#	complete = true if c_ss.is_next?(ss_current, recipe.max_order)
 					end
 				end
 			end
 
 
-# 変化がないなら過去最大のscoreを残す
-			STDERR.puts [max_score,oa_data[:score]].join(" > ")
+			# 変化がないなら過去最大のscoreを残す
+			#STDERR.puts [max_score,oa_data[:score]].join(" > ")
 			if oa_data[:score] <= max_score then
 				oa_data[:score] = max_score
 				if max_score >= @@completion_thresh then
@@ -324,18 +352,21 @@ module Navi
 				STDERR.puts "confidence: #{oa_data[:confidence]}"
 			end
 
-#if !(!!ss_current or complete)
+			#if !(!!ss_current or complete)
 			if ss_current==nil and !complete then
 				return do_nothing
 			end
 
-# 変化あり
+			# 変化あり
 			oa_data[:timestamp] = timestamp
 			oa_data[:changed_iter_index] = progress[:iter_index]
 			oa_data[:confidence_support] = false
+			if ss_current != @app.current_substep(recipe,session_data[:progress][:state]).id then
+				STDERR.puts "reset played_media: #{oa_data[:played_media].join(', ')}"
+				oa_data[:played_media] = []
+			end
 
-
-# 井上論文に書いてない処理(解放による終了判定で別のものを表示するときは，scoreを0(推薦)とする)
+			# 井上論文に書いてない処理(解放による終了判定で別のものを表示するときは，scoreを0(推薦)とする)
 			if action == :release and complete then
 				oa_data[:score] = 0
 				oa_data[:confidence] = @@probably
@@ -343,7 +374,7 @@ module Navi
 			else
 				oa_data[:score] = max_score
 			end
-			oa_data[:related_objects] = fired_trigger['ref'].split(/\s+/) if fired_trigger
+			oa_data[:related_objects] = fired_trigger[1] if fired_trigger
 
 			ex_input = {:navigator=>'default',:action=>{:name=>'check', :target=>@app.current_substep(recipe,session_data[:progress][:state]).id, :value=>complete}}
 			state, change = @app.navi_algorithms['default'].check(session_data,ex_input)
@@ -357,6 +388,7 @@ module Navi
 				## 手がかり無し⇢next関数により推薦された次の作業へ移動
 			end
 			print_time(__LINE__)
+
 			return state,change
 		end
 
@@ -372,12 +404,11 @@ module Navi
 			return max,argmax if target_substeps.empty?
 
 			for trig in oa_data[:triggers] do
-				next unless target_substeps.include?(trig.parent.id)
-
-				score = calc_score(obj_h,trig['ref'].split(/\s+/),oa_data[:objects])
-#								STDERR.puts "#{score} for #{obj_h.join(" ")} (#{trig.parent.id})"
+				next unless target_substeps.include?(trig[0])
+				score = calc_score(obj_h,trig[1],oa_data[:objects])
+				# STDERR.puts "#{score} for #{obj_h.join(" ")} (#{trig[0]})"
 				next if score < max
-# score==maxなら追加，そうでなければ綺麗に更新
+				# score==maxなら追加，そうでなければ綺麗に更新
 				argmax = [] if score > max
 				max = score
 				argmax << trig
@@ -390,11 +421,11 @@ module Navi
 				rorder = progress[:recommended_order]
 				default_order = recipe.max_order
 				argmax.sort!{|a,b|
-					a_step_id = a.parent.parent.id.to_s
-					b_step_id = b.parent.parent.id.to_s
-					result = false
+					a_step_id = recipe.getByID(a[0]).parent.id
+					b_step_id = recipe.getByID(b[0]).parent.id
+					result = -1
 					if a_step_id == b_step_id then
-						result = (b.parent.order(default_order) <=> a.parent.order(default_order))
+						result = (recipe.getByID(b[0]).order(default_order) <=> recipe.getByID(a[0]).order(default_order))
 					else
 						result = (rorder.index(b_step_id) <=> rorder.index(a_step_id))
 					end
@@ -404,7 +435,7 @@ module Navi
 				argmax.reverse! if target == :ss_backward
 			end
 
-			return max, argmax[0].parent.id,argmax[0]
+			return max, argmax[0][0],argmax[0]
 		end
 
 		def calc_score(obj_h, obj_v, objects)
@@ -427,25 +458,18 @@ module Navi
 
 				score = score + (1.0-@@score_ing) * (has_ute.size.to_f/ute_v.size.to_f)
 			end
-
-			score - extra_obj.size * @@epsilon
+			return score - extra_obj.size * @@epsilon
 		end
 
 
 		def check_completion(oa_data, gone_object, timestamp)
 			STDERR.puts "check_completion"
-			STDERR.puts __LINE__
 			if oa_data[:related_objects] then
 				return false unless oa_data[:related_objects].include?(gone_object)
 			end
-			STDERR.puts __LINE__
 			return false, oa_data[:changed_iter_index].to_s.to_i if getTimeDiff(timestamp, oa_data[:timestamp]) < @@shortest_touch
-			STDERR.puts __LINE__
 			return false if oa_data[:related_objects].size > 1 and oa_data[:objects][:ingredients].include?(gone_object)
-			STDERR.puts __LINE__
-			STDERR.puts oa_data[:confidence]
 			return true if oa_data[:confidence] == @@explicitly
-			STDERR.puts __LINE__
 
 			return false
 
@@ -481,13 +505,13 @@ module Navi
 
 # 実行の条件が揃っているsubstepを列挙する
 		def getSSinReady(recipe,progress,ss_done)
+			# add steps without parent
 			steps = recipe.xpath('//step').to_a.find_all{|v|
 				!v.attributes.include?('parent') or v['parent'].empty?
 			}
 			for ss_id in ss_done do
 				steps << recipe.getByID(ss_id).parent
 			end
-			# add steps without parent
 
 			steps.uniq!
 
@@ -499,7 +523,9 @@ module Navi
 					next unless step.attributes.include?('child')
 					child_steps = step['child'].split(/\s+/)
 					for child_id in child_steps do
+						# STDERR.puts "#{child_id} as the child of #{step.id}"
 						next unless checkStepReady(recipe,progress,child_id)
+						next if progress[:state][child_id][:is_finished]
 						temp += findUnfinishedSubsteps(recipe,progress,child_id)
 					end
 				end
@@ -509,9 +535,12 @@ module Navi
 		end
 
 		def checkStepReady(recipe,progress,step_id)
-			STDERR.puts step_id
+			#STDERR.puts step_id
 			progress[:state][step_id]
-			log_error "Unexpected Error" if progress[:state][step_id][:is_finished]
+
+			# 既に終了しているstepならfalse
+			return false if progress[:state][step_id][:is_finished]
+
 			parents = recipe.getByID(step_id)['parent'].split(/\s+/)
 			for parent in parents do
 				return false unless progress[:state][parent][:is_finished]
@@ -605,7 +634,7 @@ module Navi
 			if do_backup then
 				iter_index = session_data[:progress][:iter_index]
 				change[@@sym][:backup][iter_index.to_s] = {:timestamp=>timestamp, :touched=>new_objects, :released=>[gone_objects]}
-				STDERR.puts change[@@sym][:backup][iter_index.to_s]
+				#STDERR.puts change[@@sym][:backup][iter_index.to_s]
 			end
 
 
@@ -621,6 +650,49 @@ module Navi
 				change.deep_merge!(temp)
 			end
 			return status, change
+		end
+
+		# 現在表示されていて，確信度がexplicitlyで，かつ，
+		# if triggerがない
+		#   無条件で
+		# else
+		# 	triggerにある食材が把持されていたら
+		# メディア(audio,video,notification問わず)を再生する．
+
+		# 指定したメディアを再生するような指示を作る
+		def play_media(ss_current,session_data,oa_data,released_objects=nil)
+			# メディアの再生をチェックする
+			change = Recipe::StateChange.new
+			return nil unless oa_data[:confidence]==@@explicitly
+
+			recipe = session_data[:recipe]
+			progress = session_data[:progress]
+
+			ss = recipe.getByID(ss_current,'substep')
+
+			ss.children.each{|node|
+				next unless ['video','audio','notification'].include?(node.name)
+				next if oa_data[:played_media].include?(node['id'])
+
+				delay_array = []
+				node.xpath('./trigger').each{|trig|
+					ref = trig[:ref].split(" ")
+					ref.delete('sametime')
+
+					if trig[:timing]=='start' then
+						next unless ref.subset_of?(oa_data[:objects_in_hand])
+					elsif trig[:timing]=='end' then
+						next unless ref.subset_of?(oa_data[:objects_in_hand]+released_objects)
+						next if ref.subset_of?(oa_data[:objects_in_hand])
+					end
+					delay_array << trig[:delay].to_f
+				}
+				next if delay_array.empty?
+				delay = delay_array.min
+				change.deep_merge!(@app.play_control(recipe, progress, :PLAY, node['id'],delay)[1])
+				oa_data[:played_media] << node['id']
+			}
+			return change
 		end
 =begin
 					oa_data = session_data[:progress][@@sym]
