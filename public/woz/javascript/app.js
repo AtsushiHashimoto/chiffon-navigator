@@ -158,6 +158,26 @@ jQuery(function ($) {
                       } else {
                         warning_handler('missing recipe for NaviDraw : ' + step.id);
                       }
+                   // object access controller change
+                   if($('#OAC-'+ step.id).length) {
+                       if(step.is_finished) {
+                           $('#OAC-' + step.id).addClass('finished');
+                       }
+                       else{
+                           $('#OAC-' + step.id).removeClass('finished');
+                       }
+                       if(step.visual=='CURRENT'){
+                           $('#OAC-' + step.id).addClass('current');
+                       }
+                       else if(step.visual=='OTHERS'){
+                           $('#OAC-' + step.id).addClass('other');
+                       }
+                       else{
+                           $('#OAC-' + step.id).removeClass('current');
+                           $('#OAC-' + step.id).removeClass('other');
+                       }
+                   }
+
                       });
                
                var list = $('li.navi-step').not('li.navi-substep').sort(function(a,b){
@@ -291,6 +311,7 @@ jQuery(function ($) {
 								$(this).hide();
 						});
 						var controller = $(this).attr('value');
+                        $("#"+controller).removeClass('hidden');
 						$("#"+controller).show();
 		});
 			 

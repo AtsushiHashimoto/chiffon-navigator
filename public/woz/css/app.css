@@ -913,7 +913,13 @@ small.logo img{
 .guide_width10 td{
 	vertical-align: top;
 }
-.btn_object_access,
+.btn_object_access {
+    padding: 8px;
+    margin: 5px;
+    width: 95%;
+    alignment: left;
+}
+
 .btn_check_with_noise{
 	padding: 8px;
 	margin: 5px;
@@ -931,7 +937,9 @@ small.logo img{
 	border-top-width: 1px;
 	border-left-width: 2px;
 	border-color: #5706e3;
-	background-color: #bee1ef; 
+	background-color: #bee1ef;
+    font-size: 100%;
+
 }
 .guide_width10 .oa_controller.in_hand,
 .guide_width10 .btn_check_with_noise.noise_on{
@@ -942,6 +950,15 @@ small.logo img{
   border-top-width: 4px;
 	border-left-width: 4px;
 	background-color: #efe1be;
+}
+.guide_width10 .oa_controller.finished{
+    background-color: #808080;
+}
+.guide_width10 .oa_controller.current{
+    background-color: #90ffbf;
+}
+.guide_width10 .oa_controller.other{
+    background-color: #f0f0f0;
 }
 
 
