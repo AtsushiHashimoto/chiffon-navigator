@@ -675,18 +675,25 @@ module Navi
 				next if oa_data[:played_media].include?(node['id'])
 
 				delay_array = []
-				node.xpath('./trigger').each{|trig|
-					ref = trig[:ref].split(" ")
-					ref.delete('sametime')
+				trigs = node.xpath('./trigger')
+				if trigs.empty? then
+					# triggerがないなら，とりあえず再生する．
+					delay_array << 0
+				else
+					trigs.each{|trig|
+						ref = trig[:ref].split(" ")
+						ref.delete('sametime')
 
-					if trig[:timing]=='start' then
-						next unless ref.subset_of?(oa_data[:objects_in_hand])
-					elsif trig[:timing]=='end' then
-						next unless ref.subset_of?(oa_data[:objects_in_hand]+released_objects)
-						next if ref.subset_of?(oa_data[:objects_in_hand])
-					end
-					delay_array << trig[:delay].to_f
-				}
+						if trig[:timing]=='start' then
+							next unless ref.subset_of?(oa_data[:objects_in_hand])
+						elsif trig[:timing]=='end' then
+							next unless ref.subset_of?(oa_data[:objects_in_hand]+released_objects)
+							next if ref.subset_of?(oa_data[:objects_in_hand])
+						end
+						delay_array << trig[:delay].to_f
+					}
+				end
+
 				next if delay_array.empty?
 				delay = delay_array.min
 				change.deep_merge!(@app.play_control(recipe, progress, :PLAY, node['id'],delay)[1])
