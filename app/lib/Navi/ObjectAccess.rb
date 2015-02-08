@@ -180,9 +180,9 @@ module Navi
 			c_ss = @app.current_substep(session_data[:recipe],change[:state])
 			c_ss = @app.current_substep(session_data[:recipe],session_data[:progress][:state]) unless c_ss
 			temp = play_media(c_ss.id.to_s,session_data,oa_data)
-			if temp then
-				STDERR.puts temp
-				change.deep_merge!(temp)
+
+			if temp and temp[:play] and !temp[:play].empty? then
+				change[:play].deep_merge!(temp[:play])
 			end
 			change[@@sym][:played_media] = oa_data[:played_media]
 
@@ -425,9 +425,9 @@ module Navi
 					b_step_id = recipe.getByID(b[0]).parent.id
 					result = -1
 					if a_step_id == b_step_id then
-						result = (recipe.getByID(b[0]).order(default_order) <=> recipe.getByID(a[0]).order(default_order))
+						result = (recipe.getByID(a[0]).order(default_order) <=> recipe.getByID(b[0]).order(default_order))
 					else
-						result = (rorder.index(b_step_id) <=> rorder.index(a_step_id))
+						result = (rorder.index(a_step_id) <=> rorder.index(b_step_id))
 					end
 					result
 				}
@@ -468,7 +468,7 @@ module Navi
 				return false unless oa_data[:related_objects].include?(gone_object)
 			end
 			return false, oa_data[:changed_iter_index].to_s.to_i if getTimeDiff(timestamp, oa_data[:timestamp]) < @@shortest_touch
-			return false if oa_data[:related_objects].size > 1 and oa_data[:objects][:ingredients].include?(gone_object)
+			return false if oa_data.has_key?(:related_objects) and oa_data[:related_objects].size > 1 and oa_data[:objects][:ingredients].include?(gone_object)
 			return true if oa_data[:confidence] == @@explicitly
 
 			return false
