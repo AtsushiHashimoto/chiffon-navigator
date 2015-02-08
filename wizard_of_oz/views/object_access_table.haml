@@ -1,8 +1,10 @@
-%table
-    - mid = (@oa_objects.size + @oa_cols -1)/@oa_cols
-    - width = (100/@oa_cols).to_i
-    %tr
-        - for k in 0...@oa_cols
-            %td{width=>"#{width}%"}
-                - for i in (k*mid)...[(k+1)*mid, @oa_objects.size].min
-                    %button.btn_object_access.oa_controller{:'data-target'=>@oa_objects[i][0]} #{@oa_objects[i][1]}
+%table.span12
+    - cols = @oa_cols
+    - width = 100/cols #(100/@oa_cols).to_i
+    - for k in 0..(@oa_objects.size/cols).to_i
+        %tr
+            - for i in 0...cols
+                %td{:width=>"#{width}%"}
+                    - idx = k*cols + i
+                    - next if idx>=@oa_objects.size
+                    %button.btn_object_access.oa_controller{:'data-target'=>@oa_objects[idx][0], :id=>"OAC-#{@oa_objects[idx][0]}", :class=>"cols-#{cols}"} #{@oa_objects[idx][1]}

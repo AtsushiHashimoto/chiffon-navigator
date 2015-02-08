@@ -3,27 +3,45 @@
     .row
         %h2 Object Access Controller
         .detail
-            %table
-                %tr
-                    %td(width="29%")
-                        %h3 Ingredients
-                        - @oa_objects = []
-                        - @oa_cols = 2
-                        - for object in @recipe.xpath('//object').sort_by{|v|v['name']}
-                            - next if object['id']=~ /object\d{3}/
-                            - @oa_objects << [object['id'],object['name']]
-                        = haml :object_access_table
-                    %td(width="29%")
-                        %h3 Cooking Utensils
-                        - @oa_objects = []
-                        - for object in @recipe.xpath('//event')
-                            - next unless object['id']=~ /.+_utensil/
-                            - @oa_objects << [object['id'], object['id'].sub('_utensil','')]
-                        = haml :object_access_table
-                    %td(width="42%")
-                        %h3 Intermediate Foods
-                        - @oa_objects = []
-                        - @oa_cols = 3
-                        - for step in @recipe.xpath('//step')
-                            - @oa_objects << [step.id, "Result of #{step.id}<br>#{step['navi_text']}"]
-                        = haml :object_access_table
+            %h3 Cooking Utensils
+            - @oa_objects = []
+            - @oa_cols = 8
+            - for object in @recipe.xpath('//event')
+                - next unless object['id']=~ /.+_utensil/
+                - name = object['id'].sub('_utensil','')
+                - name = object['name'] if object['name']
+                - @oa_objects << [object['id'], name]
+            = haml :object_access_table
+            %br
+            %h3 Seasonings
+            - @oa_objects = []
+            - @oa_cols = 8
+            - for object in @recipe.xpath('//object').to_a.select{|v|v.id.to_s=~/.+_seasoning/}.sort_by{|v|v['name']}
+                - next if object['id']=~ /object\d{3}/
+                - name = object['id']
+                - name = object['name'] if object['name']
+                - @oa_objects << [object['id'],name]
+            = haml :object_access_table
+            %br
+            %h3 Ingredients
+            - @oa_objects = []
+            - @oa_cols = 8
+            - for object in @recipe.xpath('//object').to_a.delete_if{|v|v.id.to_s=~/.+_seasoning/}.sort_by{|v|v['name']}
+                - next if object['id']=~ /object\d{3}/
+                - name = object['id']
+                - name = object['name'] if object['name']
+                - @oa_objects << [object['id'],name]
+            = haml :object_access_table
+            %br
+            %h3 Intermediate Foods
+            // remove not-refered steps
+            - refered_steps = []
+            - for trig in @recipe.xpath('//substep/trigger').to_a
+                - refered_steps += trig['ref'].split(/\s+/).map{|v|v.strip}
+            - refered_steps = refered_steps.sort.uniq
+            - @oa_objects = []
+            - @oa_cols = 4
+            - for step in @recipe.xpath('//step')
+                - next unless refered_steps.include?(step.id.to_s)
+                - @oa_objects << [step.id, "#{step.id.to_s.gsub('step','')}. #{step['navi_text']}"]
+            = haml :object_access_table
