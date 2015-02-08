@@ -954,11 +954,11 @@ small.logo img{
 .guide_width10 .oa_controller.finished{
     background-color: #808080;
 }
-.guide_width10 .oa_controller.current{
-    background-color: #90ffbf;
-}
 .guide_width10 .oa_controller.other{
     background-color: #f0f0f0;
+}
+.guide_width10 .oa_controller.current{
+    background-color: #90ffbf;
 }
 
 

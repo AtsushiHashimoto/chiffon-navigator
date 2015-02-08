@@ -162,19 +162,21 @@ jQuery(function ($) {
                    if($('#OAC-'+ step.id).length) {
                        if(step.is_finished) {
                            $('#OAC-' + step.id).addClass('finished');
+                           $('#OAC-' + step.id).removeClass('current');
+                           $('#OAC-' + step.id).removeClass('other');
                        }
                        else{
                            $('#OAC-' + step.id).removeClass('finished');
-                       }
-                       if(step.visual=='CURRENT'){
-                           $('#OAC-' + step.id).addClass('current');
-                       }
-                       else if(step.visual=='OTHERS'){
-                           $('#OAC-' + step.id).addClass('other');
-                       }
-                       else{
-                           $('#OAC-' + step.id).removeClass('current');
-                           $('#OAC-' + step.id).removeClass('other');
+                           if(step.visual=='CURRENT'){
+                               $('#OAC-' + step.id).addClass('current');
+                           }
+                           else if(step.visual=='OTHERS'){
+                               $('#OAC-' + step.id).addClass('other');
+                           }
+                           else{
+                               $('#OAC-' + step.id).removeClass('current');
+                               $('#OAC-' + step.id).removeClass('other');
+                           }
                        }
                    }
 
