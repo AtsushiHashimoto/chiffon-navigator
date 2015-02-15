@@ -145,11 +145,13 @@ module Navi
 						
             change = Recipe::StateChange.new
 						if !ex_input[:action].include?(:check) or ex_input[:action][:check] == "true" then
-							unless nil==c_ss then
-									change[:state] = @app.check_substep(c_ss,true,recipe, ref_states)
-									ref_progress.deep_merge!(change)
-							end						
-						end
+              # checkが指定されていない，またはtrueとなっている場合
+              unless nil==c_ss then
+                change[:state] = @app.check_substep(c_ss,true,recipe, ref_states)
+                ref_progress.deep_merge!(change)
+              end
+            end
+
 
 						
             target_step = recipe.getByID(ex_input[:action][:target])
@@ -165,8 +167,14 @@ module Navi
 						
 						change[:recommended_order], temp = @app.update_recommended_order(recipe,ref_progress,self, target_step)
 						change[:state].deep_merge!(temp)
-						
-            
+
+
+            # チェックがついている先へjumpする場合はしっかり関連するsubstepのcheckを全部外す
+            if ref_progress[:state][target_substep.id][:is_finished] then
+              temp_state = @app.check_substep(target_substep,false,recipe, ref_states)
+              change[:state].deep_merge!(temp_state)
+            end
+
 						#ref_progress.deep_merge!(change)
 						temp = @app.set_current_substep(recipe,ref_progress[:state],target_substep)
 						temp2 = @app.set_current_substep(recipe,change[:state],target_substep)
