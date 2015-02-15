@@ -135,15 +135,15 @@ module Navi
 				objs = v['ref'].split(/\s+/)
 				!objs.subset_of?(all_objects)
 			}
-			trigger_array = []
+			trigger_hash = {}
 			for trig in triggers do
 				ss = trig.parent.id
 				ref = trig['ref'].split(/\s+/)
-				trigger_array << [ss,ref]
+				trigger_hash[ss] = ref
 				#STDERR.puts "#{ss}: #{ref.join(",")}"
 			end
 
-			oa_data[:triggers] = trigger_array
+			oa_data[:triggers] = trigger_hash
 
 			return oa_data,change
 		end
@@ -155,7 +155,10 @@ module Navi
 		def touch(session_data,ex_input,change, do_backup=true)
 			print_time(__LINE__)
 			STDERR.puts "touch!"
-			oa_data = session_data[:progress][@@sym]
+
+
+      oa_data = session_data[:progress][@@sym]
+      oa_data[:related_objects] = get_related_objects(session_data[:progress],session_data[:recipe],oa_data)
 			new_object = ex_input[:action][:target]
 			timestamp = ex_input[:action][:timestamp]
 
@@ -198,7 +201,10 @@ module Navi
 		def release(session_data,ex_input,change, do_backup=true)
 			print_time(__LINE__)
 			STDERR.puts "release!"
-			oa_data = session_data[:progress][@@sym]
+
+
+      oa_data = session_data[:progress][@@sym]
+      oa_data[:related_objects] = get_related_objects(session_data[:progress],session_data[:recipe],oa_data)
 			gone_object = ex_input[:action][:target]
 			timestamp = ex_input[:action][:timestamp]
 
@@ -243,7 +249,12 @@ module Navi
 
 			print_time(__LINE__)
 			return state,change
-		end
+    end
+
+    def get_related_objects(progress,recipe,oa_data)
+      c_ss = @app.current_substep(recipe, progress[:state])
+      return oa_data[:triggers][c_ss.id.to_s]
+    end
 
 		def getTimeDiff(ts1,ts2)
 			Time.parse_my_timestamp(ts1) - Time.parse_my_timestamp(ts2)
@@ -374,7 +385,6 @@ module Navi
 			else
 				oa_data[:score] = max_score
 			end
-			oa_data[:related_objects] = fired_trigger[1] if fired_trigger
 
 			ex_input = {:navigator=>'default',:action=>{:name=>'check', :target=>@app.current_substep(recipe,session_data[:progress][:state]).id, :value=>complete}}
 			state, change = @app.navi_algorithms['default'].check(session_data,ex_input)
@@ -388,6 +398,12 @@ module Navi
 				## 手がかり無し⇢next関数により推薦された次の作業へ移動
 			end
 			print_time(__LINE__)
+
+      if change.include?(@@sym) then
+        change[@@sym].deep_merge!(oa_data)
+      else
+        change[@@sym] = oa_data
+      end
 
 			return state,change
 		end
@@ -403,15 +419,15 @@ module Navi
 			# when no substep has been done, argmax must be empty.
 			return max,argmax if target_substeps.empty?
 
-			for trig in oa_data[:triggers] do
-				next unless target_substeps.include?(trig[0])
-				score = calc_score(obj_h,trig[1],oa_data[:objects])
-				# STDERR.puts "#{score} for #{obj_h.join(" ")} (#{trig[0]})"
+      for ss_id in target_substeps do
+        trig = oa_data[:triggers][ss_id]
+				score = calc_score(obj_h,trig,oa_data[:objects])
+				# STDERR.puts "#{score} for #{obj_h.join(" ")} (#{ss_id})"
 				next if score < max
 				# score==maxなら追加，そうでなければ綺麗に更新
 				argmax = [] if score > max
 				max = score
-				argmax << trig
+				argmax << [ss_id,trig]
 			end
 
 
@@ -464,11 +480,11 @@ module Navi
 
 		def check_completion(oa_data, gone_object, timestamp)
 			STDERR.puts "check_completion"
-			if oa_data[:related_objects] then
-				return false unless oa_data[:related_objects].include?(gone_object)
-			end
-			return false, oa_data[:changed_iter_index].to_s.to_i if getTimeDiff(timestamp, oa_data[:timestamp]) < @@shortest_touch
-			return false if oa_data.has_key?(:related_objects) and oa_data[:related_objects].size > 1 and oa_data[:objects][:ingredients].include?(gone_object)
+			return false if oa_data[:related_objects] and !oa_data[:related_objects].include?(gone_object)
+
+			return false, oa_data[:changed_iter_index].to_s.to_i if oa_data[:timestamp] and getTimeDiff(timestamp, oa_data[:timestamp]) < @@shortest_touch
+
+      return false if oa_data.has_key?(:related_objects) and oa_data[:related_objects].size > 1 and oa_data[:objects][:ingredients].include?(gone_object)
 			return true if oa_data[:confidence] == @@explicitly
 
 			return false
@@ -489,7 +505,7 @@ module Navi
 
 			ssready = getSSinReady(recipe,progress,ss_done)
 			session_data[:progress][@@sym][:ss_ready] = ssready
-			session_data[:progress][@@sym][:ss_forward],session_data[:progress][@@sym][:ss_backward] = expandContext(recipe,progress,ssready)
+			session_data[:progress][@@sym][:ss_forward],session_data[:progress][@@sym][:ss_backward] = expandContext(recipe,progress,ssready,ss_done)
 		end
 
 		def extractCompletedSubsteps(recipe,progress)
@@ -567,12 +583,14 @@ module Navi
 		end
 
 # 井上アルゴリズムに従ったコンテキストの拡張
-		def expandContext(recipe,progress,ssready)
+		def expandContext(recipe,progress,ssready,ss_done)
 
 			# forward expansion
 			ss_forward = ssready.deep_dup
-			for ss_id in ssready do
+			s_forward = []
+      for ss_id in ssready do
 				step = recipe.getByID(ss_id).parent
+        s_forward << step
 				temp = findUnfinishedSubsteps(recipe,progress,step.id,ss_id)
 				if temp.empty? then
 					next unless step.attributes.include?('child')
@@ -582,12 +600,25 @@ module Navi
 					end
 				end
 				ss_forward += temp
-			end
-
+      end
+      s_forward.uniq!
 #						STDERR.puts "ss_forward: #{ss_forward.join(' ')}"
 
 # backward expansion
 			tar_steps = []
+
+      # 井上修論にないが，全部完了したサブツリーのルートノードを加える
+      s_done = []
+      for ss in ss_done do
+        s_done << recipe.getByID(ss,'substep').parent
+      end
+      s_done.uniq!
+      s_done_ids = s_done.map{|v|v.id.to_s}
+      for step in s_done
+        children = step['child'].split(/\s+/)
+        tar_steps << step if (s_done_ids - children).size == s_done_ids.size
+      end
+
 			for ss_id in ssready do
 				step = recipe.getByID(ss_id).parent
 				tar_steps << step
